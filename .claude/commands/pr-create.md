@@ -126,7 +126,7 @@ Based on the issue labels and commit content, recommend applicable labels:
 | `security`        | Security-related fixes or improvements |
 | `breaking-change` | Changes that break existing behavior   |
 | `dependencies`    | Dependency updates                     |
-| `pandoc-blocks`   | Block recognition changes              |
+| `pandoc-syntax`   | Syntax recognition changes             |
 | `prettier-plugin` | Plugin changes                         |
 
 If the related issue has labels, prefer to match them.

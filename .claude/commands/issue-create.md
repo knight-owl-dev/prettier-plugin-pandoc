@@ -45,7 +45,7 @@ Based on the description, recommend applicable labels from this list:
 | `security`         | Security-related fixes or improvements         |
 | `breaking-change`  | Changes that break existing behavior           |
 | `dependencies`     | Dependency updates                             |
-| `pandoc-blocks`    | Block recognition changes                      |
+| `pandoc-syntax`    | Syntax recognition changes                     |
 | `prettier-plugin`  | Plugin changes                                 |
 | `good-first-issue` | Simple issues suitable for newcomers           |
 | `help-wanted`      | Issues needing extra attention or expertise    |

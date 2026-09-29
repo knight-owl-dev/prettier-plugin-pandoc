@@ -11,7 +11,7 @@ Status: pre-release. Nothing is published yet.
 | Package | What it is |
 | --- | --- |
 | [`@knight-owl-dev/prettier-plugin-pandoc`](packages/prettier-plugin-pandoc) | The prettier plugin |
-| [`@knight-owl-dev/pandoc-blocks`](packages/pandoc-blocks) | Where Pandoc's blocks begin and end; no prettier dependency |
+| [`@knight-owl-dev/pandoc-syntax`](packages/pandoc-syntax) | Where Pandoc's constructs begin and end; no prettier dependency |
 
 ## Constructs
 

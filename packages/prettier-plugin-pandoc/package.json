@@ -9,7 +9,7 @@
     "src"
   ],
   "dependencies": {
-    "@knight-owl-dev/pandoc-blocks": "0.0.0"
+    "@knight-owl-dev/pandoc-syntax": "0.0.0"
   },
   "peerDependencies": {
     "prettier": "^3"

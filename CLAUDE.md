@@ -21,7 +21,7 @@ the host.
   formatted file as it read the source, soft breaks aside — not when the output
   looks right. Add a corpus file per construct; a construct not handled yet
   stays in the oracle's `TODO` set so it runs.
-- **`pandoc-blocks` imports no prettier.** It is the one answer to where a
+- **`pandoc-syntax` imports no prettier.** It is the one answer to where a
   Pandoc block starts, for a linter and a language server as much as for the
   plugin; a printer concern belongs in the plugin.
 - **A fence is only markup where a block may start.** After a paragraph or

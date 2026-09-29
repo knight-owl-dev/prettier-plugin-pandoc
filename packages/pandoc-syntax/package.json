@@ -1,7 +1,7 @@
 {
-  "name": "@knight-owl-dev/pandoc-blocks",
+  "name": "@knight-owl-dev/pandoc-syntax",
   "version": "0.0.0",
-  "description": "Where Pandoc's markdown blocks begin and end, by Pandoc's block rules",
+  "description": "Where Pandoc's markdown constructs begin and end, by Pandoc's own rules",
   "license": "MIT",
   "type": "module",
   "exports": "./src/index.js",
@@ -11,6 +11,6 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/knight-owl-dev/prettier-plugin-pandoc.git",
-    "directory": "packages/pandoc-blocks"
+    "directory": "packages/pandoc-syntax"
   }
 }

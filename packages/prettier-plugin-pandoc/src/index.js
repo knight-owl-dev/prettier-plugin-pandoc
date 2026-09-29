@@ -4,7 +4,7 @@
 // constructs into the paragraph around them. This plugin keeps prettier's own
 // parser and printer, and settles only the block boundaries:
 //
-//   1. @knight-owl-dev/pandoc-blocks finds each block by Pandoc's rules.
+//   1. @knight-owl-dev/pandoc-syntax finds each block by Pandoc's rules.
 //   2. Each block is masked in place, so every offset stays true to the source
 //      and the stock parser sees the block break Pandoc sees there. A div's
 //      fence lines blank to spaces. A verbatim block's lines — raw TeX, verse,
@@ -18,7 +18,7 @@
 // Preserve, never repair: markup Pandoc reads as broken stays as written,
 // since repairing it would change what the document means.
 
-import { blocks } from '@knight-owl-dev/pandoc-blocks';
+import { blocks } from '@knight-owl-dev/pandoc-syntax';
 import { doc } from 'prettier';
 import * as markdown from 'prettier/plugins/markdown';
 
