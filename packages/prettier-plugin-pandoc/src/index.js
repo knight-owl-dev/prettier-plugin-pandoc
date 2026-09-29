@@ -113,16 +113,16 @@ function mask(text, divs, verbatimBlocks, inlineRaw) {
       .flatMap((div) => [div.open, div.close])
       .filter((span) => span !== null)
       .map((span) => ({ ...span, fill: (length) => ' '.repeat(length) })),
-    ...verbatimBlocks.flatMap((raw) => {
-      const lines = [];
-      for (let at = raw.start; at < raw.end; at = lineEnd(text, at) + 1) {
-        const end = Math.min(lineEnd(text, at), raw.end);
-        if (end > at) {
-          lines.push({ start: at, end, fill: (n) => `#${' '.repeat(n - 1)}` });
-        }
-      }
-      return lines;
-    }),
+    // Line by line, by the recognizer's segments: inside a container those
+    // stop short of its prefix, which stays for the stock parser to read.
+    ...verbatimBlocks.flatMap((block) =>
+      block.segments
+        .filter((segment) => segment.end > segment.start)
+        .map((segment) => ({
+          ...segment,
+          fill: (n) => `#${' '.repeat(n - 1)}`,
+        })),
+    ),
     ...inlineRaw.map((span) => ({
       ...span,
       fill: (n) => `\`${'x'.repeat(n - 2)}\``,
@@ -139,26 +139,28 @@ function mask(text, divs, verbatimBlocks, inlineRaw) {
 }
 
 // Replace the headings each verbatim mask produced with the source they stand
-// for. A mid-line end leaves text the heading swallowed; it is kept as written,
-// the whole line with it.
+// for: the segments' text, a container's prefixes left out for its printer to
+// write again. A mid-line end leaves text the heading swallowed; it is kept as
+// written, the rest of the line with it.
 function restoreVerbatim(children, verbatimBlocks, text) {
   const out = [];
   let i = 0;
-  for (const raw of verbatimBlocks) {
-    const end = lineEnd(text, raw.end);
+  for (const block of verbatimBlocks) {
+    const end = lineEnd(text, block.end);
     while (
       i < children.length &&
-      children[i].position.start.offset < raw.start
+      children[i].position.start.offset < block.start
     ) {
       out.push(children[i++]);
     }
     while (i < children.length && children[i].position.start.offset < end) {
       i++;
     }
+    const lines = block.segments.map((s) => text.slice(s.start, s.end));
     out.push({
       type: 'pandocVerbatim',
-      value: text.slice(raw.start, end),
-      position: { start: { offset: raw.start }, end: { offset: end } },
+      value: lines.join('\n') + text.slice(block.end, end),
+      position: { start: { offset: block.start }, end: { offset: end } },
     });
   }
   while (i < children.length) out.push(children[i++]);
@@ -183,23 +185,146 @@ function restoreInline(node, starts, text) {
   return node;
 }
 
+const CONTAINER_NODE = { 'block-quote': 'blockquote', 'list-item': 'listItem' };
+const isContainer = (block) => CONTAINER_NODE[block.type] !== undefined;
+const within = (inner, outer) =>
+  inner !== outer && inner.start >= outer.start && inner.end <= outer.end;
+const startOf = (block) =>
+  block.type === 'div' ? block.open.start : block.start;
+
+// Every node of prettier's tree that holds blocks of its own, by type.
+function containerNodes(node, out = []) {
+  if (node.type === 'blockquote' || node.type === 'listItem') out.push(node);
+  for (const child of node.children ?? []) containerNodes(child, out);
+  return out;
+}
+
+// The first container prettier's parser bounds where Pandoc does not, or
+// undefined. CommonMark continues a container lazily only into paragraph
+// text; Pandoc collects its text first, so after a heading or a fence the two
+// part. Each is found by where its marker sits. Their ends agree when all that
+// lies between them is what the masks blanked, a quote's bare `>` included.
+function firstMisread(containers, ast, text, masked) {
+  const nodes = containerNodes(ast);
+  return containers.find((container) => {
+    const marker =
+      container.start + /^[ \t]*/.exec(text.slice(container.start))[0].length;
+    const node = nodes.find(
+      (n) =>
+        n.type === CONTAINER_NODE[container.type] &&
+        n.position.start.offset === marker,
+    );
+    if (node === undefined) return true;
+    const end = node.position.end.offset;
+    return (
+      end > container.end || !/^[\s>]*$/.test(masked.slice(end, container.end))
+    );
+  });
+}
+
+// The top-level stretch of the document a misread container sits in: its
+// outermost container, and for a list item the whole list, as far as items
+// follow one another. It prints as written, since no smaller piece of it
+// reads the same to both parsers.
+function stretchOf(container, containers, text) {
+  const outermost = containers.find(
+    (c) =>
+      !containers.some((o) => within(c, o)) &&
+      (c === container || within(container, c)),
+  );
+  const top = containers.filter((c) => !containers.some((o) => within(c, o)));
+  let { start, end } = outermost;
+  if (outermost.type === 'list-item') {
+    const i = top.indexOf(outermost);
+    const gap = (a, b) => /^\s*$/.test(text.slice(a.end, b.start));
+    for (
+      let k = i;
+      k > 0 && top[k - 1].type === 'list-item' && gap(top[k - 1], top[k]);
+      k--
+    ) {
+      start = top[k - 1].start;
+    }
+    for (
+      let k = i;
+      k + 1 < top.length &&
+      top[k + 1].type === 'list-item' &&
+      gap(top[k], top[k + 1]);
+      k++
+    ) {
+      end = top[k + 1].end;
+    }
+  }
+  const segments = [];
+  for (let at = start; at <= end; at = lineEnd(text, at) + 1) {
+    segments.push({ start: at, end: Math.min(lineEnd(text, at), end) });
+  }
+  return { type: 'verbatim', start, end, segments };
+}
+
+// Settle each construct in the node of prettier's tree that holds it: the
+// innermost container around it, or the root.
+function settle(ast, divs, verbatimBlocks, text) {
+  const nodes = containerNodes(ast);
+  const holder = (offset) =>
+    nodes
+      .filter(
+        (n) =>
+          n.position.start.offset <= offset && offset < n.position.end.offset,
+      )
+      .reduce(
+        (inner, n) =>
+          inner === ast ||
+          n.position.start.offset >= inner.position.start.offset
+            ? n
+            : inner,
+        ast,
+      );
+  for (const node of [ast, ...nodes]) {
+    const held = (block) => holder(startOf(block)) === node;
+    node.children = fold(
+      restoreVerbatim(node.children, verbatimBlocks.filter(held), text),
+      divs.filter(held),
+      text,
+    );
+  }
+}
+
 async function parse(text, options) {
   const found = blocks(text);
-  const divs = found.filter((block) => block.type === 'div');
-  const verbatimBlocks = found.filter((block) => VERBATIM.has(block.type));
-  const inlineRaw = inlines(text, found).filter((span) => maskable(text, span));
-  const masked = mask(text, divs, verbatimBlocks, inlineRaw);
-  const ast = await base.parse(masked, options);
+  let containers = found.filter(isContainer);
+  let verbatimBlocks = found.filter((block) => VERBATIM.has(block.type));
+  let divs = found.filter((block) => block.type === 'div');
+  let inlineRaw = inlines(text, found).filter((span) => maskable(text, span));
+
+  // One misread shifts every container after it, so each is settled before
+  // the next is judged: the earliest printed as written, the rest parsed again.
+  let masked = mask(text, divs, verbatimBlocks, inlineRaw);
+  let ast = await base.parse(masked, options);
+  for (
+    let wrong = firstMisread(containers, ast, text, masked);
+    wrong !== undefined;
+    wrong = firstMisread(containers, ast, text, masked)
+  ) {
+    const stretch = stretchOf(wrong, containers, text);
+    // What the stretch holds is its to print; masks inside it would overlap.
+    const outside = (block) =>
+      startOf(block) < stretch.start || startOf(block) > stretch.end;
+    verbatimBlocks = [...verbatimBlocks.filter(outside), stretch].sort(
+      (a, b) => a.start - b.start,
+    );
+    divs = divs.filter(outside);
+    inlineRaw = inlineRaw.filter(outside);
+    containers = containers.filter(outside);
+    masked = mask(text, divs, verbatimBlocks, inlineRaw);
+    ast = await base.parse(masked, options);
+  }
+
   restoreInline(
     ast,
     new Map(inlineRaw.map((span) => [span.start, span])),
     text,
   );
-  ast.children = fold(
-    restoreVerbatim(ast.children, verbatimBlocks, text),
-    divs,
-    text,
-  );
+  settle(ast, divs, verbatimBlocks, text);
   return ast;
 }
 
@@ -262,9 +387,12 @@ function print(path, options, print) {
     const triple = printTripleRun(path, options, print);
     if (triple !== null) return triple;
   }
-  if (node.type === 'pandocVerbatim' || node.type === 'pandocInlineRaw') {
-    return replaceEndOfLine(node.value);
+  // Marked as root, a verbatim block's lines keep the container they sit in:
+  // a quote's `>`, a list item's indentation.
+  if (node.type === 'pandocVerbatim') {
+    return markAsRoot(replaceEndOfLine(node.value, literalline));
   }
+  if (node.type === 'pandocInlineRaw') return replaceEndOfLine(node.value);
   if (node.type !== 'pandocDiv') return mdast.print(path, options, print);
 
   // An unclosed div prints no close: adding one would repair it.

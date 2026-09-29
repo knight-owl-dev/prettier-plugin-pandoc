@@ -27,6 +27,8 @@ Status: pre-release. Nothing is published yet.
 | Fancy lists (`a.`, `i.`, `#.`, `(a)`, `1)`) | Handled, verbatim |
 | Inline raw TeX (`\footnote{…}`) | Handled |
 
+Each holds inside block quotes and list items as at the top level: Pandoc collects a container's text before parsing it, and so does the recognizer.
+
 ## Preserve, never repair
 
 Markup Pandoc reads as broken stays as written. A fence a paragraph continues into is that paragraph's text to Pandoc, and an unclosed div runs to the end of the document; the plugin prints both as it finds them, since repairing either would change what the document means.

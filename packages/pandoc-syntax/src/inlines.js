@@ -12,10 +12,13 @@ import { blocks } from './blocks.js';
 const LETTER = /[A-Za-z]/;
 const SPACE = /[ \t]/;
 
-// Where markdown is not read: every block but a div's body, whose fence lines
-// are markup of their own.
+// Where markdown is not read: every block but a container or a div's body,
+// whose fence lines are markup of their own.
+const CONTAINERS = new Set(['block-quote', 'list-item']);
+
 function opaqueSpans(found) {
   return found
+    .filter((block) => !CONTAINERS.has(block.type))
     .flatMap((block) =>
       block.type === 'div'
         ? [block.open, block.close].filter((span) => span !== null)

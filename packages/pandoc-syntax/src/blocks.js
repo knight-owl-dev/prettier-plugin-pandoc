@@ -249,16 +249,135 @@ function lineBlockEnd(lines, at) {
   return n;
 }
 
-// Consecutive raw TeX lines are one block to Pandoc.
+// Consecutive raw TeX lines are one block to Pandoc. Adjacency is by line:
+// inside a container, one line's content does not start where the last ended.
 function mergeAdjacent(raws) {
   const out = [];
   for (const raw of raws) {
     const last = out.at(-1);
-    if (last !== undefined && raw.start === last.end + 1) last.end = raw.end;
-    else out.push(raw);
+    if (last !== undefined && raw.from === last.to + 1) {
+      last.end = raw.end;
+      last.to = raw.to;
+    } else {
+      out.push(raw);
+    }
   }
   return out;
 }
+
+// Each line's share of a span from `start` on line `from` to `end` on line
+// `to`: what a caller masks, line by line, without touching a container's
+// prefix between them.
+const segmentsOf = (lines, from, to, start, end) =>
+  lines.slice(from, to + 1).map((line, k) => ({
+    start: k === 0 ? start : line.start,
+    end: k === to - from ? end : line.end,
+  }));
+
+// The column a line's text starts at, a tab advancing to the next stop of four.
+function indentOf(text) {
+  let col = 0;
+  for (const c of text) {
+    if (c === ' ') col++;
+    else if (c === '\t') col += 4 - (col % 4);
+    else break;
+  }
+  return col;
+}
+
+// A line with up to `cols` columns of its indentation removed: the view a
+// container's content is read through. `start` moves with it, so offsets into
+// the view stay offsets into the source.
+function dedent(line, cols) {
+  let col = 0;
+  let i = 0;
+  while (i < line.text.length && col < cols) {
+    const c = line.text[i];
+    if (c === ' ') col++;
+    else if (c === '\t') col += 4 - (col % 4);
+    else break;
+    i++;
+  }
+  return { start: line.start + i, end: line.end, text: line.text.slice(i) };
+}
+
+const QUOTE_MARKER = /^ {0,3}> ?/;
+const BULLET_ITEM = /^( {0,3})([-*+])([ \t]+|$)/;
+const PLAIN_ITEM = /^( {0,3})(\d{1,9}\.)([ \t]+|$)/;
+
+// The block quote opening on line `at`: every line up to a blank one, a `>`
+// stripped where there is one. A line without is lazy, taken as it stands —
+// Pandoc collects the quote's text first and parses it after, so laziness
+// follows the text and not what the line continues. Inside a div, a closing
+// fence is the div's, never a lazy line.
+function collectQuote(lines, at, inDiv) {
+  const content = [];
+  let n = at;
+  for (; n < lines.length && !BLANK.test(lines[n].text); n++) {
+    const marker = QUOTE_MARKER.exec(lines[n].text);
+    if (marker === null && inDiv && DIV_CLOSE.test(lines[n].text)) break;
+    content.push(
+      marker === null
+        ? { ...lines[n], lazy: true }
+        : {
+            start: lines[n].start + marker[0].length,
+            end: lines[n].end,
+            text: lines[n].text.slice(marker[0].length),
+          },
+    );
+  }
+  return { last: n - 1, content };
+}
+
+// The list item opening on line `at`. Its content column is where the text
+// after the marker starts. Straight after a content line, any line continues
+// the item except a list marker left of that column, which opens the next one;
+// past a blank line, only a line indented to the column does. Blank lines the
+// item ends on belong to what follows, and inside a div, so does a closing
+// fence.
+function collectItem(lines, at, marker, inDiv) {
+  const [prefix, indent, bullet, gap] = marker;
+  const after = lines[at].text.slice(prefix.length);
+  // Five spaces or more after a marker is an indented code block with one space
+  // of gap; no text after it puts the column one past the marker.
+  const width = BLANK.test(after) || indentOf(gap) >= 5 ? 1 : indentOf(gap);
+  const column = indent.length + bullet.length + width;
+  const first = indent.length + bullet.length + Math.min(width, gap.length);
+  const content = [
+    {
+      start: lines[at].start + first,
+      end: lines[at].end,
+      text: lines[at].text.slice(first),
+    },
+  ];
+  let last = at;
+  for (let n = at + 1; n < lines.length; n++) {
+    const line = lines[n];
+    if (BLANK.test(line.text)) continue;
+    const blankBefore = n > last + 1;
+    const indent = indentOf(line.text);
+    if (indent >= column) {
+      // Blank lines between content lines are the item's own.
+      for (let b = last + 1; b < n; b++) content.push(dedent(lines[b], column));
+      content.push(dedent(line, column));
+    } else if (blankBefore) {
+      break;
+    } else if (
+      isListMarker(line.text) ||
+      THEMATIC_BREAK.test(line.text) ||
+      (inDiv && DIV_CLOSE.test(line.text))
+    ) {
+      break;
+    } else {
+      content.push({ ...dedent(line, indent), lazy: true });
+    }
+    last = n;
+  }
+  return { last, content };
+}
+
+const isListMarker = (text) =>
+  BULLET_ITEM.test(text) || PLAIN_ITEM.test(text) || isOrderedItem(text);
 
 // A block that runs on: whether this line is still inside it. A block closed
 // by its own last line reports `ends`; one that ends before this line reports
@@ -304,6 +423,12 @@ function within(state, line) {
  * Code blocks, HTML comments and YAML metadata are reported too: Pandoc reads
  * no markdown inside them, which a caller scanning for inline syntax needs.
  *
+ * Block quotes and list items are containers: Pandoc collects each one's text
+ * and parses it as a document of its own, so everything above holds inside
+ * them too. A container is reported with the lines it holds, lazy ones marked.
+ * Every span but a div's carries `segments`, its share of each line it covers;
+ * inside a container those stop short of the prefix.
+ *
  * @param {string} text Pandoc markdown.
  * @returns {({
  *   type: 'div',
@@ -321,31 +446,53 @@ function within(state, line) {
  *     | 'fancy-list'
  *     | 'code-block'
  *     | 'html-comment'
- *     | 'yaml-metadata',
+ *     | 'yaml-metadata'
+ *     | 'block-quote'
+ *     | 'list-item',
  *   start: number,
  *   end: number,
+ *   segments: {start: number, end: number}[],
+ *   lines?: {start: number, end: number, lazy: boolean}[],
  * })[]} Offsets, a line's newline excluded.
  */
 export function blocks(text) {
-  const divs = [];
+  const out = [];
+  scan(splitLines(text), text, out, 0);
+  const start = (block) =>
+    block.type === 'div' ? block.open.start : block.start;
+  return out.sort((a, b) => start(a) - start(b));
+}
+
+// One document's lines, top level or a container's content, read by the block
+// rules into `out`. A line's `start` is where its text begins in the source,
+// so every offset found here is a source offset. `divs` counts the divs open
+// around this document, whose closing fence ends a container inside them.
+function scan(lines, text, out, divs) {
   const raws = [];
-  const verses = [];
-  const tables = [];
-  const lists = [];
+  const open = [];
+  let state = START;
+
+  // A span from `start` on line `from` to `end` on line `to`, with its share of
+  // each line.
+  const push = (type, from, to, start, end) =>
+    out.push({
+      type,
+      start,
+      end,
+      segments: segmentsOf(lines, from, to, start, end),
+    });
+  const whole = (type, from, to) =>
+    push(type, from, to, lines[from].start, lines[to].end);
+
   // Blocks Pandoc reads no markdown inside, reported so a caller scanning for
   // inline syntax can pass over them.
-  const opaque = [];
   const OPAQUE_TYPE = {
     code: 'code-block',
     indented: 'code-block',
     comment: 'html-comment',
     yaml: 'yaml-metadata',
   };
-  const close = (state, end) =>
-    opaque.push({ type: OPAQUE_TYPE[state.kind], start: state.start, end });
-  const open = [];
-  const lines = splitLines(text);
-  let state = START;
+  const close = (state, to) => whole(OPAQUE_TYPE[state.kind], state.from, to);
 
   for (const [n, line] of lines.entries()) {
     const t = line.text;
@@ -364,31 +511,37 @@ export function blocks(text) {
     if (state.kind !== 'start' && state.kind !== 'paragraph') {
       const where = within(state, t);
       if (where === 'inside') {
-        if (!BLANK.test(t)) state.last = line.end;
+        if (!BLANK.test(t)) state.to = n;
         continue;
       }
       // An indented block ends at its last non-blank line; the rest end on
-      // the line that closes them.
-      close(state, where === 'ends' ? line.end : state.last);
+      // the line that closes them. A pipe table is prettier's to print.
+      if (OPAQUE_TYPE[state.kind] !== undefined) {
+        close(state, where === 'ends' ? n : state.to);
+      }
       state = START;
       if (where === 'ends') continue;
     }
 
+    const skipTo = (last, end = lines[last].end) => {
+      state = last === n ? START : { kind: 'skip', line: last, end };
+    };
+
     if (BLANK.test(t)) {
       state = START;
     } else if (open.length > 0 && DIV_CLOSE.test(t)) {
-      divs.push({ type: 'div', open: open.pop(), close: span });
+      out.push({ type: 'div', open: open.pop(), close: span });
       state = START;
     } else if (CODE_FENCE.test(t)) {
       // Fenced code and raw TeX environments interrupt a paragraph.
-      state = {
-        kind: 'code',
-        marker: CODE_FENCE.exec(t)[1],
-        start: line.start,
-        last: line.end,
-      };
+      state = { kind: 'code', marker: CODE_FENCE.exec(t)[1], from: n, to: n };
     } else if (texClose !== null) {
-      raws.push({ type: 'raw-tex', start: line.start, end: texClose.end });
+      raws.push({
+        from: n,
+        to: texClose.line,
+        start: line.start,
+        end: texClose.end,
+      });
       if (texClose.line === n) {
         const tail = text.slice(texClose.end, line.end);
         state = BLANK.test(tail) ? START : paragraph();
@@ -409,60 +562,68 @@ export function blocks(text) {
         ? ['example-list', resumesExampleList]
         : ['definition-list', resumesDefinitionList];
       const last = listEnd(lines, n, resumes);
-      const end = lines[last].end;
-      lists.push({ type, start: line.start, end });
-      state = last === n ? START : { kind: 'skip', line: last, end };
+      whole(type, n, last);
+      skipTo(last);
     } else if (
       isOrderedItem(t) &&
       hasFancyMarker(lines, n, listEnd(lines, n, resumesOrderedList))
     ) {
       const last = listEnd(lines, n, resumesOrderedList);
-      const end = lines[last].end;
-      lists.push({ type: 'fancy-list', start: line.start, end });
-      state = last === n ? START : { kind: 'skip', line: last, end };
+      whole('fancy-list', n, last);
+      skipTo(last);
     } else if (!opensYaml(lines, n) && tableAt(lines, n) !== null) {
       const table = tableAt(lines, n);
-      const end = lines[table.last].end;
-      tables.push({ type: table.type, start: line.start, end });
-      state =
-        table.last === n ? START : { kind: 'skip', line: table.last, end };
+      whole(table.type, n, table.last);
+      skipTo(table.last);
     } else if (
       LINE_BLOCK_LINE.test(t) &&
       !TABLE_SEPARATOR.test(lines[n + 1]?.text ?? '')
     ) {
       // A bar line over a separator row is a pipe table's header instead.
       const last = lineBlockEnd(lines, n);
-      verses.push({
-        type: 'line-block',
-        start: line.start,
-        end: lines[last].end,
-      });
-      state =
-        last === n ? START : { kind: 'skip', line: last, end: lines[last].end };
+      whole('line-block', n, last);
+      skipTo(last);
     } else if (TEX_LINE.test(t)) {
       const end = line.start + TEX_LINE.exec(t)[1].length;
-      raws.push({ type: 'raw-tex', start: line.start, end });
+      raws.push({ from: n, to: n, start: line.start, end });
       if (!BLANK.test(text.slice(end, line.end))) state = paragraph();
+    } else if (
+      QUOTE_MARKER.test(t) ||
+      (!THEMATIC_BREAK.test(t) && (BULLET_ITEM.test(t) || PLAIN_ITEM.test(t)))
+    ) {
+      // A container: its content is read as a document of its own.
+      const marker = BULLET_ITEM.exec(t) ?? PLAIN_ITEM.exec(t);
+      const quote = QUOTE_MARKER.test(t);
+      const inDiv = divs + open.length > 0;
+      const { last, content } = quote
+        ? collectQuote(lines, n, inDiv)
+        : collectItem(lines, n, marker, inDiv);
+      out.push({
+        type: quote ? 'block-quote' : 'list-item',
+        start: line.start,
+        end: lines[last].end,
+        segments: segmentsOf(lines, n, last, line.start, lines[last].end),
+        lines: content.map((c) => ({
+          start: c.start,
+          end: c.end,
+          lazy: c.lazy === true,
+        })),
+      });
+      scan(content, text, out, divs + open.length);
+      skipTo(last);
     } else {
       state = opened(lines, n);
       if (HTML_COMMENT.test(t) && state === START) {
-        opaque.push({ type: 'html-comment', start: line.start, end: line.end });
+        whole('html-comment', n, n);
       } else if (OPAQUE_TYPE[state.kind] !== undefined) {
-        state = { ...state, start: line.start, last: line.end };
+        state = { ...state, from: n, to: n };
       }
     }
   }
   // A code fence or comment never closed runs to the end of the document.
-  if (OPAQUE_TYPE[state.kind] !== undefined) close(state, state.last);
-  for (const span of open) divs.push({ type: 'div', open: span, close: null });
-  const start = (block) =>
-    block.type === 'div' ? block.open.start : block.start;
-  return [
-    ...divs,
-    ...mergeAdjacent(raws),
-    ...verses,
-    ...tables,
-    ...lists,
-    ...opaque,
-  ].sort((a, b) => start(a) - start(b));
+  if (OPAQUE_TYPE[state.kind] !== undefined) close(state, state.to);
+  for (const span of open) out.push({ type: 'div', open: span, close: null });
+  for (const raw of mergeAdjacent(raws)) {
+    push('raw-tex', raw.from, raw.to, raw.start, raw.end);
+  }
 }

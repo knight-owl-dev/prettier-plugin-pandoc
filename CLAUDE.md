@@ -35,6 +35,11 @@ the host.
   it is overwritten with is chosen for the block CommonMark must see there:
   spaces for a div fence, `#` for each raw TeX line — an indented tail would
   otherwise read as code.
+- **Containers are collected, then read.** Pandoc takes every non-blank line
+  after a quote or item into it, then parses the text as a document of its
+  own; CommonMark decides line by line, and continues lazily only into a
+  paragraph. Where their extents part, the plugin prints the container as
+  written — decided by comparing prettier's tree, never predicted.
 - **Stock prettier trims code blocks.** Its line breaks drop trailing
   whitespace, which in a sample is a hard break shown; the plugin prints code
   through literal lines instead. The oracle runs both embedded settings, since
