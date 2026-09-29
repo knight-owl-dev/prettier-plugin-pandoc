@@ -31,8 +31,11 @@ const BASE = {
   parser: 'markdown',
   plugins: [plugin],
   proseWrap: 'always',
-  printWidth: 80,
 };
+
+// Block rules do not depend on width, and the sweep is what shows it: a narrow
+// width wraps the most, so it lands the most words at the start of a line.
+const WIDTHS = [40, 80, 120];
 
 // Both ways a fenced sample can be printed: reformatted by its tag, or left to
 // the markdown printer, which strips its trailing whitespace.
@@ -53,9 +56,15 @@ function pandoc(text) {
 for (const name of readdirSync(CORPUS).filter((f) => f.endsWith('.md'))) {
   const text = readFileSync(new URL(name, CORPUS), 'utf8');
 
-  for (const embedded of EMBEDDED) {
-    const options = { ...BASE, embeddedLanguageFormatting: embedded };
-    const label = `${name} (embedded ${embedded})`;
+  for (const [printWidth, embedded] of WIDTHS.flatMap((width) =>
+    EMBEDDED.map((setting) => [width, setting]),
+  )) {
+    const options = {
+      ...BASE,
+      printWidth,
+      embeddedLanguageFormatting: embedded,
+    };
+    const label = `${name} (width ${printWidth}, embedded ${embedded})`;
     const todo = TODO.has(name) || TODO.has(`${name}:${embedded}`);
 
     test(`${label}: Pandoc reads the formatted file as the source`, {
