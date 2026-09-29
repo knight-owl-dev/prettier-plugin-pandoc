@@ -7,10 +7,10 @@
 //   1. @knight-owl-dev/pandoc-blocks finds each block by Pandoc's rules.
 //   2. Each block is masked in place, so every offset stays true to the source
 //      and the stock parser sees the block break Pandoc sees there. A div's
-//      fence lines blank to spaces. Raw TeX lines each become `#` and spaces:
-//      an ATX heading ends on its own line and interrupts a paragraph, as raw
-//      TeX does, and text after a mid-line end stays out of an indented code
-//      block, where blanking would put it.
+//      fence lines blank to spaces. A verbatim block's lines — raw TeX, verse
+//      — each become `#` and spaces: an ATX heading ends on its own line and
+//      interrupts a paragraph, as raw TeX does, and text after a mid-line end
+//      stays out of an indented code block, where blanking would put it.
 //   3. The nodes a block spans are replaced by a node of this plugin's own,
 //      which the wrapped printer prints; every other node prints as stock.
 //
@@ -80,13 +80,13 @@ const lineEnd = (text, at) => {
 
 // Offsets are UTF-16 code units, as the stock parser counts them, so the mask
 // is spliced by slice rather than by spreading the string into code points.
-function mask(text, divs, raws) {
+function mask(text, divs, verbatimBlocks) {
   const edits = [
     ...divs
       .flatMap((div) => [div.open, div.close])
       .filter((span) => span !== null)
       .map((span) => ({ ...span, fill: (length) => ' '.repeat(length) })),
-    ...raws.flatMap((raw) => {
+    ...verbatimBlocks.flatMap((raw) => {
       const lines = [];
       for (let at = raw.start; at < raw.end; at = lineEnd(text, at) + 1) {
         const end = Math.min(lineEnd(text, at), raw.end);
@@ -107,13 +107,13 @@ function mask(text, divs, raws) {
   return out + text.slice(at);
 }
 
-// Replace the headings each raw TeX mask produced with the source they stand
+// Replace the headings each verbatim mask produced with the source they stand
 // for. A mid-line end leaves text the heading swallowed; it is kept as written,
 // the whole line with it.
-function restoreRaw(children, raws, text) {
+function restoreVerbatim(children, verbatimBlocks, text) {
   const out = [];
   let i = 0;
-  for (const raw of raws) {
+  for (const raw of verbatimBlocks) {
     const end = lineEnd(text, raw.end);
     while (
       i < children.length &&
@@ -125,7 +125,7 @@ function restoreRaw(children, raws, text) {
       i++;
     }
     out.push({
-      type: 'pandocRaw',
+      type: 'pandocVerbatim',
       value: text.slice(raw.start, end),
       position: { start: { offset: raw.start }, end: { offset: end } },
     });
@@ -137,15 +137,23 @@ function restoreRaw(children, raws, text) {
 async function parse(text, options) {
   const found = blocks(text);
   const divs = found.filter((block) => block.type === 'div');
-  const raws = found.filter((block) => block.type === 'raw-tex');
-  const ast = await base.parse(mask(text, divs, raws), options);
-  ast.children = fold(restoreRaw(ast.children, raws, text), divs, text);
+  // Printed as written: raw TeX is another language's source, and verse is
+  // its line breaks.
+  const verbatimBlocks = found.filter(
+    (block) => block.type === 'raw-tex' || block.type === 'line-block',
+  );
+  const ast = await base.parse(mask(text, divs, verbatimBlocks), options);
+  ast.children = fold(
+    restoreVerbatim(ast.children, verbatimBlocks, text),
+    divs,
+    text,
+  );
   return ast;
 }
 
 function print(path, options, print) {
   const node = path.node;
-  if (node.type === 'pandocRaw') return replaceEndOfLine(node.value);
+  if (node.type === 'pandocVerbatim') return replaceEndOfLine(node.value);
   if (node.type !== 'pandocDiv') return mdast.print(path, options, print);
 
   // An unclosed div prints no close: adding one would repair it.
@@ -158,8 +166,8 @@ function print(path, options, print) {
 }
 
 // The embed pass walks the tree, so each node of this plugin's own names its
-// children: a div has some, raw TeX is a leaf.
-const VISITOR_KEYS = { pandocDiv: ['children'], pandocRaw: [] };
+// children: a div has some, a verbatim block is a leaf.
+const VISITOR_KEYS = { pandocDiv: ['children'], pandocVerbatim: [] };
 
 function getVisitorKeys(node, nonTraversableKeys) {
   return (

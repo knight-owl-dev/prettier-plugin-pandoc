@@ -35,6 +35,10 @@ const YAML_FENCE = /^---[ \t]*$/;
 const YAML_END = /^(---|\.\.\.)[ \t]*$/;
 const TABLE_SEPARATOR =
   /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+// A line block opens on a bar in the first column followed by a space or the
+// end of the line; a line starting with a space continues the verse line above.
+const LINE_BLOCK_LINE = /^\|( |$)/;
+const LINE_BLOCK_CONTINUATION = /^ +\S/;
 const LINK_REFERENCE = /^ {0,3}\[[^\]^][^\]]*\]:[ \t]*\S/;
 
 // Where the line before left the reader. START: the next line may open any
@@ -89,10 +93,12 @@ function opened(lines, at) {
     return { kind: 'yaml' };
   }
   if (INDENTED.test(line)) return { kind: 'indented' };
-  if (/^[ \t]*\|/.test(line)) {
-    return next !== undefined && TABLE_SEPARATOR.test(next)
-      ? { kind: 'table' }
-      : { kind: 'line-block' };
+  if (
+    /^[ \t]*\|/.test(line) &&
+    next !== undefined &&
+    TABLE_SEPARATOR.test(next)
+  ) {
+    return { kind: 'table' };
   }
   return paragraph();
 }
@@ -115,6 +121,21 @@ function texEnd(lines, at, env) {
     }
   }
   return null;
+}
+
+// The last line of the line block opening on line `at`. It ends at the first
+// line that is neither verse nor its continuation, and what follows starts a
+// block of its own.
+function lineBlockEnd(lines, at) {
+  let n = at;
+  while (
+    n + 1 < lines.length &&
+    (LINE_BLOCK_LINE.test(lines[n + 1].text) ||
+      LINE_BLOCK_CONTINUATION.test(lines[n + 1].text))
+  ) {
+    n++;
+  }
+  return n;
 }
 
 // Consecutive raw TeX lines are one block to Pandoc.
@@ -143,15 +164,13 @@ function within(state, line) {
       return BLANK.test(line) || INDENTED.test(line) ? 'inside' : 'after';
     case 'table':
       return /^[ \t]*\|/.test(line) ? 'inside' : 'after';
-    case 'line-block':
-      return /^[ \t]*\|/.test(line) || /^ +\S/.test(line) ? 'inside' : 'after';
     default:
       return 'after';
   }
 }
 
 /**
- * Find every fenced div and raw TeX block, in source order.
+ * Find every fenced div, raw TeX block and line block, in source order.
  *
  * A div's close needs no block start: Pandoc ends the paragraph a closing fence
  * interrupts. A div never closed runs to the end of the document, as Pandoc
@@ -162,13 +181,16 @@ function within(state, line) {
  * characters Pandoc keeps raw: an environment can end mid-line, and what
  * follows is a paragraph.
  *
+ * A line block runs from its first verse line to its last, continuations
+ * included.
+ *
  * @param {string} text Pandoc markdown.
  * @returns {({
  *   type: 'div',
  *   open: {start: number, end: number},
  *   close: {start: number, end: number} | null,
  * } | {
- *   type: 'raw-tex',
+ *   type: 'raw-tex' | 'line-block',
  *   start: number,
  *   end: number,
  * })[]} Offsets, a line's newline excluded.
@@ -176,6 +198,7 @@ function within(state, line) {
 export function blocks(text) {
   const divs = [];
   const raws = [];
+  const verses = [];
   const open = [];
   const lines = splitLines(text);
   let state = START;
@@ -186,7 +209,8 @@ export function blocks(text) {
     const env = TEX_BEGIN.exec(t)?.[1];
     const texClose = env === undefined ? null : texEnd(lines, n, env);
 
-    if (state.kind === 'raw-tex') {
+    // Inside a block already found, up to the line it ends on.
+    if (state.kind === 'skip') {
       if (n < state.line) continue;
       const tail = text.slice(state.end, line.end);
       state = BLANK.test(tail) ? START : paragraph();
@@ -214,7 +238,7 @@ export function blocks(text) {
         const tail = text.slice(texClose.end, line.end);
         state = BLANK.test(tail) ? START : paragraph();
       } else {
-        state = { kind: 'raw-tex', line: texClose.line, end: texClose.end };
+        state = { kind: 'skip', line: texClose.line, end: texClose.end };
       }
     } else if (state.kind === 'paragraph') {
       // An underline turns a one-line paragraph into a heading; a block-level
@@ -225,6 +249,19 @@ export function blocks(text) {
       else state.lines++;
     } else if (DIV_OPEN.test(t)) {
       open.push(span);
+    } else if (
+      LINE_BLOCK_LINE.test(t) &&
+      !TABLE_SEPARATOR.test(lines[n + 1]?.text ?? '')
+    ) {
+      // A bar line over a separator row is a pipe table's header instead.
+      const last = lineBlockEnd(lines, n);
+      verses.push({
+        type: 'line-block',
+        start: line.start,
+        end: lines[last].end,
+      });
+      state =
+        last === n ? START : { kind: 'skip', line: last, end: lines[last].end };
     } else if (TEX_LINE.test(t)) {
       const end = line.start + TEX_LINE.exec(t)[1].length;
       raws.push({ type: 'raw-tex', start: line.start, end });
@@ -236,5 +273,7 @@ export function blocks(text) {
   for (const span of open) divs.push({ type: 'div', open: span, close: null });
   const start = (block) =>
     block.type === 'div' ? block.open.start : block.start;
-  return [...divs, ...mergeAdjacent(raws)].sort((a, b) => start(a) - start(b));
+  return [...divs, ...mergeAdjacent(raws), ...verses].sort(
+    (a, b) => start(a) - start(b),
+  );
 }

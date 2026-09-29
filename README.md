@@ -18,7 +18,7 @@ Status: pre-release. Nothing is published yet.
 | Construct | Status |
 | --- | --- |
 | Fenced divs | Handled |
-| Line blocks | Planned |
+| Line blocks | Handled |
 | Definition lists | Planned |
 | Grid tables | Planned |
 | Simple tables | Planned |

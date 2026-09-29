@@ -21,7 +21,6 @@ const TODO = new Set([
   'definition-lists.md',
   'example-lists.md',
   'grid-tables.md',
-  'line-blocks.md',
   'simple-tables.md',
   'strong-emphasis.md',
 ]);
