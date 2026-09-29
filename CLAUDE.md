@@ -21,6 +21,10 @@ the host.
   formatted file as it read the source, soft breaks aside — not when the output
   looks right. Add a corpus file per construct; a construct not handled yet
   stays in the oracle's `TODO` set so it runs.
+- **A construct is a recognizer.** One module under
+  `packages/pandoc-syntax/src/blocks/`, one position in `registry.js` — the
+  order is Pandoc's precedence, so say why it sits there — a test asking
+  Pandoc, and a corpus file.
 - **`pandoc-syntax` imports no prettier.** It is the one answer to where a
   Pandoc construct starts, for a linter and a language server as much as for
   the plugin; a printer concern belongs in the plugin.
@@ -30,11 +34,9 @@ the host.
 - **A fence is only markup where a block may start.** After a paragraph or
   list item line it is that block's text; after a heading, an HTML comment or
   a raw TeX block it opens a div. Probe Pandoc before encoding a rule.
-- **Masking keeps offsets.** A block's markup is overwritten in place, never
-  removed, so every position the stock parser reports indexes the source. What
-  it is overwritten with is chosen for the block CommonMark must see there:
-  spaces for a div fence, `#` for each raw TeX line — an indented tail would
-  otherwise read as code.
+- **Masking keeps offsets.** Markup is overwritten in place, never removed, so
+  every position the stock parser reports indexes the source. Each fill and
+  why: `mask.js`.
 - **Containers are collected, then read.** Pandoc takes every non-blank line
   after a quote or item into it, then parses the text as a document of its
   own; CommonMark decides line by line, and continues lazily only into a
