@@ -4,5 +4,8 @@
 // where a Pandoc construct starts; this is the one place that answers it, and
 // it imports no formatter.
 
+/** @typedef {import('./types.js').Block} Block */
+/** @typedef {import('./types.js').InlineSpan} InlineSpan */
+
 export { blocks } from './blocks/index.js';
 export { inlines } from './inlines/index.js';
