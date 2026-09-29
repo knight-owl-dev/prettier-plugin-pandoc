@@ -1,0 +1,16 @@
+{
+  "name": "@knight-owl-dev/pandoc-blocks",
+  "version": "0.0.0",
+  "description": "Where Pandoc's markdown blocks begin and end, by Pandoc's block rules",
+  "license": "MIT",
+  "type": "module",
+  "exports": "./src/index.js",
+  "files": [
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/knight-owl-dev/prettier-plugin-pandoc.git",
+    "directory": "packages/pandoc-blocks"
+  }
+}

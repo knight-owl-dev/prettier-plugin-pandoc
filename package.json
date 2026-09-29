@@ -1,0 +1,12 @@
+{
+  "name": "prettier-plugin-pandoc-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/pandoc-blocks",
+    "packages/prettier-plugin-pandoc"
+  ],
+  "devDependencies": {
+    "prettier": "3.9.9"
+  }
+}

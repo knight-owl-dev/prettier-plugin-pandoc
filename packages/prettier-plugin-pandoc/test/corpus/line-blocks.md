@@ -1,0 +1,7 @@
+# Line blocks
+
+| The limerick packs laughs anatomical
+| Into space that is quite economical.
+|    But the good ones I've seen
+|    So seldom are clean
+| And the clean ones so seldom are comical

@@ -1,0 +1,22 @@
+{
+  "name": "@knight-owl-dev/prettier-plugin-pandoc",
+  "version": "0.0.0",
+  "description": "Format Pandoc markdown with prettier without breaking its block syntax",
+  "license": "MIT",
+  "type": "module",
+  "exports": "./src/index.js",
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@knight-owl-dev/pandoc-blocks": "0.0.0"
+  },
+  "peerDependencies": {
+    "prettier": "^3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/knight-owl-dev/prettier-plugin-pandoc.git",
+    "directory": "packages/prettier-plugin-pandoc"
+  }
+}

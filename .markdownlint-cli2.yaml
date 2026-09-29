@@ -1,0 +1,10 @@
+# gitignore reuses .gitignore, so ignore paths live in one place.
+gitignore: true
+
+# The corpus is Pandoc input under test, written to exercise what CommonMark
+# lint rules forbid.
+ignores:
+  - "packages/*/test/corpus/**"
+
+config:
+  line-length: false
