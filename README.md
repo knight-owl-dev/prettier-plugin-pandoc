@@ -24,6 +24,7 @@ Status: pre-release. Nothing is published yet.
 | Simple and multiline tables | Handled |
 | Example lists | Handled, verbatim |
 | Raw TeX blocks | Handled |
+| Fancy lists (`a.`, `i.`, `#.`, `(a)`, `1)`) | Handled, verbatim |
 
 ## Preserve, never repair
 

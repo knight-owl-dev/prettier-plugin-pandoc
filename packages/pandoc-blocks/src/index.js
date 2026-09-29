@@ -51,6 +51,16 @@ const DASH_LINE = /^[ \t]*-+([ \t]+-+)*[ \t]*$/;
 const DEFINITION_MARKER = /^ {0,2}[:~][ \t]+\S/;
 const EXAMPLE_ITEM = /^\(@[\w-]*\)[ \t]+\S/;
 const INDENTED_CONTENT = /^( {2,}|\t)\S/;
+
+// An ordered list item, in any of Pandoc's styles: a number, a letter, a roman
+// numeral or `#`, closed by `.` or `)` or wrapped in parentheses. A capital
+// letter closed by `.` needs two spaces after it, so an initial opening a
+// sentence stays prose. `(?<indent>)` is how far in the marker sits.
+// cspell:ignore ivxlcdm IVXLCDM
+const ORDERED_MARKER =
+  /^(?<indent>[ \t]*)(?:\((?:\d+|[a-zA-Z]|[ivxlcdm]+|[IVXLCDM]+|#)\)|(?:\d+|[a-z]|[ivxlcdm]+|#)[.)]|[A-Z]\)|[IVXLCDM]+\)|(?:[A-Z]|[IVXLCDM]+)\.(?= {2}|\t))(?:[ \t]+\S|[ \t]*$)/;
+// The one marker style prettier prints as Pandoc reads it.
+const PLAIN_MARKER = /^[ \t]*\d+\.[ \t]/;
 const LINK_REFERENCE = /^ {0,3}\[[^\]^][^\]]*\]:[ \t]*\S/;
 
 // Where the line before left the reader. START: the next line may open any
@@ -209,6 +219,21 @@ const resumesDefinitionList = (lines, n) =>
   DEFINITION_MARKER.test(lines[n].text) ||
   opensDefinitionList(lines, n);
 
+const isOrderedItem = (line) => {
+  const marker = ORDERED_MARKER.exec(line);
+  return marker !== null && marker.groups.indent.length <= 3;
+};
+
+const resumesOrderedList = (lines, n) =>
+  INDENTED_CONTENT.test(lines[n].text) || isOrderedItem(lines[n].text);
+
+// Whether any item of a list, however deep, carries a marker prettier would
+// rewrite or not read as one.
+const hasFancyMarker = (lines, from, to) =>
+  lines
+    .slice(from, to + 1)
+    .some((l) => ORDERED_MARKER.test(l.text) && !PLAIN_MARKER.test(l.text));
+
 const resumesExampleList = (lines, n) =>
   INDENTED_CONTENT.test(lines[n].text) || EXAMPLE_ITEM.test(lines[n].text);
 
@@ -259,8 +284,9 @@ function within(state, line) {
 }
 
 /**
- * Find every fenced div, raw TeX block, line block, Pandoc table, definition
- * list and example list, in source order.
+ * Find every fenced div, raw TeX block, line block, Pandoc table, and each
+ * list CommonMark cannot read — definition, example and fancy — in source
+ * order.
  *
  * A div's close needs no block start: Pandoc ends the paragraph a closing fence
  * interrupts. A div never closed runs to the end of the document, as Pandoc
@@ -274,7 +300,9 @@ function within(state, line) {
  * A line block runs from its first verse line to its last, continuations
  * included. A table runs from its first line to its last; its caption is a
  * paragraph of its own, which Pandoc attaches. A definition or example list
- * runs from its first term or item to the last line that belongs to it.
+ * runs from its first term or item to the last line that belongs to it; so
+ * does a fancy list, an ordered list with any marker other than a number and
+ * a period, nested items included.
  *
  * @param {string} text Pandoc markdown.
  * @returns {({
@@ -289,7 +317,8 @@ function within(state, line) {
  *     | 'simple-table'
  *     | 'multiline-table'
  *     | 'definition-list'
- *     | 'example-list',
+ *     | 'example-list'
+ *     | 'fancy-list',
  *   start: number,
  *   end: number,
  * })[]} Offsets, a line's newline excluded.
@@ -357,6 +386,14 @@ export function blocks(text) {
       const last = listEnd(lines, n, resumes);
       const end = lines[last].end;
       lists.push({ type, start: line.start, end });
+      state = last === n ? START : { kind: 'skip', line: last, end };
+    } else if (
+      isOrderedItem(t) &&
+      hasFancyMarker(lines, n, listEnd(lines, n, resumesOrderedList))
+    ) {
+      const last = listEnd(lines, n, resumesOrderedList);
+      const end = lines[last].end;
+      lists.push({ type: 'fancy-list', start: line.start, end });
       state = last === n ? START : { kind: 'skip', line: last, end };
     } else if (!opensYaml(lines, n) && tableAt(lines, n) !== null) {
       const table = tableAt(lines, n);
