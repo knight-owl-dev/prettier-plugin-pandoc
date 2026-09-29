@@ -14,6 +14,8 @@
     "epigraph",
     "hardline",
     "headerless",
+    "Inlines",
+    "inlines",
     "literalline",
     "mdast",
     "minipage",
@@ -21,6 +23,7 @@
     "newpage",
     "Pandoc",
     "Pandoc's",
-    "setext"
+    "setext",
+    "textbf"
   ]
 }

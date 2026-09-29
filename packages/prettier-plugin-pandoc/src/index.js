@@ -1,24 +1,27 @@
-// A prettier plugin that formats Pandoc markdown without breaking its blocks.
+// A prettier plugin that formats Pandoc markdown without breaking its syntax.
 //
 // Prettier's markdown parser is CommonMark, which folds Pandoc's block
-// constructs into the paragraph around them. This plugin keeps prettier's own
-// parser and printer, and settles only the block boundaries:
+// constructs into the paragraph around them and reads markdown inside its raw
+// TeX. This plugin keeps prettier's own parser and printer, and settles only
+// where Pandoc's constructs are:
 //
-//   1. @knight-owl-dev/pandoc-syntax finds each block by Pandoc's rules.
-//   2. Each block is masked in place, so every offset stays true to the source
-//      and the stock parser sees the block break Pandoc sees there. A div's
-//      fence lines blank to spaces. A verbatim block's lines — raw TeX, verse,
-//      Pandoc tables — each become `#` and spaces: an ATX heading ends on its
-//      own line and interrupts a paragraph, as raw TeX does, and text after a
-//      mid-line end stays out of an indented code block, where blanking would
-//      put it.
-//   3. The nodes a block spans are replaced by a node of this plugin's own,
-//      which the wrapped printer prints; every other node prints as stock.
+//   1. @knight-owl-dev/pandoc-syntax finds each one by Pandoc's rules.
+//   2. Each is masked in place, so every offset stays true to the source and
+//      the stock parser sees what Pandoc sees there. A div's fence lines blank
+//      to spaces. A verbatim block's lines — raw TeX, verse, Pandoc tables —
+//      each become `#` and spaces: an ATX heading ends on its own line and
+//      interrupts a paragraph, as raw TeX does, and text after a mid-line end
+//      stays out of an indented code block, where blanking would put it.
+//      Inline raw TeX becomes a code span, which prettier neither wraps nor
+//      reads markdown inside.
+//   3. The nodes a construct spans are replaced by a node of this plugin's
+//      own, which the wrapped printer prints; every other node prints as
+//      stock.
 //
 // Preserve, never repair: markup Pandoc reads as broken stays as written,
 // since repairing it would change what the document means.
 
-import { blocks } from '@knight-owl-dev/pandoc-syntax';
+import { blocks, inlines } from '@knight-owl-dev/pandoc-syntax';
 import { doc } from 'prettier';
 import * as markdown from 'prettier/plugins/markdown';
 
@@ -96,7 +99,15 @@ const lineEnd = (text, at) => {
 
 // Offsets are UTF-16 code units, as the stock parser counts them, so the mask
 // is spliced by slice rather than by spreading the string into code points.
-function mask(text, divs, verbatimBlocks) {
+// A code span needs a backtick at each end, and one beside it would lengthen
+// the run the span opens or closes on. Such a span is left unmasked; nothing
+// shorter than three characters holds a space to wrap at.
+const maskable = (text, span) =>
+  span.end - span.start >= 3 &&
+  text[span.start - 1] !== '`' &&
+  text[span.end] !== '`';
+
+function mask(text, divs, verbatimBlocks, inlineRaw) {
   const edits = [
     ...divs
       .flatMap((div) => [div.open, div.close])
@@ -112,6 +123,10 @@ function mask(text, divs, verbatimBlocks) {
       }
       return lines;
     }),
+    ...inlineRaw.map((span) => ({
+      ...span,
+      fill: (n) => `\`${'x'.repeat(n - 2)}\``,
+    })),
   ].sort((a, b) => a.start - b.start);
 
   let out = '';
@@ -150,11 +165,36 @@ function restoreVerbatim(children, verbatimBlocks, text) {
   return out;
 }
 
+// Turn each code span an inline raw TeX mask produced back into its source.
+function restoreInline(node, starts, text) {
+  if (node.type === 'inlineCode' && starts.has(node.position.start.offset)) {
+    const { start, end } = starts.get(node.position.start.offset);
+    return {
+      type: 'pandocInlineRaw',
+      value: text.slice(start, end),
+      position: node.position,
+    };
+  }
+  if (node.children !== undefined) {
+    node.children = node.children.map((child) =>
+      restoreInline(child, starts, text),
+    );
+  }
+  return node;
+}
+
 async function parse(text, options) {
   const found = blocks(text);
   const divs = found.filter((block) => block.type === 'div');
   const verbatimBlocks = found.filter((block) => VERBATIM.has(block.type));
-  const ast = await base.parse(mask(text, divs, verbatimBlocks), options);
+  const inlineRaw = inlines(text, found).filter((span) => maskable(text, span));
+  const masked = mask(text, divs, verbatimBlocks, inlineRaw);
+  const ast = await base.parse(masked, options);
+  restoreInline(
+    ast,
+    new Map(inlineRaw.map((span) => [span.start, span])),
+    text,
+  );
   ast.children = fold(
     restoreVerbatim(ast.children, verbatimBlocks, text),
     divs,
@@ -222,7 +262,9 @@ function print(path, options, print) {
     const triple = printTripleRun(path, options, print);
     if (triple !== null) return triple;
   }
-  if (node.type === 'pandocVerbatim') return replaceEndOfLine(node.value);
+  if (node.type === 'pandocVerbatim' || node.type === 'pandocInlineRaw') {
+    return replaceEndOfLine(node.value);
+  }
   if (node.type !== 'pandocDiv') return mdast.print(path, options, print);
 
   // An unclosed div prints no close: adding one would repair it.
@@ -236,7 +278,11 @@ function print(path, options, print) {
 
 // The embed pass walks the tree, so each node of this plugin's own names its
 // children: a div has some, a verbatim block is a leaf.
-const VISITOR_KEYS = { pandocDiv: ['children'], pandocVerbatim: [] };
+const VISITOR_KEYS = {
+  pandocDiv: ['children'],
+  pandocVerbatim: [],
+  pandocInlineRaw: [],
+};
 
 function getVisitorKeys(node, nonTraversableKeys) {
   return (

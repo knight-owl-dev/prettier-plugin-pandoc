@@ -2,7 +2,7 @@
 
 Format [Pandoc](https://pandoc.org/) markdown with [prettier](https://prettier.io/) without breaking its block syntax.
 
-Prettier's markdown parser is CommonMark, which folds Pandoc's block constructs — fenced divs, line blocks, definition lists — into the paragraph around them. This plugin keeps prettier's own parser and printer and settles only where each Pandoc block begins and ends, by Pandoc's rules.
+Prettier's markdown parser is CommonMark, which folds Pandoc's block constructs — fenced divs, line blocks, definition lists — into the paragraph around them, and reads markdown inside raw TeX. This plugin keeps prettier's own parser and printer and settles only where each Pandoc construct begins and ends, by Pandoc's rules.
 
 Status: pre-release. Nothing is published yet.
 
@@ -25,6 +25,7 @@ Status: pre-release. Nothing is published yet.
 | Example lists | Handled, verbatim |
 | Raw TeX blocks | Handled |
 | Fancy lists (`a.`, `i.`, `#.`, `(a)`, `1)`) | Handled, verbatim |
+| Inline raw TeX (`\footnote{…}`) | Handled |
 
 ## Preserve, never repair
 

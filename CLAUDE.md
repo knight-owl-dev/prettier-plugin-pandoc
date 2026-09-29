@@ -22,8 +22,11 @@ the host.
   looks right. Add a corpus file per construct; a construct not handled yet
   stays in the oracle's `TODO` set so it runs.
 - **`pandoc-syntax` imports no prettier.** It is the one answer to where a
-  Pandoc block starts, for a linter and a language server as much as for the
-  plugin; a printer concern belongs in the plugin.
+  Pandoc construct starts, for a linter and a language server as much as for
+  the plugin; a printer concern belongs in the plugin.
+- **An inline span may be wider than Pandoc's, never narrower.** Pandoc's
+  LaTeX reader knows each command's arity; a scan does not. Text frozen by a
+  wider span prints as written, so its test checks containment.
 - **A fence is only markup where a block may start.** After a paragraph or
   list item line it is that block's text; after a heading, an HTML comment or
   a raw TeX block it opens a div. Probe Pandoc before encoding a rule.
