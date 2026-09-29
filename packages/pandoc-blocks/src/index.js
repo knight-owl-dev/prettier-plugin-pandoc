@@ -47,6 +47,10 @@ const GRID_RULE = /^[ \t]*\+[-=:]+(\+[-=:]+)*\+[ \t]*$/;
 const GRID_ROW = /^[ \t]*[+|]/;
 const DASH_COLUMNS = /^[ \t]*-+([ \t]+-+)+[ \t]*$/;
 const DASH_LINE = /^[ \t]*-+([ \t]+-+)*[ \t]*$/;
+// A definition marker, indented at most two spaces, and an example list item.
+const DEFINITION_MARKER = /^ {0,2}[:~][ \t]+\S/;
+const EXAMPLE_ITEM = /^\(@[\w-]*\)[ \t]+\S/;
+const INDENTED_CONTENT = /^( {2,}|\t)\S/;
 const LINK_REFERENCE = /^ {0,3}\[[^\]^][^\]]*\]:[ \t]*\S/;
 
 // Where the line before left the reader. START: the next line may open any
@@ -173,6 +177,41 @@ function tableAt(lines, at) {
   return null;
 }
 
+// Whether a definition list opens on line `at`: a one-line term, then its
+// marker, a blank line between them allowed. A line that opens a block of its
+// own, a heading say, is never a term.
+function opensDefinitionList(lines, at) {
+  const [next, after] = [lines[at + 1]?.text, lines[at + 2]?.text];
+  if (BLANK.test(lines[at].text) || next === undefined) return false;
+  if (opened(lines, at).kind !== 'paragraph') return false;
+  if (DEFINITION_MARKER.test(next)) return true;
+  return (
+    BLANK.test(next) && after !== undefined && DEFINITION_MARKER.test(after)
+  );
+}
+
+// The last line of a list opening on line `at`. Every non-blank line after an
+// item continues it, lazily or not; past a blank line, the list goes on only
+// where `resumes` says the next non-blank line belongs to it.
+function listEnd(lines, at, resumes) {
+  let last = at;
+  for (let n = at + 1; n < lines.length; n++) {
+    if (!BLANK.test(lines[n].text)) {
+      if (!BLANK.test(lines[n - 1].text) || resumes(lines, n)) last = n;
+      else break;
+    }
+  }
+  return last;
+}
+
+const resumesDefinitionList = (lines, n) =>
+  INDENTED_CONTENT.test(lines[n].text) ||
+  DEFINITION_MARKER.test(lines[n].text) ||
+  opensDefinitionList(lines, n);
+
+const resumesExampleList = (lines, n) =>
+  INDENTED_CONTENT.test(lines[n].text) || EXAMPLE_ITEM.test(lines[n].text);
+
 // The last line of the line block opening on line `at`. It ends at the first
 // line that is neither verse nor its continuation, and what follows starts a
 // block of its own.
@@ -220,8 +259,8 @@ function within(state, line) {
 }
 
 /**
- * Find every fenced div, raw TeX block, line block and Pandoc table, in source
- * order.
+ * Find every fenced div, raw TeX block, line block, Pandoc table, definition
+ * list and example list, in source order.
  *
  * A div's close needs no block start: Pandoc ends the paragraph a closing fence
  * interrupts. A div never closed runs to the end of the document, as Pandoc
@@ -234,7 +273,8 @@ function within(state, line) {
  *
  * A line block runs from its first verse line to its last, continuations
  * included. A table runs from its first line to its last; its caption is a
- * paragraph of its own, which Pandoc attaches.
+ * paragraph of its own, which Pandoc attaches. A definition or example list
+ * runs from its first term or item to the last line that belongs to it.
  *
  * @param {string} text Pandoc markdown.
  * @returns {({
@@ -247,7 +287,9 @@ function within(state, line) {
  *     | 'line-block'
  *     | 'grid-table'
  *     | 'simple-table'
- *     | 'multiline-table',
+ *     | 'multiline-table'
+ *     | 'definition-list'
+ *     | 'example-list',
  *   start: number,
  *   end: number,
  * })[]} Offsets, a line's newline excluded.
@@ -257,6 +299,7 @@ export function blocks(text) {
   const raws = [];
   const verses = [];
   const tables = [];
+  const lists = [];
   const open = [];
   const lines = splitLines(text);
   let state = START;
@@ -307,6 +350,14 @@ export function blocks(text) {
       else state.lines++;
     } else if (DIV_OPEN.test(t)) {
       open.push(span);
+    } else if (opensDefinitionList(lines, n) || EXAMPLE_ITEM.test(t)) {
+      const [type, resumes] = EXAMPLE_ITEM.test(t)
+        ? ['example-list', resumesExampleList]
+        : ['definition-list', resumesDefinitionList];
+      const last = listEnd(lines, n, resumes);
+      const end = lines[last].end;
+      lists.push({ type, start: line.start, end });
+      state = last === n ? START : { kind: 'skip', line: last, end };
     } else if (!opensYaml(lines, n) && tableAt(lines, n) !== null) {
       const table = tableAt(lines, n);
       const end = lines[table.last].end;
@@ -337,7 +388,7 @@ export function blocks(text) {
   for (const span of open) divs.push({ type: 'div', open: span, close: null });
   const start = (block) =>
     block.type === 'div' ? block.open.start : block.start;
-  return [...divs, ...mergeAdjacent(raws), ...verses, ...tables].sort(
+  return [...divs, ...mergeAdjacent(raws), ...verses, ...tables, ...lists].sort(
     (a, b) => start(a) - start(b),
   );
 }

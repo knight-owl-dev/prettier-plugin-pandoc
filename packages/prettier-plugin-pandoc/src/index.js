@@ -30,13 +30,17 @@ const mdast = markdown.printers.mdast;
 const AST_FORMAT = 'mdast-pandoc';
 
 // Printed as written: raw TeX is another language's source, verse is its line
-// breaks, and a Pandoc table's layout is its column alignment.
+// breaks, and a Pandoc table's layout is its column alignment. Definition and
+// example lists are CommonMark paragraphs to prettier's parser, so their
+// content stays unformatted until the plugin formats inside them.
 const VERBATIM = new Set([
   'raw-tex',
   'line-block',
   'grid-table',
   'simple-table',
   'multiline-table',
+  'definition-list',
+  'example-list',
 ]);
 
 // Fold the nodes each div spans into a pandocDiv, nesting as the fences do.

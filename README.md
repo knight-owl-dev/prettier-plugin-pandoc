@@ -19,10 +19,10 @@ Status: pre-release. Nothing is published yet.
 | --- | --- |
 | Fenced divs | Handled |
 | Line blocks | Handled |
-| Definition lists | Planned |
+| Definition lists | Handled, verbatim |
 | Grid tables | Handled |
 | Simple and multiline tables | Handled |
-| Example lists | Planned |
+| Example lists | Handled, verbatim |
 | Raw TeX blocks | Handled |
 
 ## Preserve, never repair

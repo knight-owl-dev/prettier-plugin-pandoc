@@ -16,12 +16,7 @@ const CORPUS = new URL('./corpus/', import.meta.url);
 
 // Constructs the plugin does not handle yet. Each runs, reported as todo, so
 // the day one starts passing is visible in the output.
-const TODO = new Set([
-  'code-trailing-space.md:off',
-  'definition-lists.md',
-  'example-lists.md',
-  'strong-emphasis.md',
-]);
+const TODO = new Set(['code-trailing-space.md:off', 'strong-emphasis.md']);
 
 const BASE = {
   parser: 'markdown',
