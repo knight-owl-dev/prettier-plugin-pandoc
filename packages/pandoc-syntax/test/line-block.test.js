@@ -1,4 +1,4 @@
-// Which lines form line blocks, checked against Pandoc rather than asserted.
+// Which lines form line blocks.
 //
 // Pandoc's parse gives each line block its verse lines. The recognizer's spans
 // must hold the same number of blocks, each opening the same number of verse

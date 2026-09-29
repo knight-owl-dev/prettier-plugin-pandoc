@@ -1,4 +1,4 @@
-// Constructs inside containers, checked against Pandoc rather than asserted.
+// Constructs inside containers.
 //
 // Each construct is wrapped in a block quote, a list item and both, and the
 // recognizer must find in it what Pandoc does: the same constructs, in the same

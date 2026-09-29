@@ -1,5 +1,4 @@
-// Which lines form Pandoc's own tables, checked against Pandoc rather than
-// asserted.
+// Which lines form Pandoc's own tables.
 //
 // Pandoc's parse gives each table its rows. The recognizer's table spans must
 // hold the same number of tables. The cases carry no pipe table, which Pandoc

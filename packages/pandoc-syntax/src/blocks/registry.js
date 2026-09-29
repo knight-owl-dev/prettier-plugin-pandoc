@@ -3,9 +3,6 @@
 // At a block start the first recognizer to match a line claims it, so the
 // order is Pandoc's precedence. Where a paragraph would continue into the line,
 // only those that interrupt a paragraph are asked, in the same order.
-//
-// Every pattern allows up to three spaces of indentation where a block may
-// start (` {0,3}`): four make a line indented code.
 
 import { fencedCode, indentedCode } from './code.js';
 import { blockQuote, footnoteDefinition, listItem } from './container.js';
@@ -23,7 +20,7 @@ import { yamlMetadata } from './yaml.js';
 
 /** @type {Recognizer[]} */
 export const REGISTRY = [
-  // The four that interrupt a paragraph. A fence and an environment claim
+  // Those that interrupt a paragraph. A fence and an environment claim
   // their lines before anything else can read inside them.
   fencedCode,
   texEnvironment,

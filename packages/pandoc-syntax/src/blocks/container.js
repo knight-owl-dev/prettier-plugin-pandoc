@@ -1,8 +1,8 @@
-// Containers: block quotes, list items and footnote definitions. Pandoc collects a container's lines
-// first and parses the text as a document of its own, so which lines belong to
-// it follows the text, not what each line continues — a line without its
-// prefix is lazy, taken whatever it follows. Inside a div, a closing fence is
-// the div's, never a lazy line.
+// Containers: block quotes, list items and footnote definitions. Pandoc
+// collects a container's lines first and parses the text as a document of its
+// own, so which lines belong to it follows the text, not what each line
+// continues — a line without its prefix is lazy, taken whatever it follows.
+// Inside a div, a closing fence is the div's, never a lazy line.
 //
 // Each recognizer returns the container's content as views of its lines, for
 // the scan to read in turn.
@@ -16,8 +16,8 @@ import { isOrderedItem } from './list.js';
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
 
-// A list item's marker, in its indentation and before its gap. Pandoc caps an
-// ordered marker at nine digits, as CommonMark does.
+// Each container's marker; a list item's with its indentation and gap. Pandoc
+// caps an ordered marker at nine digits, as CommonMark does.
 const patterns = perSyntax(({ blockIndent }) => ({
   quoteMarker: new RegExp(`^ {0,${blockIndent}}> ?`),
   footnoteMarker: new RegExp(`^ {0,${blockIndent}}\\[\\^[^\\]\\s]+\\]:[ \\t]*`),

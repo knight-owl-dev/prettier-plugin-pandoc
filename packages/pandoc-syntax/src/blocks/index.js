@@ -14,11 +14,10 @@ const startOf = (block) =>
  * reads no markdown inside, and the containers that hold them, in source
  * order.
  *
- * A div's close needs no block start: Pandoc ends the paragraph a closing fence
- * interrupts. A div never closed runs to the end of the document, as Pandoc
- * reads it (with a warning), so its `close` is null. Block quotes, list items
- * and footnote definitions hold their content's blocks, reported beside them; every span inside a
- * container stops short of its prefix.
+ * A div never closed runs to the end of the document, so its `close` is null.
+ * Block quotes, list items and footnote definitions hold their content's
+ * blocks, reported beside them; every span inside a container stops short of
+ * its prefix.
  *
  * @param {string} text Pandoc markdown.
  * @param {{tabStop?: number}} [options] `tabStop` is Pandoc's `--tab-stop`,

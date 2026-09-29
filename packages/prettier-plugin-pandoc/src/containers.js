@@ -1,8 +1,8 @@
 // Containers the two parsers bound differently.
 //
-// Pandoc collects a block quote's, list item's or footnote's lines first and parses them
-// as a document of its own, so a line without its prefix belongs to the
-// container whatever it follows. CommonMark decides line by line and continues
+// Pandoc collects a container's lines first and parses them as a document of
+// its own, so a line without its prefix belongs to the container whatever it
+// follows. CommonMark decides line by line and continues
 // a container lazily only into paragraph text, so after a heading or a fence
 // its tree can part from Pandoc's. Where they part, the container prints as
 // written — decided by comparing the trees, never predicted.

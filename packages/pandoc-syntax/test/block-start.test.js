@@ -1,9 +1,7 @@
-// Where a fence opens a div, checked against Pandoc rather than asserted.
+// Where a fence opens a div.
 //
 // Each case puts `::: note` on the line straight after a block, with no blank
 // between. Pandoc decides whether that opens a div; the recognizer must agree.
-// The verdict is asked at test time, so a Pandoc that changes its mind fails
-// here instead of drifting from what an assertion once recorded.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

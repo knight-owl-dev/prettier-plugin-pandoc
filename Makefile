@@ -6,7 +6,7 @@ CI_TOOLS_IMAGE ?= ghcr.io/knight-owl-dev/ci-tools:v1.5.0@sha256:e6f787624a5b19f7
 
 TEST_IMAGE ?= prettier-plugin-pandoc-test:local
 
-# Whether a human is watching. Probed once; the container TTY keys off it.
+# Whether a human is watching, probed once.
 IS_TTY := $(shell test -t 0 && echo 1)
 
 # Pass `-t` to `docker run` when stdin is a terminal, so TTY-aware tools see a
@@ -16,8 +16,8 @@ DOCKER_TTY ?= $(if $(IS_TTY),-t)
 .PHONY: resolve test test-image lint lint-fix lint-docker lint-js lint-js-fix \
 	lint-md lint-md-fix lint-spell help
 
-# Node and npm come from the test image, never the host. As the invoking user,
-# so node_modules on the mount stays the host's to delete.
+# Node and npm come from the test image, never the host. It runs as the
+# invoking user, so node_modules on the mount stays the host's to delete.
 TEST_RUNNER = docker run --rm $(DOCKER_TTY) --user "$$(id -u):$$(id -g)" \
 	-e HOME=/tmp -v "$(CURDIR):/work" -w /work $(TEST_IMAGE)
 
@@ -53,8 +53,8 @@ lint-fix:
 lint-docker:
 	@echo "Linting Dockerfile..." && hadolint test/Dockerfile && echo "OK"
 
-# --error-on-warnings because Biome reports most rules as warnings and would
-# otherwise exit 0 on every finding, gating nothing.
+# --error-on-warnings: Biome reports most rules as warnings, which would
+# otherwise exit 0.
 lint-js:
 	@echo "Checking JavaScript..." && biome check --error-on-warnings && echo "OK"
 

@@ -1,5 +1,4 @@
-// Which lines form definition and example lists, checked against Pandoc rather
-// than asserted.
+// Which lines form definition and example lists.
 //
 // Pandoc's parse gives each list its entries. The recognizer's spans must hold
 // the same lists, of the same kind, in the same order.

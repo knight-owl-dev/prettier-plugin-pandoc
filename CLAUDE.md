@@ -22,9 +22,9 @@ the host.
   looks right. Add a corpus file per construct; a construct not handled yet
   stays in the oracle's `TODO` set so it runs.
 - **A construct is a recognizer.** One module under
-  `packages/pandoc-syntax/src/blocks/`, one position in `registry.js` — the
-  order is Pandoc's precedence, so say why it sits there — a test asking
-  Pandoc, and a corpus file.
+  `packages/pandoc-syntax/src/blocks/`, a test asking Pandoc, a corpus file,
+  and a position in `registry.js`. The order is Pandoc's precedence, so a
+  comment there says why it sits there.
 - **`pandoc-syntax` imports no prettier.** It is the one answer to where a
   Pandoc construct starts, for a linter and a language server as much as for
   the plugin; a printer concern belongs in the plugin.
@@ -42,11 +42,10 @@ the host.
   `syntaxFor(tabStop)` in `pandoc-syntax`. Prettier's own parser reads at four
   whatever it is — where the two part, the plugin masks. Probe Pandoc at more
   than one stop before encoding an indentation rule.
-- **Containers are collected, then read.** Pandoc takes every non-blank line
-  after a quote or item into it, then parses the text as a document of its
-  own; CommonMark decides line by line, and continues lazily only into a
-  paragraph. Where their extents part, the plugin prints the container as
-  written — decided by comparing prettier's tree, never predicted.
+- **Containers are collected, then read.** Pandoc parses a container's
+  collected lines as a document of its own; CommonMark decides line by line.
+  Where their extents part, the plugin prints the container as written,
+  decided by comparing prettier's tree, never predicted: `containers.js`.
 - **Stock prettier trims code blocks.** Its line breaks drop trailing
   whitespace, which in a sample is a hard break shown; the plugin prints code
   through literal lines instead. The oracle runs both embedded settings, since

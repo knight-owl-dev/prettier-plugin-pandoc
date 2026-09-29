@@ -1,4 +1,7 @@
 // Pandoc as the tests' oracle: its parse of a document, at a tab stop.
+//
+// A verdict is asked at test time, so a Pandoc that changes its mind fails a
+// test instead of drifting from what an assertion once recorded.
 
 import { spawnSync } from 'node:child_process';
 

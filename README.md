@@ -27,13 +27,13 @@ Status: pre-release. Nothing is published yet.
 | Fancy lists (`a.`, `i.`, `#.`, `(a)`, `1)`) | Handled, verbatim |
 | Inline raw TeX (`\footnote{…}`) | Handled |
 
-Each holds inside block quotes and list items as at the top level: Pandoc collects a container's text before parsing it, and so does the recognizer.
+Each holds inside block quotes, list items and footnotes as at the top level: Pandoc collects a container's text before parsing it, and so does the recognizer.
 
 ## Options
 
 | Option | Default | What it is |
 | --- | --- | --- |
-| `pandocTabStop` | `4` | Pandoc's `--tab-stop`: the columns a tab advances to, and the indentation that makes code. Set it to what your documents are built with. |
+| `pandocTabStop` | `4` | Pandoc's `--tab-stop`: the columns a tab advances to, and the indentation that makes code. Match what the documents are built with. |
 
 For documents built with `pandoc --tab-stop=8`, in `.prettierrc`:
 

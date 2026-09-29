@@ -17,8 +17,7 @@ const base = markdown.parsers.markdown;
 
 // Printed as written: raw TeX is another language's source, verse is its line
 // breaks, and a Pandoc table's layout is its column alignment. Definition,
-// example and fancy lists are CommonMark paragraphs to prettier's parser, so
-// their content stays unformatted until the plugin formats inside them.
+// example and fancy lists are CommonMark paragraphs to prettier's parser.
 // Indented code is code at Pandoc's tab stop, which CommonMark's fixed one of
 // four need not agree with.
 const VERBATIM = new Set([

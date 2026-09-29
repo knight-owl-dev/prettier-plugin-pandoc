@@ -30,8 +30,7 @@ function getVisitorKeys(node, nonTraversableKeys) {
   );
 }
 
-// Pandoc's `--tab-stop`, which decides every indentation rule of the
-// markdown it reads. Set it to what the document is built with.
+// Match what the documents are built with: every indentation rule follows it.
 export const options = {
   pandocTabStop: {
     type: 'int',

@@ -1,4 +1,4 @@
-// Where a fancy list is, checked against Pandoc rather than asserted.
+// Where a fancy list is.
 //
 // A fancy list is one whose parse Pandoc records with a style or delimiter
 // other than a number and a period: a letter, a roman numeral, `#`, `)` or

@@ -13,8 +13,7 @@ const SPACE = /[ \t]/;
 const CLOSES = { '{': '}', '[': ']' };
 
 /**
- * Whether a command starts at `at`: a backslash before a letter. A backslash
- * before anything else escapes it.
+ * Whether a command starts at `at`: a backslash before a letter.
  *
  * @param {string} text
  * @param {number} at

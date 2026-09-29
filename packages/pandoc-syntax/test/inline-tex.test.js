@@ -1,4 +1,4 @@
-// Where inline raw TeX is, checked against Pandoc rather than asserted.
+// Where inline raw TeX is.
 //
 // Pandoc's parse keeps each raw inline's text. Every one must lie inside a
 // span the recognizer reports — wider is allowed, narrower is not — and no

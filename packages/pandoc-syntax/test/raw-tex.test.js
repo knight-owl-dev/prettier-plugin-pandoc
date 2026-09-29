@@ -1,4 +1,4 @@
-// Which text is raw TeX, checked against Pandoc rather than asserted.
+// Which text is raw TeX.
 //
 // Pandoc's parse names each raw TeX block and keeps its text. The recognizer's
 // spans must cover the same text, in the same order. Pandoc drops an

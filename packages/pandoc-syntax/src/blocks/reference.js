@@ -5,7 +5,7 @@ import { perSyntax } from '../syntax.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 
-// A `[^label]:` line is a footnote definition, whose body is a paragraph.
+// A `[^label]:` line is a footnote definition instead.
 const patterns = perSyntax((syntax) => ({
   definition: syntax.atBlockIndent('\\[[^\\]^][^\\]]*\\]:[ \\t]*\\S'),
 }));
