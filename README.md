@@ -35,6 +35,12 @@ Each holds inside block quotes and list items as at the top level: Pandoc collec
 | --- | --- | --- |
 | `pandocTabStop` | `4` | Pandoc's `--tab-stop`: the columns a tab advances to, and the indentation that makes code. Set it to what your documents are built with. |
 
+For documents built with `pandoc --tab-stop=8`, in `.prettierrc`:
+
+```json
+{ "plugins": ["@knight-owl-dev/prettier-plugin-pandoc"], "pandocTabStop": 8 }
+```
+
 ## Preserve, never repair
 
 Markup Pandoc reads as broken stays as written. A fence a paragraph continues into is that paragraph's text to Pandoc, and an unclosed div runs to the end of the document; the plugin prints both as it finds them, since repairing either would change what the document means.
