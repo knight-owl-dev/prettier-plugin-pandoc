@@ -5,4 +5,4 @@
 // it imports no formatter.
 
 export { blocks } from './blocks/index.js';
-export { inlines } from './inlines.js';
+export { inlines } from './inlines/index.js';
