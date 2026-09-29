@@ -9,7 +9,8 @@
 
 export const BLANK = /^[ \t]*$/;
 
-// Columns a tab advances to the next multiple of.
+// Pandoc's `--tab-stop`, at its default: a tab advances to the next multiple
+// of it, and indentation one stop deep makes a line code.
 export const TAB_STOP = 4;
 
 /**
