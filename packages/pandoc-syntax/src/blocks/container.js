@@ -8,6 +8,7 @@
 // the scan to read in turn.
 
 import { BLANK, dedent, indentOf, strip } from '../lines.js';
+import { CODE_INDENT } from './code.js';
 import { DIV_CLOSE } from './div.js';
 import { THEMATIC_BREAK } from './heading.js';
 import { isOrderedItem } from './list.js';
@@ -19,9 +20,6 @@ const QUOTE_MARKER = /^ {0,3}> ?/;
 const BULLET_ITEM = /^( {0,3})([-*+])([ \t]+|$)/;
 // CommonMark caps an ordered marker at nine digits.
 const PLAIN_ITEM = /^( {0,3})(\d{1,9}\.)([ \t]+|$)/;
-
-// Columns of indentation that make a line code.
-const CODE_INDENT = 4;
 
 const isListMarker = (text) =>
   BULLET_ITEM.test(text) || PLAIN_ITEM.test(text) || isOrderedItem(text);

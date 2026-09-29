@@ -47,6 +47,7 @@ const CASES = {
   'inline TeX opening a paragraph': '\\emph{x} and prose',
   'fenced code': '```\nx\n```',
   'indented code': '\n    code',
+  'code indented by spaces then a tab': '\n  \tcode',
   'pipe table': '| a | b |\n|---|---|\n| 1 | 2 |',
   'block quote': '> quoted',
   'bullet list': '- item',

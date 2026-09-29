@@ -1,6 +1,7 @@
 // Printing: the stock markdown printer, with the nodes it would print wrong
 // printed here.
 
+import { CODE_INDENT } from '@knight-owl-dev/pandoc-syntax';
 import { doc } from 'prettier';
 import * as markdown from 'prettier/plugins/markdown';
 import { DIV, INLINE_RAW, VERBATIM } from './nodes.js';
@@ -9,9 +10,8 @@ const { align, hardline, literalline, markAsRoot } = doc.builders;
 const { replaceEndOfLine } = doc.utils;
 const mdast = markdown.printers.mdast;
 
-// CommonMark's shortest code fence, and the indentation that makes code.
+// CommonMark's shortest code fence.
 const SHORTEST_FENCE = 3;
-const CODE_INDENT = '    ';
 
 // The longest run of `char` in `text`, for a fence that cannot close early.
 const longestRun = (text, char) =>
@@ -42,7 +42,7 @@ function printCode(node, options) {
     value = value.slice(0, -1);
   }
   if (node.isIndented) {
-    return align(CODE_INDENT.length, [CODE_INDENT, asWritten(value)]);
+    return align(CODE_INDENT, [' '.repeat(CODE_INDENT), asWritten(value)]);
   }
   const fence = '`'.repeat(
     Math.max(SHORTEST_FENCE, longestRun(value, '`') + 1),

@@ -4,6 +4,7 @@
 // belongs to it.
 
 import { BLANK } from '../lines.js';
+import { CODE_INDENT } from './code.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
@@ -39,7 +40,7 @@ const PLAIN_MARKER = /^[ \t]*\d+\.[ \t]/;
  */
 export function isOrderedItem(text) {
   const marker = ORDERED_MARKER.exec(text);
-  return marker !== null && marker.groups.indent.length <= 3;
+  return marker !== null && marker.groups.indent.length < CODE_INDENT;
 }
 
 // The last line of a list opening on line `at`. Every non-blank line straight

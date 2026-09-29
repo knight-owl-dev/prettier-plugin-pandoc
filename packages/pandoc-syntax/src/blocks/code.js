@@ -1,13 +1,21 @@
 // Code blocks, fenced and indented. Pandoc reads no markdown inside either, so
 // each is reported for a caller scanning for inline syntax to pass over.
 
-import { BLANK } from '../lines.js';
+import { BLANK, indentOf } from '../lines.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
 
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
-const INDENTED = /^( {4}|\t)/;
+
+/**
+ * Columns of indentation that make a line code. Reading and writing both hang
+ * on it: a printer emitting fewer would turn code into a paragraph, more would
+ * put spaces into the code.
+ */
+export const CODE_INDENT = 4;
+
+const isIndented = (text) => !BLANK.test(text) && indentOf(text) >= CODE_INDENT;
 
 // A fence closes on its own character, in a run at least as long as the one it
 // opened with, and nothing after it.
@@ -66,11 +74,11 @@ export const indentedCode = {
   name: 'indented-code',
   interruptsParagraph: false,
   match(lines, at) {
-    if (!INDENTED.test(lines[at].text)) return null;
+    if (!isIndented(lines[at].text)) return null;
     let last = at;
     for (let n = at + 1; n < lines.length; n++) {
       const text = lines[n].text;
-      if (INDENTED.test(text) && !BLANK.test(text)) last = n;
+      if (isIndented(text)) last = n;
       else if (!BLANK.test(text)) break;
     }
     return {
