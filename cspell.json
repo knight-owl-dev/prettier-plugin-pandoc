@@ -14,7 +14,10 @@
     "epigraph",
     "hardline",
     "mdast",
+    "newcommand",
+    "newpage",
     "Pandoc",
-    "Pandoc's"
+    "Pandoc's",
+    "setext"
   ]
 }
