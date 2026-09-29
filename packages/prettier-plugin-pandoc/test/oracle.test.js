@@ -32,19 +32,36 @@ const WIDTHS = [40, 80, 120];
 // written.
 const EMBEDDED = ['auto', 'off'];
 
-function pandoc(text) {
+// Pandoc's parse, soft breaks read as spaces. With embedded formatting on, a
+// markdown sample is formatted too, so what must hold is what Pandoc reads in
+// it; with it off, the sample prints as written and is compared as such.
+function pandoc(text, samples = 'as-written') {
   const run = spawnSync('pandoc', ['-f', 'markdown', '-t', 'json'], {
     input: text,
     encoding: 'utf8',
   });
   if (run.error) throw run.error;
   if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);
-  return JSON.parse(run.stdout, (_, value) =>
-    value?.t === 'SoftBreak' ? { t: 'Space' } : value,
-  );
+  return JSON.parse(run.stdout, (_, value) => {
+    if (value?.t === 'SoftBreak') return { t: 'Space' };
+    if (
+      samples === 'by-meaning' &&
+      value?.t === 'CodeBlock' &&
+      value.c[0][1].includes('markdown')
+    ) {
+      const read = pandoc(value.c[1], samples).blocks;
+      return { t: 'CodeBlock', c: [value.c[0], read] };
+    }
+    return value;
+  });
 }
 
-for (const name of readdirSync(CORPUS).filter((f) => f.endsWith('.md'))) {
+// Every markdown file under the corpus, a directory's README aside.
+const corpus = readdirSync(CORPUS, { recursive: true }).filter(
+  (f) => f.endsWith('.md') && !f.endsWith('README.md'),
+);
+
+for (const name of corpus) {
   const text = readFileSync(new URL(name, CORPUS), 'utf8');
 
   for (const [printWidth, embedded] of WIDTHS.flatMap((width) =>
@@ -62,7 +79,8 @@ for (const name of readdirSync(CORPUS).filter((f) => f.endsWith('.md'))) {
       todo,
     }, async () => {
       const formatted = await prettier.format(text, options);
-      assert.deepEqual(pandoc(formatted), pandoc(text));
+      const samples = embedded === 'auto' ? 'by-meaning' : 'as-written';
+      assert.deepEqual(pandoc(formatted, samples), pandoc(text, samples));
     });
 
     test(`${label}: formatting twice changes nothing`, { todo }, async () => {
