@@ -5,10 +5,12 @@ import { blocks } from '../src/index.js';
 // The fence lines each div was found at, as text, so a failure reads as
 // markup rather than offsets.
 function fences(text) {
-  return blocks(text).map(({ open, close }) => [
-    text.slice(open.start, open.end),
-    close === null ? null : text.slice(close.start, close.end),
-  ]);
+  return blocks(text)
+    .filter((block) => block.type === 'div')
+    .map(({ open, close }) => [
+      text.slice(open.start, open.end),
+      close === null ? null : text.slice(close.start, close.end),
+    ]);
 }
 
 test('a div opens at the start of the document', () => {

@@ -23,7 +23,7 @@ Status: pre-release. Nothing is published yet.
 | Grid tables | Planned |
 | Simple tables | Planned |
 | Example lists | Planned |
-| Raw TeX blocks | Planned |
+| Raw TeX blocks | Handled |
 
 ## Preserve, never repair
 

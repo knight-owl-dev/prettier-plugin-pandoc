@@ -5,10 +5,13 @@
 // parser and printer, and settles only the block boundaries:
 //
 //   1. @knight-owl-dev/pandoc-blocks finds each block by Pandoc's rules.
-//   2. Its markup lines are blanked to spaces in place, so every offset stays
-//      true to the source and the stock parser sees the block break Pandoc
-//      sees there.
-//   3. The nodes a block spans are folded into a node of this plugin's own,
+//   2. Each block is masked in place, so every offset stays true to the source
+//      and the stock parser sees the block break Pandoc sees there. A div's
+//      fence lines blank to spaces. Raw TeX lines each become `#` and spaces:
+//      an ATX heading ends on its own line and interrupts a paragraph, as raw
+//      TeX does, and text after a mid-line end stays out of an indented code
+//      block, where blanking would put it.
+//   3. The nodes a block spans are replaced by a node of this plugin's own,
 //      which the wrapped printer prints; every other node prints as stock.
 //
 // Preserve, never repair: markup Pandoc reads as broken stays as written,
@@ -19,6 +22,7 @@ import { doc } from 'prettier';
 import * as markdown from 'prettier/plugins/markdown';
 
 const { hardline } = doc.builders;
+const { replaceEndOfLine } = doc.utils;
 const base = markdown.parsers.markdown;
 const mdast = markdown.printers.mdast;
 
@@ -69,31 +73,79 @@ function fold(children, divs, text) {
   return out;
 }
 
-// Offsets are UTF-16 code units, as the stock parser counts them, so the blanks
-// are spliced by slice rather than by spreading the string into code points.
-function mask(text, divs) {
-  const spans = divs
-    .flatMap((div) => [div.open, div.close])
-    .filter((span) => span !== null)
-    .sort((a, b) => a.start - b.start);
+const lineEnd = (text, at) => {
+  const newline = text.indexOf('\n', at);
+  return newline === -1 ? text.length : newline;
+};
+
+// Offsets are UTF-16 code units, as the stock parser counts them, so the mask
+// is spliced by slice rather than by spreading the string into code points.
+function mask(text, divs, raws) {
+  const edits = [
+    ...divs
+      .flatMap((div) => [div.open, div.close])
+      .filter((span) => span !== null)
+      .map((span) => ({ ...span, fill: (length) => ' '.repeat(length) })),
+    ...raws.flatMap((raw) => {
+      const lines = [];
+      for (let at = raw.start; at < raw.end; at = lineEnd(text, at) + 1) {
+        const end = Math.min(lineEnd(text, at), raw.end);
+        if (end > at) {
+          lines.push({ start: at, end, fill: (n) => `#${' '.repeat(n - 1)}` });
+        }
+      }
+      return lines;
+    }),
+  ].sort((a, b) => a.start - b.start);
+
   let out = '';
   let at = 0;
-  for (const span of spans) {
-    out += text.slice(at, span.start) + ' '.repeat(span.end - span.start);
-    at = span.end;
+  for (const edit of edits) {
+    out += text.slice(at, edit.start) + edit.fill(edit.end - edit.start);
+    at = edit.end;
   }
   return out + text.slice(at);
 }
 
+// Replace the headings each raw TeX mask produced with the source they stand
+// for. A mid-line end leaves text the heading swallowed; it is kept as written,
+// the whole line with it.
+function restoreRaw(children, raws, text) {
+  const out = [];
+  let i = 0;
+  for (const raw of raws) {
+    const end = lineEnd(text, raw.end);
+    while (
+      i < children.length &&
+      children[i].position.start.offset < raw.start
+    ) {
+      out.push(children[i++]);
+    }
+    while (i < children.length && children[i].position.start.offset < end) {
+      i++;
+    }
+    out.push({
+      type: 'pandocRaw',
+      value: text.slice(raw.start, end),
+      position: { start: { offset: raw.start }, end: { offset: end } },
+    });
+  }
+  while (i < children.length) out.push(children[i++]);
+  return out;
+}
+
 async function parse(text, options) {
-  const divs = blocks(text).filter((block) => block.type === 'div');
-  const ast = await base.parse(mask(text, divs), options);
-  ast.children = fold(ast.children, divs, text);
+  const found = blocks(text);
+  const divs = found.filter((block) => block.type === 'div');
+  const raws = found.filter((block) => block.type === 'raw-tex');
+  const ast = await base.parse(mask(text, divs, raws), options);
+  ast.children = fold(restoreRaw(ast.children, raws, text), divs, text);
   return ast;
 }
 
 function print(path, options, print) {
   const node = path.node;
+  if (node.type === 'pandocRaw') return replaceEndOfLine(node.value);
   if (node.type !== 'pandocDiv') return mdast.print(path, options, print);
 
   // An unclosed div prints no close: adding one would repair it.
@@ -105,10 +157,14 @@ function print(path, options, print) {
   return [node.open, ...body, ...close];
 }
 
+// The embed pass walks the tree, so each node of this plugin's own names its
+// children: a div has some, raw TeX is a leaf.
+const VISITOR_KEYS = { pandocDiv: ['children'], pandocRaw: [] };
+
 function getVisitorKeys(node, nonTraversableKeys) {
-  return node.type === 'pandocDiv'
-    ? ['children']
-    : mdast.getVisitorKeys(node, nonTraversableKeys);
+  return (
+    VISITOR_KEYS[node.type] ?? mdast.getVisitorKeys(node, nonTraversableKeys)
+  );
 }
 
 export const parsers = {

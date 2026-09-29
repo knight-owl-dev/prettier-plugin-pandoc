@@ -21,10 +21,13 @@ const ATX_HEADING = /^ {0,3}#{1,6}(\s|$)/;
 const SETEXT_UNDERLINE = /^ {0,3}(=+|-+)[ \t]*$/;
 const THEMATIC_BREAK = /^ {0,3}([-*_])([ \t]*\1){2,}[ \t]*$/;
 const INDENTED = /^( {4}|\t)/;
-const TEX_BEGIN = /^\\begin\{([^}]+)\}/;
-// A line of TeX commands and their arguments, nothing after: Pandoc reads it
-// as a raw block. Prose after the last argument makes it a paragraph.
-const TEX_LINE = /^\\[A-Za-z]+\*?([ \t]*(\{[^{}]*\}|\[[^\]]*\]))*[ \t]*$/;
+const TEX_BEGIN = /^ {0,3}\\begin\{([^}]+)\}/;
+// A line of TeX commands and their arguments: Pandoc reads the commands as a
+// raw block and a trailing `%` comment as a paragraph after it. Prose after the
+// last argument makes the whole line a paragraph, and an environment is raw
+// only with its matching end, so neither half counts here.
+const TEX_LINE =
+  /^(?!\\(?:begin|end)\{)(\\[A-Za-z]+\*?(?:[ \t]*(?:\{[^{}]*\}|\[[^\]]*\]))*)[ \t]*(?:%.*)?$/;
 const HTML_COMMENT = /^ {0,3}<!--/;
 const HTML_BLOCK_TAG =
   /^ {0,3}<\/?(address|article|aside|blockquote|center|details|dialog|dd|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|nav|ol|p|pre|section|summary|table|tbody|td|tfoot|th|thead|tr|ul)(\s|\/?>|$)/i;
@@ -75,7 +78,7 @@ function opened(lines, at) {
   if (HTML_COMMENT.test(line)) {
     return line.includes('-->') ? START : { kind: 'comment' };
   }
-  if (HTML_BLOCK_TAG.test(line) || TEX_LINE.test(line)) return START;
+  if (HTML_BLOCK_TAG.test(line)) return START;
   if (LINK_REFERENCE.test(line)) return START;
   if (
     YAML_FENCE.test(line) &&
@@ -94,6 +97,37 @@ function opened(lines, at) {
   return paragraph();
 }
 
+// Where the environment opened on line `at` ends: the line, and the offset just
+// past its matching `\end`. Null when it never closes, which Pandoc reads as
+// paragraph text rather than raw TeX.
+function texEnd(lines, at, env) {
+  const marker = new RegExp(
+    `\\\\(begin|end)\\{${env.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`,
+    'g',
+  );
+  let depth = 0;
+  for (let n = at; n < lines.length; n++) {
+    for (const m of lines[n].text.matchAll(marker)) {
+      depth += m[1] === 'begin' ? 1 : -1;
+      if (depth === 0) {
+        return { line: n, end: lines[n].start + m.index + m[0].length };
+      }
+    }
+  }
+  return null;
+}
+
+// Consecutive raw TeX lines are one block to Pandoc.
+function mergeAdjacent(raws) {
+  const out = [];
+  for (const raw of raws) {
+    const last = out.at(-1);
+    if (last !== undefined && raw.start === last.end + 1) last.end = raw.end;
+    else out.push(raw);
+  }
+  return out;
+}
+
 // A block that runs on: whether this line is still inside it. A block closed
 // by its own last line reports `ends`; one that ends before this line reports
 // neither, and the line is read afresh.
@@ -105,13 +139,6 @@ function within(state, line) {
       return line.includes('-->') ? 'ends' : 'inside';
     case 'yaml':
       return YAML_END.test(line) ? 'ends' : 'inside';
-    case 'tex': {
-      if (line.startsWith(`\\begin{${state.env}}`)) state.depth++;
-      if (line.startsWith(`\\end{${state.env}}`) && --state.depth === 0) {
-        return 'ends';
-      }
-      return 'inside';
-    }
     case 'indented':
       return BLANK.test(line) || INDENTED.test(line) ? 'inside' : 'after';
     case 'table':
@@ -124,21 +151,31 @@ function within(state, line) {
 }
 
 /**
- * Find every fenced div, in source order.
+ * Find every fenced div and raw TeX block, in source order.
  *
- * A close needs no block start: Pandoc ends the paragraph a closing fence
+ * A div's close needs no block start: Pandoc ends the paragraph a closing fence
  * interrupts. A div never closed runs to the end of the document, as Pandoc
  * reads it (with a warning), so its `close` is null.
  *
+ * A raw TeX block is an environment, from `\begin` to its matching `\end`, or
+ * a line of commands, and adjacent ones merge. Its span covers exactly the
+ * characters Pandoc keeps raw: an environment can end mid-line, and what
+ * follows is a paragraph.
+ *
  * @param {string} text Pandoc markdown.
- * @returns {{
+ * @returns {({
  *   type: 'div',
  *   open: {start: number, end: number},
  *   close: {start: number, end: number} | null,
- * }[]} Fence lines as offsets, newline excluded.
+ * } | {
+ *   type: 'raw-tex',
+ *   start: number,
+ *   end: number,
+ * })[]} Offsets, a line's newline excluded.
  */
 export function blocks(text) {
   const divs = [];
+  const raws = [];
   const open = [];
   const lines = splitLines(text);
   let state = START;
@@ -146,6 +183,15 @@ export function blocks(text) {
   for (const [n, line] of lines.entries()) {
     const t = line.text;
     const span = { start: line.start, end: line.end };
+    const env = TEX_BEGIN.exec(t)?.[1];
+    const texClose = env === undefined ? null : texEnd(lines, n, env);
+
+    if (state.kind === 'raw-tex') {
+      if (n < state.line) continue;
+      const tail = text.slice(state.end, line.end);
+      state = BLANK.test(tail) ? START : paragraph();
+      continue;
+    }
 
     if (state.kind !== 'start' && state.kind !== 'paragraph') {
       const where = within(state, t);
@@ -162,9 +208,14 @@ export function blocks(text) {
     } else if (CODE_FENCE.test(t)) {
       // Fenced code and raw TeX environments interrupt a paragraph.
       state = { kind: 'code', marker: CODE_FENCE.exec(t)[1] };
-    } else if (TEX_BEGIN.test(t)) {
-      state = { kind: 'tex', env: TEX_BEGIN.exec(t)[1], depth: 0 };
-      if (within(state, t) === 'ends') state = START;
+    } else if (texClose !== null) {
+      raws.push({ type: 'raw-tex', start: line.start, end: texClose.end });
+      if (texClose.line === n) {
+        const tail = text.slice(texClose.end, line.end);
+        state = BLANK.test(tail) ? START : paragraph();
+      } else {
+        state = { kind: 'raw-tex', line: texClose.line, end: texClose.end };
+      }
     } else if (state.kind === 'paragraph') {
       // An underline turns a one-line paragraph into a heading; a block-level
       // HTML tag ends any paragraph. Anything else, a heading marker included,
@@ -174,10 +225,16 @@ export function blocks(text) {
       else state.lines++;
     } else if (DIV_OPEN.test(t)) {
       open.push(span);
+    } else if (TEX_LINE.test(t)) {
+      const end = line.start + TEX_LINE.exec(t)[1].length;
+      raws.push({ type: 'raw-tex', start: line.start, end });
+      if (!BLANK.test(text.slice(end, line.end))) state = paragraph();
     } else {
       state = opened(lines, n);
     }
   }
   for (const span of open) divs.push({ type: 'div', open: span, close: null });
-  return divs.sort((a, b) => a.open.start - b.open.start);
+  const start = (block) =>
+    block.type === 'div' ? block.open.start : block.start;
+  return [...divs, ...mergeAdjacent(raws)].sort((a, b) => start(a) - start(b));
 }

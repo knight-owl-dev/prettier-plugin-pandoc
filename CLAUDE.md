@@ -27,8 +27,11 @@ the host.
 - **A fence is only markup where a block may start.** After a paragraph or
   list item line it is that block's text; after a heading, an HTML comment or
   a raw TeX block it opens a div. Probe Pandoc before encoding a rule.
-- **Masking keeps offsets.** Fence lines are blanked to spaces in place, never
-  removed, so every position the stock parser reports indexes the source.
+- **Masking keeps offsets.** A block's markup is overwritten in place, never
+  removed, so every position the stock parser reports indexes the source. What
+  it is overwritten with is chosen for the block CommonMark must see there:
+  spaces for a div fence, `#` for each raw TeX line — an indented tail would
+  otherwise read as code.
 - **`embeddedLanguageFormatting: off` strips trailing whitespace in code.**
   The oracle runs every file under both settings for that reason.
 - **Keep issue numbers out of commit messages.** They belong in the PR.
