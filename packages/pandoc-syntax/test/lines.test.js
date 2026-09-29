@@ -17,22 +17,24 @@ test('lines keep their source offsets, newlines excluded', () => {
   ]);
 });
 
-test('a tab advances indentation to the next stop of four', () => {
-  assert.equal(indentOf('\tx'), 4);
-  assert.equal(indentOf('  \tx'), 4);
-  assert.equal(indentOf('    \tx'), 8);
-  assert.equal(indentOf('x'), 0);
+test('a tab advances indentation to the next tab stop', () => {
+  assert.equal(indentOf('\tx', 4), 4);
+  assert.equal(indentOf('  \tx', 4), 4);
+  assert.equal(indentOf('    \tx', 4), 8);
+  assert.equal(indentOf('   \tx', 2), 4);
+  assert.equal(indentOf('\tx', 8), 8);
+  assert.equal(indentOf('x', 4), 0);
 });
 
 test('a dedented view moves its start with the text', () => {
   const [line] = splitLines('    code');
-  assert.deepEqual(dedent(line, 2), { start: 2, end: 8, text: '  code' });
-  assert.deepEqual(dedent(line, 9), { start: 4, end: 8, text: 'code' });
+  assert.deepEqual(dedent(line, 2, 4), { start: 2, end: 8, text: '  code' });
+  assert.deepEqual(dedent(line, 9, 4), { start: 4, end: 8, text: 'code' });
 });
 
 test('a tab dedents whole, however many columns are asked', () => {
   const [line] = splitLines('\tcode');
-  assert.deepEqual(dedent(line, 2), { start: 1, end: 5, text: 'code' });
+  assert.deepEqual(dedent(line, 2, 4), { start: 1, end: 5, text: 'code' });
 });
 
 test('a stripped view moves its start with the text', () => {

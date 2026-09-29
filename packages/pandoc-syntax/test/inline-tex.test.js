@@ -5,19 +5,14 @@
 // span may hold text Pandoc reads as something opaque: code or math.
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
-import { inlines } from '../src/index.js';
+import { blocks, inlines } from '../src/index.js';
+import { readPandoc, TAB_STOPS } from './helpers/pandoc.js';
 
-function pandocRawInlines(text) {
-  const run = spawnSync('pandoc', ['-f', 'markdown', '-t', 'json'], {
-    input: text,
-    encoding: 'utf8',
-  });
-  if (run.error) throw run.error;
-  if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);
+function pandocRawInlines(text, tabStop) {
+  const stdout = readPandoc(text, tabStop);
   const found = [];
-  JSON.parse(run.stdout, (_, value) => {
+  JSON.parse(stdout, (_, value) => {
     if (value?.t === 'RawInline' && value.c[0] === 'tex')
       found.push(value.c[1]);
     return value;
@@ -27,11 +22,13 @@ function pandocRawInlines(text) {
 
 // Each Pandoc raw inline, matched in order to the first span after the last
 // match that contains its text.
-function uncovered(text) {
-  const spans = inlines(text).map((s) => text.slice(s.start, s.end));
+function uncovered(text, tabStop) {
+  const spans = inlines(text, blocks(text, { tabStop })).map((s) =>
+    text.slice(s.start, s.end),
+  );
   const missing = [];
   let at = 0;
-  for (const raw of pandocRawInlines(text)) {
+  for (const raw of pandocRawInlines(text, tabStop)) {
     const hit = spans.findIndex((span, i) => i >= at && span.includes(raw));
     if (hit === -1) missing.push(raw);
     else at = hit + 1;
@@ -73,9 +70,11 @@ const CASES = {
 };
 
 for (const [name, text] of Object.entries(CASES)) {
-  test(`${name}: every raw inline Pandoc finds is inside a span`, () => {
-    assert.deepEqual(uncovered(`${text}\n`), []);
-  });
+  for (const tabStop of TAB_STOPS) {
+    test(`${name}: every raw inline Pandoc finds is inside a span (tab stop ${tabStop})`, () => {
+      assert.deepEqual(uncovered(`${text}\n`, tabStop), []);
+    });
+  }
 }
 
 // The other direction, for what must stay out: text Pandoc reads as code or

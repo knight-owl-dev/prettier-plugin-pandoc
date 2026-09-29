@@ -1,6 +1,6 @@
 // Containers the two parsers bound differently.
 //
-// Pandoc collects a block quote's or list item's lines first and parses them
+// Pandoc collects a block quote's, list item's or footnote's lines first and parses them
 // as a document of its own, so a line without its prefix belongs to the
 // container whatever it follows. CommonMark decides line by line and continues
 // a container lazily only into paragraph text, so after a heading or a fence
@@ -12,7 +12,11 @@ import { lineSpans } from './text.js';
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
 // The node prettier's parser makes for each of the recognizer's containers.
-const NODE_TYPE = { 'block-quote': 'blockquote', 'list-item': 'listItem' };
+const NODE_TYPE = {
+  'block-quote': 'blockquote',
+  'list-item': 'listItem',
+  'footnote-definition': 'footnoteDefinition',
+};
 const NODE_TYPES = new Set(Object.values(NODE_TYPE));
 
 /**

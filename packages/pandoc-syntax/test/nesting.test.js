@@ -6,18 +6,13 @@
 // container prefix in them.
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { blocks } from '../src/index.js';
+import { readPandoc, TAB_STOPS } from './helpers/pandoc.js';
 
 // Pandoc's parse as the kinds of construct it holds, in document order.
-function pandocKinds(text) {
-  const run = spawnSync('pandoc', ['-f', 'markdown', '-t', 'json'], {
-    input: text,
-    encoding: 'utf8',
-  });
-  if (run.error) throw run.error;
-  if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);
+function pandocKinds(text, tabStop) {
+  const stdout = readPandoc(text, tabStop);
   const kinds = [];
   const walk = (node) => {
     if (Array.isArray(node)) return node.forEach(walk);
@@ -33,11 +28,13 @@ function pandocKinds(text) {
     if (node.t === 'Table') kinds.push('table');
     Object.values(node).forEach(walk);
   };
-  walk(JSON.parse(run.stdout).blocks);
+  walk(JSON.parse(stdout).blocks);
   return kinds;
 }
 
 const TABLES = new Set(['grid-table', 'simple-table', 'multiline-table']);
+// A container's own segments are its whole lines, prefix and all.
+const CONTAINERS = new Set(['block-quote', 'list-item', 'footnote-definition']);
 const KINDS = new Set([
   'div',
   'line-block',
@@ -46,8 +43,8 @@ const KINDS = new Set([
   'raw-tex',
 ]);
 
-function recognizerKinds(text) {
-  return blocks(text)
+function recognizerKinds(text, tabStop) {
+  return blocks(text, { tabStop })
     .map((block) => (TABLES.has(block.type) ? 'table' : block.type))
     .filter((kind) => KINDS.has(kind) || kind === 'table');
 }
@@ -64,6 +61,13 @@ const CONSTRUCTS = {
 const WRAPPERS = {
   'a block quote': (lines) => lines.map((l) => `> ${l}`.trimEnd()),
   'a list item': (lines) => ['- item', '', ...lines.map((l) => `  ${l}`)],
+  'a footnote definition': (lines) => [
+    'a[^n]',
+    '',
+    '[^n]: first',
+    '',
+    ...lines.map((l) => `    ${l}`),
+  ],
   'a list item in a block quote': (lines) =>
     ['- item', '', ...lines.map((l) => `  ${l}`)].map((l) =>
       `> ${l}`.trimEnd(),
@@ -74,27 +78,44 @@ for (const [what, construct] of Object.entries(CONSTRUCTS)) {
   for (const [where, wrap] of Object.entries(WRAPPERS)) {
     const text = `${wrap(construct.split('\n')).join('\n')}\n`;
 
-    test(`${what} in ${where}: the recognizer and Pandoc agree`, () => {
-      assert.deepEqual(
-        recognizerKinds(text).filter((k) => k !== 'list-item'),
-        pandocKinds(text),
-      );
-    });
+    for (const tabStop of TAB_STOPS) {
+      const label = `${what} in ${where} (tab stop ${tabStop})`;
 
-    test(`${what} in ${where}: no span holds a container prefix`, () => {
-      for (const block of blocks(text)) {
-        if (block.type === 'block-quote' || block.type === 'list-item') {
-          continue;
+      test(`${label}: the recognizer and Pandoc agree`, () => {
+        assert.deepEqual(
+          recognizerKinds(text, tabStop).filter((k) => k !== 'list-item'),
+          pandocKinds(text, tabStop),
+        );
+      });
+
+      test(`${label}: no span holds a container prefix`, () => {
+        const found = blocks(text, { tabStop });
+        const contentStarts = found
+          .filter((block) => CONTAINERS.has(block.type))
+          .flatMap((container) => container.lines.map((line) => line.start));
+        for (const block of found) {
+          if (CONTAINERS.has(block.type)) continue;
+          const spans =
+            block.type === 'div'
+              ? [block.open, block.close].filter((s) => s !== null)
+              : block.segments;
+          for (const span of spans) {
+            // The innermost container's content on this span's line starts at
+            // the latest content start there.
+            const lineStart = text.lastIndexOf('\n', span.start - 1) + 1;
+            const onLine = contentStarts.filter(
+              (s) => s >= lineStart && s <= span.end,
+            );
+            if (onLine.length > 0) {
+              assert.ok(
+                span.start >= Math.max(...onLine),
+                text.slice(span.start, span.end),
+              );
+            }
+          }
         }
-        const spans =
-          block.type === 'div'
-            ? [block.open, block.close].filter((s) => s !== null)
-            : block.segments;
-        for (const span of spans) {
-          assert.doesNotMatch(text.slice(span.start, span.end), /^(>| {2})/);
-        }
-      }
-    });
+      });
+    }
   }
 }
 
@@ -113,10 +134,12 @@ const LAZY = {
 };
 
 for (const [name, text] of Object.entries(LAZY)) {
-  test(`${name}: the recognizer and Pandoc agree`, () => {
-    assert.deepEqual(
-      recognizerKinds(`${text}\n`).filter((k) => k !== 'list-item'),
-      pandocKinds(`${text}\n`),
-    );
-  });
+  for (const tabStop of TAB_STOPS) {
+    test(`${name}: the recognizer and Pandoc agree (tab stop ${tabStop})`, () => {
+      assert.deepEqual(
+        recognizerKinds(`${text}\n`, tabStop).filter((k) => k !== 'list-item'),
+        pandocKinds(`${text}\n`, tabStop),
+      );
+    });
+  }
 }

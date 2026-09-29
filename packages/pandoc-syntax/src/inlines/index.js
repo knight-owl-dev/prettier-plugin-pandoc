@@ -13,7 +13,7 @@ import { commandEnd, startsCommand } from './tex.js';
 /** @typedef {import('../types.js').InlineSpan} InlineSpan */
 /** @typedef {import('../types.js').Span} Span */
 
-const CONTAINERS = new Set(['block-quote', 'list-item']);
+const CONTAINERS = new Set(['block-quote', 'list-item', 'footnote-definition']);
 
 /**
  * Where markdown is not read, in source order: every block but a container

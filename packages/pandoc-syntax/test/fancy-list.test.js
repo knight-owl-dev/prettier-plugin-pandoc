@@ -9,19 +9,14 @@
 // yet prettier would not read the item. The oracle corpus checks that one.
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { blocks } from '../src/index.js';
+import { readPandoc, TAB_STOPS } from './helpers/pandoc.js';
 
-function pandocFancy(text) {
-  const run = spawnSync('pandoc', ['-f', 'markdown', '-t', 'json'], {
-    input: text,
-    encoding: 'utf8',
-  });
-  if (run.error) throw run.error;
-  if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);
+function pandocFancy(text, tabStop) {
+  const stdout = readPandoc(text, tabStop);
   let fancy = false;
-  JSON.parse(run.stdout, (_, value) => {
+  JSON.parse(stdout, (_, value) => {
     if (value?.t === 'OrderedList') {
       const [, style, delim] = value.c[0];
       const plain = style.t === 'Decimal' && delim.t === 'Period';
@@ -32,8 +27,8 @@ function pandocFancy(text) {
   return fancy;
 }
 
-const recognizerFancy = (text) =>
-  blocks(text).some((block) => block.type === 'fancy-list');
+const recognizerFancy = (text, tabStop) =>
+  blocks(text, { tabStop }).some((block) => block.type === 'fancy-list');
 
 const CASES = {
   'lower alpha': 'a. one\nb. two',
@@ -55,7 +50,12 @@ const CASES = {
 };
 
 for (const [name, text] of Object.entries(CASES)) {
-  test(`${name}: the recognizer and Pandoc agree on a fancy list`, () => {
-    assert.equal(recognizerFancy(`${text}\n`), pandocFancy(`${text}\n`));
-  });
+  for (const tabStop of TAB_STOPS) {
+    test(`${name}: the recognizer and Pandoc agree on a fancy list (tab stop ${tabStop})`, () => {
+      assert.equal(
+        recognizerFancy(`${text}\n`, tabStop),
+        pandocFancy(`${text}\n`, tabStop),
+      );
+    });
+  }
 }

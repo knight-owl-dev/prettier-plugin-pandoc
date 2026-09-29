@@ -3,18 +3,30 @@
 // is reported whole, from its first term or item to the last line that
 // belongs to it.
 
-import { BLANK } from '../lines.js';
-import { CODE_INDENT } from './code.js';
+import { BLANK, indentOf } from '../lines.js';
+import { perSyntax } from '../syntax.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
 /** @typedef {import('../types.js').Context} Context */
+/** @typedef {import('../syntax.js').Syntax} Syntax */
 
-// A definition's marker, indented at most two spaces.
-const DEFINITION_MARKER = /^ {0,2}[:~][ \t]+\S/;
+const patterns = perSyntax((syntax) => ({
+  definitionMarker: syntax.atBlockIndent('[:~][ \\t]+\\S'),
+}));
 const EXAMPLE_ITEM = /^\(@[\w-]*\)[ \t]+\S/;
-// A list resumes past a blank line on content indented under its items.
-const INDENTED_CONTENT = /^( {2,}|\t)\S/;
+
+// A definition list resumes past a blank line on content one tab stop deep.
+const resumesDefinition = (text, syntax) =>
+  !BLANK.test(text) && indentOf(text, syntax.tabStop) >= syntax.codeIndent;
+
+// An example or fancy list resumes on content indented under its items, as
+// narrow as a one-character marker and its space. Wider items resume only
+// further in, so this can run past where Pandoc ends a list — which, for a
+// list printed as written, freezes text that prints as written anyway.
+const NARROWEST_ITEM_CONTENT = 2;
+const resumesItem = (text, syntax) =>
+  !BLANK.test(text) && indentOf(text, syntax.tabStop) >= NARROWEST_ITEM_CONTENT;
 
 // An ordered list marker, in any of Pandoc's styles:
 //
@@ -33,14 +45,19 @@ const ORDERED_MARKER =
 const PLAIN_MARKER = /^[ \t]*\d+\.[ \t]/;
 
 /**
- * Whether a line opens an ordered list item, in any of Pandoc's styles.
+ * Whether a line opens an ordered list item, in any of Pandoc's styles: its
+ * marker short of indented code.
  *
  * @param {string} text
+ * @param {Syntax} syntax
  * @returns {boolean}
  */
-export function isOrderedItem(text) {
+export function isOrderedItem(text, syntax) {
   const marker = ORDERED_MARKER.exec(text);
-  return marker !== null && marker.groups.indent.length < CODE_INDENT;
+  return (
+    marker !== null &&
+    indentOf(marker.groups.indent, syntax.tabStop) < syntax.codeIndent
+  );
 }
 
 // The last line of a list opening on line `at`. Every non-blank line straight
@@ -75,8 +92,9 @@ function opensDefinitionList(lines, at, context) {
   const [next, after] = [lines[at + 1]?.text, lines[at + 2]?.text];
   if (BLANK.test(lines[at].text) || next === undefined) return false;
   if (context.opensBlock(lines, at)) return false;
-  if (DEFINITION_MARKER.test(next)) return true;
-  return BLANK.test(next) && DEFINITION_MARKER.test(after ?? '');
+  const { definitionMarker } = patterns(context.syntax);
+  if (definitionMarker.test(next)) return true;
+  return BLANK.test(next) && definitionMarker.test(after ?? '');
 }
 
 /** @type {Recognizer} */
@@ -86,8 +104,8 @@ export const definitionList = {
   match(lines, at, context) {
     if (!opensDefinitionList(lines, at, context)) return null;
     const resumes = (lines, n) =>
-      INDENTED_CONTENT.test(lines[n].text) ||
-      DEFINITION_MARKER.test(lines[n].text) ||
+      resumesDefinition(lines[n].text, context.syntax) ||
+      patterns(context.syntax).definitionMarker.test(lines[n].text) ||
       opensDefinitionList(lines, n, context);
     return list('definition-list', lines, at, resumes);
   },
@@ -97,10 +115,10 @@ export const definitionList = {
 export const exampleList = {
   name: 'example-list',
   interruptsParagraph: false,
-  match(lines, at) {
+  match(lines, at, { syntax }) {
     if (!EXAMPLE_ITEM.test(lines[at].text)) return null;
     const resumes = (lines, n) =>
-      INDENTED_CONTENT.test(lines[n].text) || EXAMPLE_ITEM.test(lines[n].text);
+      resumesItem(lines[n].text, syntax) || EXAMPLE_ITEM.test(lines[n].text);
     return list('example-list', lines, at, resumes);
   },
 };
@@ -114,10 +132,11 @@ export const exampleList = {
 export const fancyList = {
   name: 'fancy-list',
   interruptsParagraph: false,
-  match(lines, at) {
-    if (!isOrderedItem(lines[at].text)) return null;
+  match(lines, at, { syntax }) {
+    if (!isOrderedItem(lines[at].text, syntax)) return null;
     const resumes = (lines, n) =>
-      INDENTED_CONTENT.test(lines[n].text) || isOrderedItem(lines[n].text);
+      resumesItem(lines[n].text, syntax) ||
+      isOrderedItem(lines[n].text, syntax);
     const last = listEnd(lines, at, resumes);
     const fancy = lines
       .slice(at, last + 1)

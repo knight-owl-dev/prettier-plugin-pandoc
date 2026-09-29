@@ -1,6 +1,7 @@
 // Where Pandoc's markdown blocks begin and end, by Pandoc's block rules.
 
 import { splitLines } from '../lines.js';
+import { DEFAULT_TAB_STOP, syntaxFor } from '../syntax.js';
 import { scan } from './scan.js';
 
 /** @typedef {import('../types.js').Block} Block */
@@ -15,16 +16,18 @@ const startOf = (block) =>
  *
  * A div's close needs no block start: Pandoc ends the paragraph a closing fence
  * interrupts. A div never closed runs to the end of the document, as Pandoc
- * reads it (with a warning), so its `close` is null. Block quotes and list
- * items hold their content's blocks, reported beside them; every span inside a
+ * reads it (with a warning), so its `close` is null. Block quotes, list items
+ * and footnote definitions hold their content's blocks, reported beside them; every span inside a
  * container stops short of its prefix.
  *
  * @param {string} text Pandoc markdown.
+ * @param {{tabStop?: number}} [options] `tabStop` is Pandoc's `--tab-stop`,
+ *   which decides every indentation rule.
  * @returns {Block[]} Offsets into `text`, a line's newline excluded.
  */
-export function blocks(text) {
+export function blocks(text, { tabStop = DEFAULT_TAB_STOP } = {}) {
   /** @type {Block[]} */
   const out = [];
-  scan(splitLines(text), text, out, 0);
+  scan(splitLines(text), text, out, 0, syntaxFor(tabStop));
   return out.sort((a, b) => startOf(a) - startOf(b));
 }

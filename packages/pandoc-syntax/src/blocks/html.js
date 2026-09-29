@@ -2,10 +2,10 @@
 // block-level tag, which end the block before them.
 
 import { BLANK } from '../lines.js';
+import { perSyntax } from '../syntax.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 
-const COMMENT = /^ {0,3}<!--/;
 const COMMENT_END = '-->';
 
 // The tags that open an HTML block. Inline ones — `<span>`, `<em>` — open a
@@ -47,10 +47,13 @@ const BLOCK_TAGS = [
   'tr',
   'ul',
 ];
-const BLOCK_TAG = new RegExp(
-  `^ {0,3}</?(${BLOCK_TAGS.join('|')})(\\s|/?>|$)`,
-  'i',
-);
+const patterns = perSyntax((syntax) => ({
+  comment: syntax.atBlockIndent('<!--'),
+  blockTag: syntax.atBlockIndent(
+    `</?(${BLOCK_TAGS.join('|')})(\\s|/?>|$)`,
+    'i',
+  ),
+}));
 
 /**
  * A comment runs to the line its `-->` is on, or to the end of the document.
@@ -61,8 +64,8 @@ const BLOCK_TAG = new RegExp(
 export const htmlComment = {
   name: 'html-comment',
   interruptsParagraph: false,
-  match(lines, at) {
-    if (!COMMENT.test(lines[at].text)) return null;
+  match(lines, at, { syntax }) {
+    if (!patterns(syntax).comment.test(lines[at].text)) return null;
     let last = at;
     for (let n = at; n < lines.length; n++) {
       if (!BLANK.test(lines[n].text)) last = n;
@@ -89,7 +92,9 @@ export const htmlComment = {
 export const htmlBlockTag = {
   name: 'html-block-tag',
   interruptsParagraph: true,
-  match(lines, at) {
-    return BLOCK_TAG.test(lines[at].text) ? { last: at, after: 'start' } : null;
+  match(lines, at, { syntax }) {
+    return patterns(syntax).blockTag.test(lines[at].text)
+      ? { last: at, after: 'start' }
+      : null;
   },
 };

@@ -2,14 +2,29 @@
 // prettier prints as Pandoc reads them. They are recognized for the block
 // start they leave behind, and nothing is reported.
 
+import { perSyntax } from '../syntax.js';
+
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 
-const ATX = /^ {0,3}#{1,6}(\s|$)/;
-const SETEXT_UNDERLINE = /^ {0,3}(=+|-+)[ \t]*$/;
-export const THEMATIC_BREAK = /^ {0,3}([-*_])([ \t]*\1){2,}[ \t]*$/;
+// An ATX heading starts in the first column: indented, it is paragraph text.
+const ATX = /^#{1,6}(\s|$)/;
 
-const endsHere = (pattern) => (lines, at) =>
+const patterns = perSyntax((syntax) => ({
+  setextUnderline: syntax.atBlockIndent('(=+|-+)[ \\t]*$'),
+  thematicBreak: syntax.atBlockIndent('([-*_])([ \\t]*\\1){2,}[ \\t]*$'),
+}));
+
+const endsHere = (pattern, lines, at) =>
   pattern.test(lines[at].text) ? { last: at, after: 'start' } : null;
+
+/**
+ * Whether a line is a thematic break.
+ *
+ * @param {string} text
+ * @param {import('../syntax.js').Syntax} syntax
+ */
+export const isThematicBreak = (text, syntax) =>
+  patterns(syntax).thematicBreak.test(text);
 
 /**
  * Pandoc wants a blank line before a heading, so `#` continues a paragraph.
@@ -19,7 +34,7 @@ const endsHere = (pattern) => (lines, at) =>
 export const atxHeading = {
   name: 'atx-heading',
   interruptsParagraph: false,
-  match: endsHere(ATX),
+  match: (lines, at) => endsHere(ATX, lines, at),
 };
 
 /**
@@ -33,7 +48,7 @@ export const setextUnderline = {
   interruptsParagraph: true,
   match(lines, at, context) {
     if (context.paragraph?.lines !== 1) return null;
-    return endsHere(SETEXT_UNDERLINE)(lines, at);
+    return endsHere(patterns(context.syntax).setextUnderline, lines, at);
   },
 };
 
@@ -41,5 +56,6 @@ export const setextUnderline = {
 export const thematicBreak = {
   name: 'thematic-break',
   interruptsParagraph: false,
-  match: endsHere(THEMATIC_BREAK),
+  match: (lines, at, { syntax }) =>
+    endsHere(patterns(syntax).thematicBreak, lines, at),
 };

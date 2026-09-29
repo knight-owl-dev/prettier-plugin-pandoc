@@ -5,17 +5,12 @@
 // the same lists, of the same kind, in the same order.
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { blocks } from '../src/index.js';
+import { readPandoc, TAB_STOPS } from './helpers/pandoc.js';
 
-function pandocLists(text) {
-  const run = spawnSync('pandoc', ['-f', 'markdown', '-t', 'json'], {
-    input: text,
-    encoding: 'utf8',
-  });
-  if (run.error) throw run.error;
-  if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);
+function pandocLists(text, tabStop) {
+  const stdout = readPandoc(text, tabStop);
   const found = [];
   const walk = (node) => {
     if (Array.isArray(node)) return node.forEach(walk);
@@ -26,12 +21,12 @@ function pandocLists(text) {
     }
     Object.values(node).forEach(walk);
   };
-  walk(JSON.parse(run.stdout).blocks);
+  walk(JSON.parse(stdout).blocks);
   return found;
 }
 
-const recognizerLists = (text) =>
-  blocks(text)
+const recognizerLists = (text, tabStop) =>
+  blocks(text, { tabStop })
     .filter((b) => b.type === 'definition-list' || b.type === 'example-list')
     .map((b) => b.type);
 
@@ -45,6 +40,9 @@ const CASES = {
   'text after a blank line': 'Term\n:   Def\n\ntext',
   'two terms': 'T1\n:   D1\n\nT2\n:   D2',
   'a marker indented two spaces': 'Term\n  : Def',
+  'a marker indented three spaces': 'Term\n   : Def',
+  'a marker indented five spaces': 'Term\n     : Def',
+  'a two-space line after a blank': 'Term\n:   Def\n\n  more',
   'a marker with no space after': 'Term\n:Def',
   'a term after a paragraph line': 'prose\nTerm\n:   Def',
   'a two-line term': 'Term one\nterm two\n:   Def',
@@ -61,7 +59,12 @@ const CASES = {
 };
 
 for (const [name, text] of Object.entries(CASES)) {
-  test(`${name}: the recognizer and Pandoc agree on the lists`, () => {
-    assert.deepEqual(recognizerLists(`${text}\n`), pandocLists(`${text}\n`));
-  });
+  for (const tabStop of TAB_STOPS) {
+    test(`${name}: the recognizer and Pandoc agree on the lists (tab stop ${tabStop})`, () => {
+      assert.deepEqual(
+        recognizerLists(`${text}\n`, tabStop),
+        pandocLists(`${text}\n`, tabStop),
+      );
+    });
+  }
 }

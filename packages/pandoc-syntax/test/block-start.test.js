@@ -6,26 +6,21 @@
 // here instead of drifting from what an assertion once recorded.
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { blocks } from '../src/index.js';
+import { readPandoc, TAB_STOPS } from './helpers/pandoc.js';
 
 const FENCE = '::: note\ntext\n:::\n';
 
-function pandocOpens(before) {
-  const run = spawnSync('pandoc', ['-f', 'markdown', '-t', 'json'], {
-    input: `${before}\n${FENCE}`,
-    encoding: 'utf8',
-  });
-  if (run.error) throw run.error;
-  if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);
-  return JSON.stringify(JSON.parse(run.stdout).blocks).includes('["note"]');
+function pandocOpens(before, tabStop) {
+  const stdout = readPandoc(`${before}\n${FENCE}`, tabStop);
+  return JSON.stringify(JSON.parse(stdout).blocks).includes('["note"]');
 }
 
-function recognizerOpens(before) {
+function recognizerOpens(before, tabStop) {
   const text = `${before}\n${FENCE}`;
   const at = before.length + 1;
-  return blocks(text).some(
+  return blocks(text, { tabStop }).some(
     (block) => block.type === 'div' && block.open.start === at,
   );
 }
@@ -33,6 +28,8 @@ function recognizerOpens(before) {
 const CASES = {
   paragraph: 'prose',
   'ATX heading': '# H',
+  'an ATX heading indented one space': ' # H',
+  'an ATX heading indented three spaces': '   # H',
   'setext heading': 'H\n=',
   'setext heading, level 2': 'H\n--',
   'thematic break': '***',
@@ -75,7 +72,12 @@ const CASES = {
 };
 
 for (const [name, before] of Object.entries(CASES)) {
-  test(`after ${name}, the recognizer and Pandoc agree`, () => {
-    assert.equal(recognizerOpens(before), pandocOpens(before));
-  });
+  for (const tabStop of TAB_STOPS) {
+    test(`after ${name}, the recognizer and Pandoc agree (tab stop ${tabStop})`, () => {
+      assert.equal(
+        recognizerOpens(before, tabStop),
+        pandocOpens(before, tabStop),
+      );
+    });
+  }
 }

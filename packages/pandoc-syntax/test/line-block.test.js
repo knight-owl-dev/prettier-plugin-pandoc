@@ -5,27 +5,22 @@
 // lines; a continuation joins the line above, so it opens none.
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { blocks } from '../src/index.js';
+import { readPandoc, TAB_STOPS } from './helpers/pandoc.js';
 
-function pandocVerse(text) {
-  const run = spawnSync('pandoc', ['-f', 'markdown', '-t', 'json'], {
-    input: text,
-    encoding: 'utf8',
-  });
-  if (run.error) throw run.error;
-  if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);
+function pandocVerse(text, tabStop) {
+  const stdout = readPandoc(text, tabStop);
   const found = [];
-  JSON.parse(run.stdout, (_, value) => {
+  JSON.parse(stdout, (_, value) => {
     if (value?.t === 'LineBlock') found.push(value.c.length);
     return value;
   });
   return found;
 }
 
-function recognizerVerse(text) {
-  return blocks(text)
+function recognizerVerse(text, tabStop) {
+  return blocks(text, { tabStop })
     .filter((block) => block.type === 'line-block')
     .map(
       (block) =>
@@ -54,7 +49,12 @@ const CASES = {
 };
 
 for (const [name, text] of Object.entries(CASES)) {
-  test(`${name}: the recognizer and Pandoc agree on the line blocks`, () => {
-    assert.deepEqual(recognizerVerse(text), pandocVerse(text));
-  });
+  for (const tabStop of TAB_STOPS) {
+    test(`${name}: the recognizer and Pandoc agree on the line blocks (tab stop ${tabStop})`, () => {
+      assert.deepEqual(
+        recognizerVerse(text, tabStop),
+        pandocVerse(text, tabStop),
+      );
+    });
+  }
 }

@@ -4,13 +4,16 @@
 // either way what follows on the line is a paragraph.
 
 import { BLANK } from '../lines.js';
+import { perSyntax } from '../syntax.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
 /** @typedef {import('../types.js').SpanSpec} SpanSpec */
 /** @typedef {import('../types.js').Match} Match */
 
-const BEGIN = /^ {0,3}\\begin\{([^}]+)\}/;
+const patterns = perSyntax((syntax) => ({
+  begin: syntax.atBlockIndent('\\\\begin\\{([^}]+)\\}'),
+}));
 
 // Commands and their arguments, then optionally a comment. Prose after the
 // last argument makes the whole line a paragraph, and an environment is raw
@@ -56,8 +59,8 @@ function raw(lines, from, to, end, text) {
 export const texEnvironment = {
   name: 'tex-environment',
   interruptsParagraph: true,
-  match(lines, at, { text }) {
-    const name = BEGIN.exec(lines[at].text)?.[1];
+  match(lines, at, { syntax, text }) {
+    const name = patterns(syntax).begin.exec(lines[at].text)?.[1];
     if (name === undefined) return null;
     const close = environmentEnd(lines, at, name);
     return close === null ? null : raw(lines, at, close.line, close.end, text);

@@ -8,7 +8,7 @@
 // start (` {0,3}`): four make a line indented code.
 
 import { fencedCode, indentedCode } from './code.js';
-import { blockQuote, listItem } from './container.js';
+import { blockQuote, footnoteDefinition, listItem } from './container.js';
 import { divOpen } from './div.js';
 import { atxHeading, setextUnderline, thematicBreak } from './heading.js';
 import { htmlBlockTag, htmlComment } from './html.js';
@@ -39,17 +39,20 @@ export const REGISTRY = [
   fancyList,
   // Before the thematic break a table's dash line would otherwise read as.
   pandocTable,
+  pipeTable,
+  // A line one tab stop deep is code, whatever else but a table it would
+  // open: tables come first in Pandoc, each opening short of a tab stop.
+  indentedCode,
   lineBlock,
   texCommandLine,
   blockQuote,
   // Before the list item a `* * *` or `- - -` would otherwise open.
   thematicBreak,
   listItem,
+  footnoteDefinition,
   atxHeading,
   htmlComment,
   linkReference,
-  indentedCode,
-  pipeTable,
 ];
 
 export const INTERRUPTERS = REGISTRY.filter((r) => r.interruptsParagraph);

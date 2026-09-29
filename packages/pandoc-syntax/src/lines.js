@@ -9,10 +9,6 @@
 
 export const BLANK = /^[ \t]*$/;
 
-// Pandoc's `--tab-stop`, at its default: a tab advances to the next multiple
-// of it, and indentation one stop deep makes a line code.
-export const TAB_STOP = 4;
-
 /**
  * Split a document into its lines, newlines excluded.
  *
@@ -31,11 +27,11 @@ export function splitLines(text) {
   }
 }
 
-// The column after `char`, read at `col`; null for a character that is not
-// indentation.
-function advance(col, char) {
+// The column after `char`, read at `col`: a tab advances to the next multiple
+// of `tabStop`. Null for a character that is not indentation.
+function advance(col, char, tabStop) {
   if (char === ' ') return col + 1;
-  if (char === '\t') return col + TAB_STOP - (col % TAB_STOP);
+  if (char === '\t') return col + tabStop - (col % tabStop);
   return null;
 }
 
@@ -43,12 +39,13 @@ function advance(col, char) {
  * The column a line's text starts at.
  *
  * @param {string} text
+ * @param {number} tabStop
  * @returns {number}
  */
-export function indentOf(text) {
+export function indentOf(text, tabStop) {
   let col = 0;
   for (const char of text) {
-    const next = advance(col, char);
+    const next = advance(col, char, tabStop);
     if (next === null) break;
     col = next;
   }
@@ -60,13 +57,14 @@ export function indentOf(text) {
  *
  * @param {Line} line
  * @param {number} cols
+ * @param {number} tabStop
  * @returns {Line}
  */
-export function dedent(line, cols) {
+export function dedent(line, cols, tabStop) {
   let col = 0;
   let i = 0;
   while (i < line.text.length && col < cols) {
-    const next = advance(col, line.text[i]);
+    const next = advance(col, line.text[i], tabStop);
     if (next === null) break;
     col = next;
     i++;

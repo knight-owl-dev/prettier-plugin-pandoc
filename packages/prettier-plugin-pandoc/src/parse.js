@@ -1,7 +1,11 @@
 // Parsing: mask what Pandoc reads differently, parse with prettier's own
 // markdown parser, and settle the masked constructs into its tree.
 
-import { blocks, inlines } from '@knight-owl-dev/pandoc-syntax';
+import {
+  blocks,
+  DEFAULT_TAB_STOP,
+  inlines,
+} from '@knight-owl-dev/pandoc-syntax';
 import * as markdown from 'prettier/plugins/markdown';
 import { firstMisread, isContainer, stretchOf } from './containers.js';
 import { mask, maskable } from './mask.js';
@@ -15,7 +19,10 @@ const base = markdown.parsers.markdown;
 // breaks, and a Pandoc table's layout is its column alignment. Definition,
 // example and fancy lists are CommonMark paragraphs to prettier's parser, so
 // their content stays unformatted until the plugin formats inside them.
+// Indented code is code at Pandoc's tab stop, which CommonMark's fixed one of
+// four need not agree with.
 const VERBATIM = new Set([
+  'indented-code',
   'raw-tex',
   'line-block',
   'grid-table',
@@ -48,10 +55,13 @@ function withStretch(constructs, stretch) {
 
 /**
  * @param {string} text
- * @param {object} options
+ * @param {{pandocTabStop?: number}} options Prettier's options, this plugin's
+ *   among them.
  */
 export async function parse(text, options) {
-  const found = blocks(text);
+  const found = blocks(text, {
+    tabStop: options.pandocTabStop ?? DEFAULT_TAB_STOP,
+  });
   let constructs = {
     divs: found.filter((block) => block.type === 'div'),
     verbatim: found.filter((block) => VERBATIM.has(block.type)),

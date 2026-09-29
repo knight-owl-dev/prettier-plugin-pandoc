@@ -7,6 +7,6 @@
 /** @typedef {import('./types.js').Block} Block */
 /** @typedef {import('./types.js').InlineSpan} InlineSpan */
 
-export { CODE_INDENT } from './blocks/code.js';
 export { blocks } from './blocks/index.js';
 export { inlines } from './inlines/index.js';
+export { DEFAULT_TAB_STOP } from './syntax.js';

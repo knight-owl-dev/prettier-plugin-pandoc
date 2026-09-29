@@ -29,6 +29,12 @@ Status: pre-release. Nothing is published yet.
 
 Each holds inside block quotes and list items as at the top level: Pandoc collects a container's text before parsing it, and so does the recognizer.
 
+## Options
+
+| Option | Default | What it is |
+| --- | --- | --- |
+| `pandocTabStop` | `4` | Pandoc's `--tab-stop`: the columns a tab advances to, and the indentation that makes code. Set it to what your documents are built with. |
+
 ## Preserve, never repair
 
 Markup Pandoc reads as broken stays as written. A fence a paragraph continues into is that paragraph's text to Pandoc, and an unclosed div runs to the end of the document; the plugin prints both as it finds them, since repairing either would change what the document means.

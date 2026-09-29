@@ -32,14 +32,23 @@ const WIDTHS = [40, 80, 120];
 // written.
 const EMBEDDED = ['auto', 'off'];
 
+// Below, at and above Pandoc's default: every indentation rule moves with the
+// tab stop, and prettier's own parser reads at four whatever Pandoc is set to.
+const TAB_STOPS = [2, 4, 8];
+
+// Every combination of the three, for each corpus file.
+const CONFIGURATIONS = WIDTHS.flatMap((printWidth) =>
+  EMBEDDED.flatMap((embedded) =>
+    TAB_STOPS.map((tabStop) => ({ printWidth, embedded, tabStop })),
+  ),
+);
+
 // Pandoc's parse, soft breaks read as spaces. With embedded formatting on, a
 // markdown sample is formatted too, so what must hold is what Pandoc reads in
 // it; with it off, the sample prints as written and is compared as such.
-function pandoc(text, samples = 'as-written') {
-  const run = spawnSync('pandoc', ['-f', 'markdown', '-t', 'json'], {
-    input: text,
-    encoding: 'utf8',
-  });
+function pandoc(text, { samples, tabStop }) {
+  const args = ['-f', 'markdown', '-t', 'json', `--tab-stop=${tabStop}`];
+  const run = spawnSync('pandoc', args, { input: text, encoding: 'utf8' });
   if (run.error) throw run.error;
   if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);
   return JSON.parse(run.stdout, (_, value) => {
@@ -49,7 +58,7 @@ function pandoc(text, samples = 'as-written') {
       value?.t === 'CodeBlock' &&
       value.c[0][1].includes('markdown')
     ) {
-      const read = pandoc(value.c[1], samples).blocks;
+      const read = pandoc(value.c[1], { samples, tabStop }).blocks;
       return { t: 'CodeBlock', c: [value.c[0], read] };
     }
     return value;
@@ -64,23 +73,25 @@ const corpus = readdirSync(CORPUS, { recursive: true }).filter(
 for (const name of corpus) {
   const text = readFileSync(new URL(name, CORPUS), 'utf8');
 
-  for (const [printWidth, embedded] of WIDTHS.flatMap((width) =>
-    EMBEDDED.map((setting) => [width, setting]),
-  )) {
+  for (const { printWidth, embedded, tabStop } of CONFIGURATIONS) {
     const options = {
       ...BASE,
       printWidth,
       embeddedLanguageFormatting: embedded,
+      pandocTabStop: tabStop,
     };
-    const label = `${name} (width ${printWidth}, embedded ${embedded})`;
+    const label = `${name} (width ${printWidth}, embedded ${embedded}, tab stop ${tabStop})`;
     const todo = TODO.has(name) || TODO.has(`${name}:${embedded}`);
+    const read = {
+      samples: embedded === 'auto' ? 'by-meaning' : 'as-written',
+      tabStop,
+    };
 
     test(`${label}: Pandoc reads the formatted file as the source`, {
       todo,
     }, async () => {
       const formatted = await prettier.format(text, options);
-      const samples = embedded === 'auto' ? 'by-meaning' : 'as-written';
-      assert.deepEqual(pandoc(formatted, samples), pandoc(text, samples));
+      assert.deepEqual(pandoc(formatted, read), pandoc(text, read));
     });
 
     test(`${label}: formatting twice changes nothing`, { todo }, async () => {

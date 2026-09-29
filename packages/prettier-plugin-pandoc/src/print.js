@@ -1,7 +1,7 @@
 // Printing: the stock markdown printer, with the nodes it would print wrong
 // printed here.
 
-import { CODE_INDENT } from '@knight-owl-dev/pandoc-syntax';
+import { DEFAULT_TAB_STOP } from '@knight-owl-dev/pandoc-syntax';
 import { doc } from 'prettier';
 import * as markdown from 'prettier/plugins/markdown';
 import { DIV, INLINE_RAW, VERBATIM } from './nodes.js';
@@ -10,8 +10,12 @@ const { align, hardline, literalline, markAsRoot } = doc.builders;
 const { replaceEndOfLine } = doc.utils;
 const mdast = markdown.printers.mdast;
 
-// CommonMark's shortest code fence.
+// CommonMark's shortest code fence, and the indentation that makes code to it.
+// Indented code Pandoc reads as code prints as written; a code node reaching
+// this printer is CommonMark's reading alone, re-emitted as CommonMark wrote
+// it — Pandoc's tab stop has no say in it.
 const SHORTEST_FENCE = 3;
+const COMMONMARK_CODE_INDENT = 4;
 
 // The longest run of `char` in `text`, for a fence that cannot close early.
 const longestRun = (text, char) =>
@@ -42,7 +46,8 @@ function printCode(node, options) {
     value = value.slice(0, -1);
   }
   if (node.isIndented) {
-    return align(CODE_INDENT, [' '.repeat(CODE_INDENT), asWritten(value)]);
+    const indent = ' '.repeat(COMMONMARK_CODE_INDENT);
+    return align(indent.length, [indent, asWritten(value)]);
   }
   const fence = '`'.repeat(
     Math.max(SHORTEST_FENCE, longestRun(value, '`') + 1),
@@ -79,6 +84,18 @@ function printTripleRun(path, options, printChild) {
   return [run, inner, run];
 }
 
+// A footnote definition: its first paragraph on the marker's line, its body
+// indented one tab stop — Pandoc's rule. Stock prettier indents four, which at
+// a tab stop of two is code.
+function printFootnoteDefinition(path, options, printChild) {
+  const tabStop = options.pandocTabStop ?? DEFAULT_TAB_STOP;
+  const body = [];
+  path.each((_, index) => {
+    body.push(index === 0 ? '' : [hardline, hardline], printChild());
+  }, 'children');
+  return ['[^', path.node.label, ']: ', align(tabStop, body)];
+}
+
 // A div: its fences as written, its body formatted. An unclosed div prints no
 // close, since adding one would repair it.
 function printDiv(path, printChild) {
@@ -107,6 +124,8 @@ export function print(path, options, printChild) {
       return replaceEndOfLine(node.value);
     case 'code':
       return printCode(node, options);
+    case 'footnoteDefinition':
+      return printFootnoteDefinition(path, options, printChild);
     case 'emphasis':
       return (
         printTripleRun(path, options, printChild) ??

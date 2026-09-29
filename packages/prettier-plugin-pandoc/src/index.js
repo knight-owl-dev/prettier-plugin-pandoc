@@ -15,6 +15,7 @@
 // Preserve, never repair: markup Pandoc reads as broken stays as written,
 // since repairing it would change what the document means.
 
+import { DEFAULT_TAB_STOP } from '@knight-owl-dev/pandoc-syntax';
 import * as markdown from 'prettier/plugins/markdown';
 import { VISITOR_KEYS } from './nodes.js';
 import { parse } from './parse.js';
@@ -29,6 +30,19 @@ function getVisitorKeys(node, nonTraversableKeys) {
   );
 }
 
+// Pandoc's `--tab-stop`, which decides every indentation rule of the
+// markdown it reads. Set it to what the document is built with.
+export const options = {
+  pandocTabStop: {
+    type: 'int',
+    category: 'Pandoc',
+    default: DEFAULT_TAB_STOP,
+    description:
+      "Pandoc's --tab-stop: the columns a tab advances to, and the indentation that makes code.",
+    range: { start: 1, end: Number.POSITIVE_INFINITY, step: 1 },
+  },
+};
+
 export const parsers = {
   markdown: { ...markdown.parsers.markdown, parse, astFormat: AST_FORMAT },
 };
@@ -37,4 +51,4 @@ export const printers = {
   [AST_FORMAT]: { ...mdast, print, getVisitorKeys },
 };
 
-export default { parsers, printers };
+export default { options, parsers, printers };

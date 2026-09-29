@@ -58,7 +58,7 @@ function toBlock(lines, { type, from, to, start, end }) {
  * @param {Line[]} lines
  * @param {number} from
  * @param {number} to
- * @param {'block-quote' | 'list-item'} type
+ * @param {import('../types.js').ContainerBlock['type']} type
  * @param {Line[]} content
  * @returns {Block}
  */
@@ -86,8 +86,9 @@ function toContainer(lines, from, to, type, content) {
  * @param {Block[]} out
  * @param {number} divDepth Divs open around this document, whose closing fence
  *   ends a container inside them.
+ * @param {import('../syntax.js').Syntax} syntax
  */
-export function scan(lines, text, out, divDepth) {
+export function scan(lines, text, out, divDepth, syntax) {
   /** @type {Span[]} */
   const open = [];
   /** @type {SpanSpec[]} */
@@ -97,6 +98,7 @@ export function scan(lines, text, out, divDepth) {
 
   /** @type {Context} */
   const context = {
+    syntax,
     text,
     inDiv: false,
     paragraph: null,
@@ -122,7 +124,7 @@ export function scan(lines, text, out, divDepth) {
     if (match.container !== undefined) {
       const { type, content } = match.container;
       out.push(toContainer(lines, at, match.last, type, content));
-      scan(content, text, out, divDepth + open.length);
+      scan(content, text, out, divDepth + open.length, syntax);
     }
     paragraph = match.after === 'paragraph' ? { lines: 1 } : null;
     return match.last;

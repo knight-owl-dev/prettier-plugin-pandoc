@@ -37,6 +37,11 @@ the host.
 - **Masking keeps offsets.** Markup is overwritten in place, never removed, so
   every position the stock parser reports indexes the source. Each fill and
   why: `mask.js`.
+- **The tab stop decides indentation.** Pandoc's `--tab-stop` sets both tab
+  expansion and how deep code starts, so every indentation rule derives from
+  `syntaxFor(tabStop)` in `pandoc-syntax`. Prettier's own parser reads at four
+  whatever it is — where the two part, the plugin masks. Probe Pandoc at more
+  than one stop before encoding an indentation rule.
 - **Containers are collected, then read.** Pandoc takes every non-blank line
   after a quote or item into it, then parses the text as a document of its
   own; CommonMark decides line by line, and continues lazily only into a

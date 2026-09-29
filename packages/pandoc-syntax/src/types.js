@@ -30,7 +30,8 @@
 /**
  * @typedef {'raw-tex' | 'line-block' | 'grid-table' | 'simple-table'
  *   | 'multiline-table' | 'definition-list' | 'example-list' | 'fancy-list'
- *   | 'code-block' | 'html-comment' | 'yaml-metadata'} SpanType
+ *   | 'fenced-code' | 'indented-code' | 'html-comment' | 'yaml-metadata'
+ * } SpanType
  */
 
 /**
@@ -45,10 +46,11 @@
  */
 
 /**
- * A block quote or list item, with the lines of its content.
+ * A block quote, list item or footnote definition, with the lines of its
+ * content.
  *
  * @typedef {object} ContainerBlock
- * @property {'block-quote' | 'list-item'} type
+ * @property {'block-quote' | 'list-item' | 'footnote-definition'} type
  * @property {number} start
  * @property {number} end
  * @property {Span[]} segments
@@ -81,12 +83,13 @@
  * @property {'start' | 'paragraph'} after `paragraph` when text a mid-line end
  *   left on the last line is a paragraph's first line.
  * @property {SpanSpec[]} [spans]
- * @property {{type: 'block-quote' | 'list-item', content: Line[]}} [container]
+ * @property {{type: ContainerBlock['type'], content: Line[]}} [container]
  * @property {Span} [divOpen]
  */
 
 /**
  * @typedef {object} Context
+ * @property {import('./syntax.js').Syntax} syntax What the tab stop decides.
  * @property {string} text The whole source.
  * @property {boolean} inDiv Whether a div is open around this line, at any
  *   level of nesting.

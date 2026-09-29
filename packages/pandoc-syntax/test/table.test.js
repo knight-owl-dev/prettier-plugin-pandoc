@@ -6,29 +6,24 @@
 // counts and the recognizer leaves to prettier.
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { blocks } from '../src/index.js';
+import { readPandoc, TAB_STOPS } from './helpers/pandoc.js';
 
 const TABLES = new Set(['grid-table', 'simple-table', 'multiline-table']);
 
-function pandocTables(text) {
-  const run = spawnSync('pandoc', ['-f', 'markdown', '-t', 'json'], {
-    input: text,
-    encoding: 'utf8',
-  });
-  if (run.error) throw run.error;
-  if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);
+function pandocTables(text, tabStop) {
+  const stdout = readPandoc(text, tabStop);
   let found = 0;
-  JSON.parse(run.stdout, (_, value) => {
+  JSON.parse(stdout, (_, value) => {
     if (value?.t === 'Table') found++;
     return value;
   });
   return found;
 }
 
-const recognizerTables = (text) =>
-  blocks(text).filter((block) => TABLES.has(block.type)).length;
+const recognizerTables = (text, tabStop) =>
+  blocks(text, { tabStop }).filter((block) => TABLES.has(block.type)).length;
 
 const GRID = '+---+---+\n| a | b |\n+===+===+\n| 1 | 2 |\n+---+---+';
 const SIMPLE = '  Right  Left\n-------  ----\n     12  12\n    123  123';
@@ -56,7 +51,12 @@ const CASES = {
 };
 
 for (const [name, text] of Object.entries(CASES)) {
-  test(`${name}: the recognizer and Pandoc agree on the tables`, () => {
-    assert.equal(recognizerTables(`${text}\n`), pandocTables(`${text}\n`));
-  });
+  for (const tabStop of TAB_STOPS) {
+    test(`${name}: the recognizer and Pandoc agree on the tables (tab stop ${tabStop})`, () => {
+      assert.equal(
+        recognizerTables(`${text}\n`, tabStop),
+        pandocTables(`${text}\n`, tabStop),
+      );
+    });
+  }
 }

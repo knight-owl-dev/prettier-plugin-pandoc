@@ -3,20 +3,30 @@
 // is only passed over.
 
 import { BLANK } from '../lines.js';
+import { perSyntax } from '../syntax.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
 
-// A grid table is framed in `+` rules and its rows by `|`.
-const GRID_RULE = /^[ \t]*\+[-=:]+(\+[-=:]+)*\+[ \t]*$/;
+// A grid table is framed in `+` rules and its rows by `|`. A dash line is one
+// or more runs of dashes: several runs split a simple table's columns, and a
+// multiline or headerless table opens and closes on one. Rows sit wherever
+// their alignment puts them.
 const GRID_ROW = /^[ \t]*[+|]/;
-
-// A dash line is one or more runs of dashes. Several runs split a simple
-// table's columns; a multiline or headerless table opens and closes on one.
 const DASH_COLUMNS = /^[ \t]*-+([ \t]+-+)+[ \t]*$/;
 const DASH_LINE = /^[ \t]*-+([ \t]+-+)*[ \t]*$/;
-
 const PIPE_ROW = /^[ \t]*\|/;
+
+// The line a table opens on sits short of indented code: a grid table's first
+// rule, the dash line a multiline or headerless table opens on, a simple
+// table's column line — whose header above it sits anywhere — and a pipe
+// table's first row.
+const opening = perSyntax((syntax) => ({
+  gridRule: syntax.atBlockIndent('\\+[-=:]+(\\+[-=:]+)*\\+[ \\t]*$'),
+  dashColumns: syntax.atBlockIndent('-+([ \\t]+-+)+[ \\t]*$'),
+  dashLine: syntax.atBlockIndent('-+([ \\t]+-+)*[ \\t]*$'),
+  pipeRow: syntax.atBlockIndent('\\|'),
+}));
 export const PIPE_SEPARATOR =
   /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
 
@@ -50,23 +60,24 @@ function dashTable(lines, at) {
 // Which of Pandoc's tables opens on line `at`, and its last line. A grid table
 // ends on its last framed line; a simple table at the next blank line, so a
 // text line straight after it is another row.
-function pandocTableAt(lines, at) {
+function pandocTableAt(lines, at, syntax) {
+  const { gridRule, dashColumns, dashLine } = opening(syntax);
   const line = lines[at].text;
   const next = lines[at + 1]?.text;
-  if (GRID_RULE.test(line)) {
+  if (gridRule.test(line)) {
     return {
       type: 'grid-table',
       last: lastWhile(lines, at, (l) => GRID_ROW.test(l)),
     };
   }
   if (next === undefined) return null;
-  if (!BLANK.test(line) && DASH_COLUMNS.test(next)) {
+  if (!BLANK.test(line) && dashColumns.test(next)) {
     return {
       type: 'simple-table',
       last: lastWhile(lines, at, (l) => !BLANK.test(l)),
     };
   }
-  if (DASH_LINE.test(line) && !BLANK.test(next)) return dashTable(lines, at);
+  if (dashLine.test(line) && !BLANK.test(next)) return dashTable(lines, at);
   return null;
 }
 
@@ -74,8 +85,8 @@ function pandocTableAt(lines, at) {
 export const pandocTable = {
   name: 'pandoc-table',
   interruptsParagraph: false,
-  match(lines, at) {
-    const table = pandocTableAt(lines, at);
+  match(lines, at, { syntax }) {
+    const table = pandocTableAt(lines, at, syntax);
     if (table === null) return null;
     return {
       last: table.last,
@@ -94,9 +105,11 @@ export const pandocTable = {
 export const pipeTable = {
   name: 'pipe-table',
   interruptsParagraph: false,
-  match(lines, at) {
+  match(lines, at, { syntax }) {
     const next = lines[at + 1]?.text;
-    if (!PIPE_ROW.test(lines[at].text) || next === undefined) return null;
+    if (!opening(syntax).pipeRow.test(lines[at].text) || next === undefined) {
+      return null;
+    }
     if (!PIPE_SEPARATOR.test(next)) return null;
     return {
       last: lastWhile(lines, at, (l) => PIPE_ROW.test(l)),
