@@ -27,6 +27,7 @@ export const REGISTRY = [
   setextUnderline,
   htmlBlockTag,
 
+  // The rest open only at a block start.
   divOpen,
   // Before the thematic break and the tables its `---` would otherwise open.
   yamlMetadata,
