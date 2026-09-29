@@ -39,6 +39,14 @@ const TABLE_SEPARATOR =
 // end of the line; a line starting with a space continues the verse line above.
 const LINE_BLOCK_LINE = /^\|( |$)/;
 const LINE_BLOCK_CONTINUATION = /^ +\S/;
+// Pandoc's own table forms; a pipe table is CommonMark's too, and prettier
+// already prints one as Pandoc reads it. A grid table is framed in `+` rules. A
+// dash line is one or more runs of dashes: several runs split a simple table's
+// columns, and a multiline or headerless table opens and closes on one.
+const GRID_RULE = /^[ \t]*\+[-=:]+(\+[-=:]+)*\+[ \t]*$/;
+const GRID_ROW = /^[ \t]*[+|]/;
+const DASH_COLUMNS = /^[ \t]*-+([ \t]+-+)+[ \t]*$/;
+const DASH_LINE = /^[ \t]*-+([ \t]+-+)*[ \t]*$/;
 const LINK_REFERENCE = /^ {0,3}\[[^\]^][^\]]*\]:[ \t]*\S/;
 
 // Where the line before left the reader. START: the next line may open any
@@ -84,14 +92,7 @@ function opened(lines, at) {
   }
   if (HTML_BLOCK_TAG.test(line)) return START;
   if (LINK_REFERENCE.test(line)) return START;
-  if (
-    YAML_FENCE.test(line) &&
-    next !== undefined &&
-    !BLANK.test(next) &&
-    lines.slice(at + 1).some((l) => YAML_END.test(l.text))
-  ) {
-    return { kind: 'yaml' };
-  }
+  if (opensYaml(lines, at)) return { kind: 'yaml' };
   if (INDENTED.test(line)) return { kind: 'indented' };
   if (
     /^[ \t]*\|/.test(line) &&
@@ -117,6 +118,55 @@ function texEnd(lines, at, env) {
       depth += m[1] === 'begin' ? 1 : -1;
       if (depth === 0) {
         return { line: n, end: lines[n].start + m.index + m[0].length };
+      }
+    }
+  }
+  return null;
+}
+
+function opensYaml(lines, at) {
+  const next = lines[at + 1]?.text;
+  return (
+    YAML_FENCE.test(lines[at].text) &&
+    next !== undefined &&
+    !BLANK.test(next) &&
+    lines.slice(at + 1).some((l) => YAML_END.test(l.text))
+  );
+}
+
+// The table opening on line `at`, and its last line; null when none does. A
+// grid table ends on its last framed line, a simple table at the next blank
+// line — a text line straight after it is another row — and a multiline or
+// headerless table on its closing dash line. Without that line the opening
+// dashes are a thematic break.
+function tableAt(lines, at) {
+  const line = lines[at].text;
+  const next = lines[at + 1]?.text;
+
+  if (GRID_RULE.test(line)) {
+    let n = at;
+    while (n + 1 < lines.length && GRID_ROW.test(lines[n + 1].text)) n++;
+    return { type: 'grid-table', last: n };
+  }
+  if (next !== undefined && !BLANK.test(line) && DASH_COLUMNS.test(next)) {
+    let n = at;
+    while (n + 1 < lines.length && !BLANK.test(lines[n + 1].text)) n++;
+    return { type: 'simple-table', last: n };
+  }
+  if (DASH_LINE.test(line) && next !== undefined && !BLANK.test(next)) {
+    // Headerless: rows between two column lines. Multiline: a full-width rule,
+    // header lines, a column line, rows, and a full-width rule again — which
+    // closes it only once the column line has been seen.
+    const headerless = DASH_COLUMNS.test(line);
+    let separated = false;
+    for (let n = at + 1; n < lines.length; n++) {
+      const row = lines[n].text;
+      if (headerless && DASH_COLUMNS.test(row)) {
+        return { type: 'simple-table', last: n };
+      }
+      if (!headerless && DASH_COLUMNS.test(row)) separated = true;
+      else if (!headerless && separated && DASH_LINE.test(row)) {
+        return { type: 'multiline-table', last: n };
       }
     }
   }
@@ -170,7 +220,8 @@ function within(state, line) {
 }
 
 /**
- * Find every fenced div, raw TeX block and line block, in source order.
+ * Find every fenced div, raw TeX block, line block and Pandoc table, in source
+ * order.
  *
  * A div's close needs no block start: Pandoc ends the paragraph a closing fence
  * interrupts. A div never closed runs to the end of the document, as Pandoc
@@ -182,7 +233,8 @@ function within(state, line) {
  * follows is a paragraph.
  *
  * A line block runs from its first verse line to its last, continuations
- * included.
+ * included. A table runs from its first line to its last; its caption is a
+ * paragraph of its own, which Pandoc attaches.
  *
  * @param {string} text Pandoc markdown.
  * @returns {({
@@ -190,7 +242,12 @@ function within(state, line) {
  *   open: {start: number, end: number},
  *   close: {start: number, end: number} | null,
  * } | {
- *   type: 'raw-tex' | 'line-block',
+ *   type:
+ *     | 'raw-tex'
+ *     | 'line-block'
+ *     | 'grid-table'
+ *     | 'simple-table'
+ *     | 'multiline-table',
  *   start: number,
  *   end: number,
  * })[]} Offsets, a line's newline excluded.
@@ -199,6 +256,7 @@ export function blocks(text) {
   const divs = [];
   const raws = [];
   const verses = [];
+  const tables = [];
   const open = [];
   const lines = splitLines(text);
   let state = START;
@@ -249,6 +307,12 @@ export function blocks(text) {
       else state.lines++;
     } else if (DIV_OPEN.test(t)) {
       open.push(span);
+    } else if (!opensYaml(lines, n) && tableAt(lines, n) !== null) {
+      const table = tableAt(lines, n);
+      const end = lines[table.last].end;
+      tables.push({ type: table.type, start: line.start, end });
+      state =
+        table.last === n ? START : { kind: 'skip', line: table.last, end };
     } else if (
       LINE_BLOCK_LINE.test(t) &&
       !TABLE_SEPARATOR.test(lines[n + 1]?.text ?? '')
@@ -273,7 +337,7 @@ export function blocks(text) {
   for (const span of open) divs.push({ type: 'div', open: span, close: null });
   const start = (block) =>
     block.type === 'div' ? block.open.start : block.start;
-  return [...divs, ...mergeAdjacent(raws), ...verses].sort(
+  return [...divs, ...mergeAdjacent(raws), ...verses, ...tables].sort(
     (a, b) => start(a) - start(b),
   );
 }

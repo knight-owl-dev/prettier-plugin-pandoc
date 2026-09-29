@@ -7,10 +7,11 @@
 //   1. @knight-owl-dev/pandoc-blocks finds each block by Pandoc's rules.
 //   2. Each block is masked in place, so every offset stays true to the source
 //      and the stock parser sees the block break Pandoc sees there. A div's
-//      fence lines blank to spaces. A verbatim block's lines — raw TeX, verse
-//      — each become `#` and spaces: an ATX heading ends on its own line and
-//      interrupts a paragraph, as raw TeX does, and text after a mid-line end
-//      stays out of an indented code block, where blanking would put it.
+//      fence lines blank to spaces. A verbatim block's lines — raw TeX, verse,
+//      Pandoc tables — each become `#` and spaces: an ATX heading ends on its
+//      own line and interrupts a paragraph, as raw TeX does, and text after a
+//      mid-line end stays out of an indented code block, where blanking would
+//      put it.
 //   3. The nodes a block spans are replaced by a node of this plugin's own,
 //      which the wrapped printer prints; every other node prints as stock.
 //
@@ -27,6 +28,16 @@ const base = markdown.parsers.markdown;
 const mdast = markdown.printers.mdast;
 
 const AST_FORMAT = 'mdast-pandoc';
+
+// Printed as written: raw TeX is another language's source, verse is its line
+// breaks, and a Pandoc table's layout is its column alignment.
+const VERBATIM = new Set([
+  'raw-tex',
+  'line-block',
+  'grid-table',
+  'simple-table',
+  'multiline-table',
+]);
 
 // Fold the nodes each div spans into a pandocDiv, nesting as the fences do.
 function fold(children, divs, text) {
@@ -137,11 +148,7 @@ function restoreVerbatim(children, verbatimBlocks, text) {
 async function parse(text, options) {
   const found = blocks(text);
   const divs = found.filter((block) => block.type === 'div');
-  // Printed as written: raw TeX is another language's source, and verse is
-  // its line breaks.
-  const verbatimBlocks = found.filter(
-    (block) => block.type === 'raw-tex' || block.type === 'line-block',
-  );
+  const verbatimBlocks = found.filter((block) => VERBATIM.has(block.type));
   const ast = await base.parse(mask(text, divs, verbatimBlocks), options);
   ast.children = fold(
     restoreVerbatim(ast.children, verbatimBlocks, text),

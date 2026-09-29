@@ -20,8 +20,8 @@ Status: pre-release. Nothing is published yet.
 | Fenced divs | Handled |
 | Line blocks | Handled |
 | Definition lists | Planned |
-| Grid tables | Planned |
-| Simple tables | Planned |
+| Grid tables | Handled |
+| Simple and multiline tables | Handled |
 | Example lists | Planned |
 | Raw TeX blocks | Handled |
 

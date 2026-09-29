@@ -20,8 +20,6 @@ const TODO = new Set([
   'code-trailing-space.md:off',
   'definition-lists.md',
   'example-lists.md',
-  'grid-tables.md',
-  'simple-tables.md',
   'strong-emphasis.md',
 ]);
 
