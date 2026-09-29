@@ -7,7 +7,7 @@
 // never runs narrower: every raw inline Pandoc finds lies inside one span, so a
 // caller that leaves the spans as written leaves Pandoc's raw text alone.
 
-import { blocks } from './blocks.js';
+import { blocks } from './blocks/index.js';
 
 const LETTER = /[A-Za-z]/;
 const SPACE = /[ \t]/;
