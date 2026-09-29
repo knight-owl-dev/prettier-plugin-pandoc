@@ -1,0 +1,82 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+
+  // config:recommended is not extended: its :ignoreModulesAndTests covers
+  // **/test/**, where the test image's Dockerfile lives.
+  "extends": ["docker:pinDigests"],
+
+  "dependencyDashboard": true,
+
+  // Commit subjects here are plain imperative sentences.
+  "semanticCommits": "disabled",
+
+  // No `schedule` here: renovate.yml's cron owns when this runs.
+  "prConcurrentLimit": 5,
+
+  // A weekly run under the default hourly cap leaves every update past the
+  // second for next week; prConcurrentLimit already bounds the CI load.
+  "prHourlyLimit": 0,
+
+  "customManagers": [
+    {
+      // The ci-tools lint toolchain, which the Makefile alone names.
+      "customType": "regex",
+      "managerFilePatterns": ["/^Makefile$/"],
+      "matchStrings": [
+        "CI_TOOLS_IMAGE \\?= (?<depName>\\S+):(?<currentValue>[^:@\\s]+)@(?<currentDigest>sha256:[0-9a-f]{64})"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["action"],
+      "labels": ["dependencies", "github-actions"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["action"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "actions (minor and patch)"
+    },
+    {
+      "matchDatasources": ["github-runners"],
+      "labels": ["dependencies", "github-actions"]
+    },
+    {
+      "matchDatasources": ["docker"],
+      "labels": ["dependencies", "docker"]
+    },
+
+    // The oracle's reader: a bump is a new Pandoc under test, which the
+    // corpus sweep on its PR either confirms or refutes.
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["pandoc/minimal"],
+      "labels": ["dependencies", "pandoc"]
+    },
+
+    // The github-actions manager reads renovate.yml's renovate-version input
+    // as this image. The input takes a version, so a digest has nowhere to go.
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/renovatebot/renovate"],
+      "pinDigests": false
+    },
+
+    {
+      "matchManagers": ["npm"],
+      "labels": ["dependencies", "npm"]
+    },
+
+    // The peer range is the support promise, and the suite tests only the
+    // pinned devDependency. It moves by hand, with a devDependency major.
+    {
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["peerDependencies"],
+      "enabled": false
+    }
+  ]
+}
