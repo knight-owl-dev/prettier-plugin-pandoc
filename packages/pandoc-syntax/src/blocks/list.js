@@ -20,10 +20,10 @@ const EXAMPLE_ITEM = /^\(@[\w-]*\)[ \t]+\S/;
 const resumesDefinition = (text, syntax) =>
   !BLANK.test(text) && indentOf(text, syntax.tabStop) >= syntax.codeIndent;
 
-// An example or fancy list resumes on content indented under its items, as
-// narrow as a one-character marker and its space. Wider items resume only
-// further in, so this can run past where Pandoc ends a list — which, for a
-// list printed as written, freezes text that prints as written anyway.
+// An example or fancy list resumes on content indented two columns or more:
+// the narrowest an item's content sits, a one-character marker and its space.
+// An item with a wider marker needs more, so a list can run past where Pandoc
+// ends it. The span prints as written, which leaves those lines unchanged.
 const NARROWEST_ITEM_CONTENT = 2;
 const resumesItem = (text, syntax) =>
   !BLANK.test(text) && indentOf(text, syntax.tabStop) >= NARROWEST_ITEM_CONTENT;

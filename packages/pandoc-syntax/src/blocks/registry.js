@@ -37,8 +37,8 @@ export const REGISTRY = [
   // Before the thematic break a table's dash line would otherwise read as.
   pandocTable,
   pipeTable,
-  // A line one tab stop deep is code, whatever else but a table it would
-  // open: tables come first in Pandoc, each opening short of a tab stop.
+  // A line one tab stop deep is code, except where it opens a table: Pandoc
+  // tries tables first, and a simple table's header may sit that deep.
   indentedCode,
   lineBlock,
   texCommandLine,
