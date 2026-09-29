@@ -22,7 +22,7 @@ import { blocks } from '@knight-owl-dev/pandoc-blocks';
 import { doc } from 'prettier';
 import * as markdown from 'prettier/plugins/markdown';
 
-const { hardline } = doc.builders;
+const { align, hardline, literalline, markAsRoot } = doc.builders;
 const { replaceEndOfLine } = doc.utils;
 const base = markdown.parsers.markdown;
 const mdast = markdown.printers.mdast;
@@ -163,8 +163,65 @@ async function parse(text, options) {
   return ast;
 }
 
+// The longest run of `char` in `text`, for a fence that cannot close early.
+const longestRun = (text, char) =>
+  Math.max(
+    0,
+    ...[...text.matchAll(new RegExp(`\\${char}+`, 'g'))].map(
+      (m) => m[0].length,
+    ),
+  );
+
+// Code prints as written. Stock prettier breaks its lines with hardline, which
+// trims trailing whitespace — and a sample's two trailing spaces are a hard
+// break it shows. A literal line does not trim; marked as root, it keeps the
+// indentation the block sits at, inside a list item say.
+function printCode(node, options) {
+  let { value } = node;
+  // An unclosed fence at the end of the file keeps the file's last newline
+  // in its value; stock prettier drops it, and so does this.
+  if (
+    node.position.end.offset === options.originalText.length &&
+    value.endsWith('\n') &&
+    options.originalText.endsWith('\n')
+  ) {
+    value = value.slice(0, -1);
+  }
+  const body = markAsRoot(replaceEndOfLine(value, literalline));
+  if (node.isIndented) return align(4, ['    ', body]);
+  const fence = '`'.repeat(Math.max(3, longestRun(value, '`') + 1));
+  const info = [node.lang ?? '', node.meta ? ` ${node.meta}` : ''];
+  return [fence, ...info, hardline, body, hardline, fence];
+}
+
+// `***x***` is strong around emphasis to Pandoc and emphasis around strong to
+// prettier's parser, which prints it as `_**x**_` — emphasis around strong to
+// Pandoc too. Where the source wrote the triple run, it is written again.
+function printTripleRun(path, options, print) {
+  const node = path.node;
+  if (node.children.length !== 1 || node.children[0].type !== 'strong') {
+    return null;
+  }
+  const source = options.originalText.slice(
+    node.position.start.offset,
+    node.position.end.offset,
+  );
+  const run = /^(\*\*\*|___)/.exec(source)?.[1];
+  if (run === undefined) return null;
+  return [
+    run,
+    path.call((inner) => inner.map(print, 'children'), 'children', 0),
+    run,
+  ];
+}
+
 function print(path, options, print) {
   const node = path.node;
+  if (node.type === 'code') return printCode(node, options);
+  if (node.type === 'emphasis') {
+    const triple = printTripleRun(path, options, print);
+    if (triple !== null) return triple;
+  }
   if (node.type === 'pandocVerbatim') return replaceEndOfLine(node.value);
   if (node.type !== 'pandocDiv') return mdast.print(path, options, print);
 

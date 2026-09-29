@@ -32,6 +32,8 @@ the host.
   it is overwritten with is chosen for the block CommonMark must see there:
   spaces for a div fence, `#` for each raw TeX line — an indented tail would
   otherwise read as code.
-- **`embeddedLanguageFormatting: off` strips trailing whitespace in code.**
-  The oracle runs every file under both settings for that reason.
+- **Stock prettier trims code blocks.** Its line breaks drop trailing
+  whitespace, which in a sample is a hard break shown; the plugin prints code
+  through literal lines instead. The oracle runs both embedded settings, since
+  `auto` reformats a tagged sample and `off` leaves it to that printer.
 - **Keep issue numbers out of commit messages.** They belong in the PR.

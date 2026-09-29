@@ -16,7 +16,7 @@ const CORPUS = new URL('./corpus/', import.meta.url);
 
 // Constructs the plugin does not handle yet. Each runs, reported as todo, so
 // the day one starts passing is visible in the output.
-const TODO = new Set(['code-trailing-space.md:off', 'strong-emphasis.md']);
+const TODO = new Set([]);
 
 const BASE = {
   parser: 'markdown',
@@ -28,8 +28,8 @@ const BASE = {
 // width wraps the most, so it lands the most words at the start of a line.
 const WIDTHS = [40, 80, 120];
 
-// Both ways a fenced sample can be printed: reformatted by its tag, or left to
-// the markdown printer, which strips its trailing whitespace.
+// Both ways a fenced sample can be printed: reformatted by its tag, or as
+// written.
 const EMBEDDED = ['auto', 'off'];
 
 function pandoc(text) {
