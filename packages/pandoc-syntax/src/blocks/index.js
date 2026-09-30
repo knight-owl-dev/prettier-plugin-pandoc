@@ -7,7 +7,7 @@ import { endsParagraph, scan } from './scan.js';
 
 /** @typedef {import('../types.js').Block} Block */
 
-// The paragraph `interruptsParagraph` asks about.
+// The paragraph line `interruptsParagraph` asks about when none is given.
 const PARAGRAPH_LINE = 'text';
 
 const startOf = (block) =>
@@ -40,23 +40,29 @@ export function blocks(text, { tabStop = DEFAULT_TAB_STOP } = {}) {
  * line a formatter must not wrap a paragraph onto.
  *
  * @param {string} line One line, without its newline.
- * @param {{tabStop?: number, after?: string}} [options] `after` is what
- *   follows the line, where a fence finds its close and an environment its
- *   end.
+ * @param {{
+ *   tabStop?: number,
+ *   before?: string,
+ *   after?: string | (() => string),
+ * }} [options] `before` is the paragraph's line above, where a pipe table
+ *   finds its header. `after` is what follows, where a fence finds its close
+ *   and an environment its end; given as a function, it is asked for only
+ *   where it could decide.
  * @returns {boolean}
  */
 export function interruptsParagraph(
   line,
-  { tabStop = DEFAULT_TAB_STOP, after = '' } = {},
+  { tabStop = DEFAULT_TAB_STOP, before = PARAGRAPH_LINE, after = '' } = {},
 ) {
   const syntax = syntaxFor(tabStop);
+  const above = before.replaceAll('\n', ' ');
   const endsWith = (following) => {
-    const text = `${PARAGRAPH_LINE}\n${line}\n${following}`;
+    const text = `${above}\n${line}\n${following}`;
     return endsParagraph(splitLines(text), text, syntax);
   };
   // What follows is read only where it could decide: a formatter asks this of
   // every word, and most open nothing.
   if (endsWith('')) return true;
-  const looksAhead = INTERRUPTERS.some((r) => r.opensAhead?.(line, syntax));
-  return looksAhead && endsWith(after);
+  if (!INTERRUPTERS.some((r) => r.opensAhead?.(line, syntax))) return false;
+  return endsWith(typeof after === 'function' ? after() : after);
 }

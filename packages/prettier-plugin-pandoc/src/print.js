@@ -1,14 +1,11 @@
 // Printing: the stock markdown printer, with the nodes it would print wrong
 // printed here.
 
-import {
-  DEFAULT_TAB_STOP,
-  interruptsParagraph,
-} from '@knight-owl-dev/pandoc-syntax';
+import { DEFAULT_TAB_STOP } from '@knight-owl-dev/pandoc-syntax';
 import { doc } from 'prettier';
 import * as markdown from 'prettier/plugins/markdown';
 import { DIV, isInlineRaw, VERBATIM } from './nodes.js';
-import { lineEnd } from './text.js';
+import { breaksParagraph } from './wrap.js';
 
 const { align, hardline, literalline, markAsRoot } = doc.builders;
 const { replaceEndOfLine } = doc.utils;
@@ -98,38 +95,6 @@ function printFootnoteDefinition(path, options, printChild) {
     body.push(index === 0 ? '' : [hardline, hardline], printChild());
   }, 'children');
   return ['[^', path.node.label, ']: ', align(tabStop, body)];
-}
-
-// What a line broken at this whitespace would start with, and the source after
-// that line: the next word, or the inline node after the sentence it ends. A
-// word carries no offset, so the rest of the document from its paragraph on
-// stands in; a close before the break only keeps the line whole, and a word
-// that could open an environment is one that never closes, since a closed one
-// is raw TeX with an offset of its own.
-function nextOnLine(path, options) {
-  const text = options.originalText;
-  if (path.next) {
-    const paragraph = path.findAncestor((node) => node.type === 'paragraph');
-    const from = paragraph?.position.start.offset ?? text.length;
-    return { line: path.next.value ?? '', after: text.slice(from) };
-  }
-  const [sentence, holder] = [path.parent, path.grandparent];
-  const next = holder?.children?.[holder.children.indexOf(sentence) + 1];
-  if (next?.position === undefined) return { line: '', after: '' };
-  const start = next.position.start.offset;
-  const end = lineEnd(text, start);
-  return { line: text.slice(start, end), after: text.slice(end + 1) };
-}
-
-// Whitespace a line must not break at: the line after would open a block to
-// Pandoc — `--` a setext underline, a fence a code block.
-function breaksParagraph(path, options) {
-  const { line, after } = nextOnLine(path, options);
-  if (line === '') return false;
-  return interruptsParagraph(line, {
-    tabStop: options.pandocTabStop ?? DEFAULT_TAB_STOP,
-    after,
-  });
 }
 
 const isHardline = (part) =>

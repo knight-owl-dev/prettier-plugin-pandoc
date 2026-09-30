@@ -10,6 +10,7 @@ import * as markdown from 'prettier/plugins/markdown';
 import { firstUnreadCode } from './code.js';
 import { firstMisread, isContainer, stretchOf } from './containers.js';
 import { mask, maskable } from './mask.js';
+import { CONTAINERS } from './nodes.js';
 import { settle } from './settle.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
@@ -93,5 +94,6 @@ export async function parse(text, options) {
   }
 
   settle(ast, constructs, text);
+  ast[CONTAINERS] = found.filter(isContainer);
   return ast;
 }

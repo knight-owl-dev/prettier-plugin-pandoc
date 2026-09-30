@@ -11,7 +11,11 @@ the rain came down on every quiet road ```
 
 the rain came down on every quiet road <div>
 
-the rain came down on every quiet road : and a colon
+the rain came down on every quiet roads : and a colon
+
+the rain came down on every quiet roads ~ and a tilde
+
+a | b | the rain fell on every quiet ro |---|---|
 
 A code block later in the file, whose opening fence a wrapped fence would close
 on:
@@ -19,3 +23,12 @@ on:
 ```
 code
 ```
+
+In a block quote, a fence finds its close on the quote's own lines:
+
+> the rain came down on every quiet roa ```
+> and more
+>
+> ```
+> code
+> ```

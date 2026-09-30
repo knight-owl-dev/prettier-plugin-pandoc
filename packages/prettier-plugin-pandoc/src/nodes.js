@@ -12,6 +12,10 @@ export const VISITOR_KEYS = {
   [VERBATIM]: [],
 };
 
+// On the root: the recognizer's containers, whose content lines the printer
+// reads the source through.
+export const CONTAINERS = 'pandocContainers';
+
 // Inline raw TeX, printed exactly as written: a code span marked so. It stays
 // a code span to prettier, which joins a node's children by line breaks
 // wherever one is a type it does not know as inline.

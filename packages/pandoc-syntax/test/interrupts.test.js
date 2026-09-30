@@ -24,24 +24,29 @@ const ELEMENTS = `a abbr address area article aside audio b base bdi bdo
   .split(/\s+/);
 // cspell:enable
 
-function pandocInterrupts(line, after, tabStop) {
-  const text = `text\n${line}\n${after}`;
+function pandocInterrupts(line, { before, after }, tabStop) {
+  const text = `${before}\n${line}\n${after}`;
   const [first] = JSON.parse(readPandoc(text, tabStop)).blocks;
   return !(first.t === 'Para' && first.c.length > 1);
 }
 
-// A case is a line, or a line and the text after it.
+// A case is a line, or a line with the paragraph line above it and the text
+// after it.
 const CASES = {
   'a setext underline': '--',
   'a setext underline of equals signs': '==',
   'a dash followed by text': '-- and more',
   'an unclosed code fence': '```',
-  'a closed code fence': ['```', 'code\n```\n'],
+  'a closed code fence': ['```', { after: 'code\n```\n' }],
   'an unclosed tilde fence': '~~~',
-  'a closed tilde fence': ['~~~', 'code\n~~~\n'],
+  'a closed tilde fence': ['~~~', { after: 'code\n~~~\n' }],
   'an unclosed environment': '\\begin{center}',
-  'a closed environment': ['\\begin{center}', 'x\n\\end{center}\n'],
+  'a closed environment': ['\\begin{center}', { after: 'x\n\\end{center}\n' }],
   'a definition marker straight after': ': definition',
+  'a lone colon': ':',
+  'a tilde definition marker': '~ definition',
+  'a pipe separator under a pipe header': ['|---|---|', { before: 'a | b' }],
+  'a pipe separator under prose': '|---|---|',
   'a heading marker': '# Heading',
   'a list marker': '- item',
   'a div fence': '::: note',
@@ -58,12 +63,13 @@ for (const element of ELEMENTS) {
 }
 
 for (const [name, value] of Object.entries(CASES)) {
-  const [line, after = ''] = [value].flat();
+  const [line, given = {}] = [value].flat();
+  const around = { before: 'text', after: '', ...given };
   for (const tabStop of TAB_STOPS) {
     test(`${name}: the recognizer and Pandoc agree whether it ends a paragraph (tab stop ${tabStop})`, () => {
       assert.equal(
-        interruptsParagraph(line, { tabStop, after }),
-        pandocInterrupts(line, after, tabStop),
+        interruptsParagraph(line, { tabStop, ...around }),
+        pandocInterrupts(line, around, tabStop),
       );
     });
   }
