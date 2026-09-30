@@ -22,8 +22,8 @@ the host.
   construct not handled yet stays in the oracle's `TODO` set so it runs:
   `oracle.test.js`.
 - **A construct is a recognizer.** One module under
-  `packages/pandoc-syntax/src/blocks/`, a test asking Pandoc, a corpus file,
-  and a position in `registry.js`, with a comment saying why it sits there.
+  `packages/pandoc-syntax/src/blocks/`, a test asking Pandoc, a corpus file, and
+  a position in `registry.js`, with a comment saying why it sits there.
 - **`pandoc-syntax` imports no prettier.** It answers where a Pandoc construct
   starts for any consumer; a printer concern belongs in the plugin.
 - **Probe Pandoc before encoding a rule**, at more than one tab stop when the
@@ -35,7 +35,7 @@ the host.
 - **Containers are collected, then read:** `containers.js`.
 - **Where the two parsers part, print as written, found by comparing their
   trees:** `containers.js`, `unread.js`, `stretch.js`.
-- **A node the plugin puts inside inline content keeps a type prettier knows
-  as inline:** `nodes.js`.
+- **A node the plugin puts inside inline content keeps a type prettier knows as
+  inline:** `nodes.js`.
 - **Stock prettier trims code blocks:** `print.js`.
 - **Keep issue numbers out of commit messages.** They belong in the PR.

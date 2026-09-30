@@ -1,8 +1,8 @@
 # PR Auto-Merge Command
 
-Enable auto-merge (squash) on a pull request with a reviewed, consolidated commit
-body — and **no subject**, so GitHub keeps the PR title as the squash title and
-appends `(#N)` on merge.
+Enable auto-merge (squash) on a pull request with a reviewed, consolidated
+commit body — and **no subject**, so GitHub keeps the PR title as the squash
+title and appends `(#N)` on merge.
 
 ## Arguments: $ARGUMENTS
 
@@ -44,7 +44,8 @@ If no PR exists for the branch, stop and tell the user (suggest `/pr-create`).
     --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved|not)'
   ```
 
-  For each unresolved thread whose feedback is **already addressed**, resolve it:
+  For each unresolved thread whose feedback is **already addressed**, resolve
+  it:
 
   ```bash
   gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=<threadId>
