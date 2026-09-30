@@ -1,7 +1,10 @@
 // Printing: the stock markdown printer, with the nodes it would print wrong
 // printed here.
 
-import { DEFAULT_TAB_STOP } from '@knight-owl-dev/pandoc-syntax';
+import {
+  DEFAULT_TAB_STOP,
+  interruptsParagraph,
+} from '@knight-owl-dev/pandoc-syntax';
 import { doc } from 'prettier';
 import * as markdown from 'prettier/plugins/markdown';
 import { DIV, INLINE_RAW, VERBATIM } from './nodes.js';
@@ -96,6 +99,37 @@ function printFootnoteDefinition(path, options, printChild) {
   return ['[^', path.node.label, ']: ', align(tabStop, body)];
 }
 
+// The source of what a line broken at this whitespace would start with: the
+// next word, or the inline node after the sentence it ends.
+function nextOnLine(path, options) {
+  if (path.next) return path.next.value ?? '';
+  const [sentence, holder] = [path.parent, path.grandparent];
+  const after = holder?.children?.[holder.children.indexOf(sentence) + 1];
+  if (after?.position === undefined) return '';
+  return options.originalText.slice(
+    after.position.start.offset,
+    after.position.end.offset,
+  );
+}
+
+// Whitespace a line must not break at: the line after would open a block to
+// Pandoc — `--` a setext underline, a fence a code block. The rest of the
+// document from the paragraph on stands for what follows, where a fence finds
+// its close; a close before the break only keeps the line whole.
+function breaksParagraph(path, options) {
+  const line = nextOnLine(path, options).split('\n', 1)[0];
+  if (line === '') return false;
+  const paragraph = path.findAncestor((node) => node.type === 'paragraph');
+  const after =
+    paragraph === undefined
+      ? ''
+      : options.originalText.slice(paragraph.position.start.offset);
+  return interruptsParagraph(line, {
+    tabStop: options.pandocTabStop ?? DEFAULT_TAB_STOP,
+    after,
+  });
+}
+
 const isHardline = (part) =>
   Array.isArray(part) && part[0]?.type === 'line' && part[0].hard === true;
 
@@ -144,6 +178,10 @@ export function print(path, options, printChild) {
       return replaceEndOfLine(node.value);
     case 'code':
       return printCode(node, options);
+    case 'whitespace':
+      return breaksParagraph(path, options)
+        ? mdast.print(path, { ...options, proseWrap: 'never' }, printChild)
+        : mdast.print(path, options, printChild);
     case 'list':
       return printList(path, options, printChild);
     case 'footnoteDefinition':

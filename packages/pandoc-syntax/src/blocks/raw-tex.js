@@ -59,6 +59,7 @@ function raw(lines, from, to, end, text) {
 export const texEnvironment = {
   name: 'tex-environment',
   interruptsParagraph: true,
+  opensAhead: (text, syntax) => patterns(syntax).begin.test(text),
   match(lines, at, { syntax, text }) {
     const name = patterns(syntax).begin.exec(lines[at].text)?.[1];
     if (name === undefined) return null;

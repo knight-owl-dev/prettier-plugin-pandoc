@@ -2,6 +2,7 @@
 
 import { splitLines } from '../lines.js';
 import { DEFAULT_TAB_STOP, syntaxFor } from '../syntax.js';
+import { INTERRUPTERS } from './registry.js';
 import { endsParagraph, scan } from './scan.js';
 
 /** @typedef {import('../types.js').Block} Block */
@@ -48,6 +49,14 @@ export function interruptsParagraph(
   line,
   { tabStop = DEFAULT_TAB_STOP, after = '' } = {},
 ) {
-  const text = `${PARAGRAPH_LINE}\n${line}\n${after}`;
-  return endsParagraph(splitLines(text), text, syntaxFor(tabStop));
+  const syntax = syntaxFor(tabStop);
+  const endsWith = (following) => {
+    const text = `${PARAGRAPH_LINE}\n${line}\n${following}`;
+    return endsParagraph(splitLines(text), text, syntax);
+  };
+  // What follows is read only where it could decide: a formatter asks this of
+  // every word, and most open nothing.
+  if (endsWith('')) return true;
+  const looksAhead = INTERRUPTERS.some((r) => r.opensAhead?.(line, syntax));
+  return looksAhead && endsWith(after);
 }

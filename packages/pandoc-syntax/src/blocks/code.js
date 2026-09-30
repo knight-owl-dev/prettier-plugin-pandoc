@@ -35,6 +35,7 @@ function closes(line, opener, fencePattern) {
 export const fencedCode = {
   name: 'fenced-code',
   interruptsParagraph: true,
+  opensAhead: (text, syntax) => patterns(syntax).fence.test(text),
   match(lines, at, { syntax, paragraph }) {
     const { fence } = patterns(syntax);
     const opener = fence.exec(lines[at].text)?.[1];

@@ -102,12 +102,16 @@
 /**
  * One of Pandoc's block constructs. `match` answers whether one opens at line
  * `at`; one that `interruptsParagraph` may open where a paragraph would
- * otherwise continue.
+ * otherwise continue. One that opens only once a later line closes it says
+ * through `opensAhead` whether a line could open it, the lines after it
+ * permitting.
  *
  * @typedef {object} Recognizer
  * @property {string} name
  * @property {boolean} interruptsParagraph
  * @property {(lines: Line[], at: number, context: Context) => Match | null} match
+ * @property {(text: string, syntax: import('./syntax.js').Syntax) => boolean}
+ *   [opensAhead]
  */
 
 /**
