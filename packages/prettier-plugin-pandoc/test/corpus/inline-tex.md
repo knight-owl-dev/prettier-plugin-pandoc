@@ -10,3 +10,8 @@ A command split over two lines \textbf
 {bold} and a starred one \vspace*{1em} inside prose.
 
 Opaque neighbors: `\code{x}` in a code span, $\frac{a}{b}$ in math, and a price of $5 and $6.
+
+## A heading holding \label{sec:held} a command
+
+Emphasis *around \emph{a command}* and **strong \textbf{too}**, and a
+[link holding \emph{one}](https://example.com).

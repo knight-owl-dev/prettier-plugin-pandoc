@@ -7,7 +7,7 @@ import {
 } from '@knight-owl-dev/pandoc-syntax';
 import { doc } from 'prettier';
 import * as markdown from 'prettier/plugins/markdown';
-import { DIV, INLINE_RAW, VERBATIM } from './nodes.js';
+import { DIV, isInlineRaw, VERBATIM } from './nodes.js';
 
 const { align, hardline, literalline, markAsRoot } = doc.builders;
 const { replaceEndOfLine } = doc.utils;
@@ -169,13 +169,12 @@ function printDiv(path, printChild) {
  */
 export function print(path, options, printChild) {
   const node = path.node;
+  if (isInlineRaw(node)) return replaceEndOfLine(node.value);
   switch (node.type) {
     case DIV:
       return printDiv(path, printChild);
     case VERBATIM:
       return asWritten(node.value);
-    case INLINE_RAW:
-      return replaceEndOfLine(node.value);
     case 'code':
       return printCode(node, options);
     case 'whitespace':

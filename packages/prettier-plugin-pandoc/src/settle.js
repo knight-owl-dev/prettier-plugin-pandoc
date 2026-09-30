@@ -109,7 +109,8 @@ function restoreInline(node, spans, text) {
   if (node.type === 'inlineCode' && spans.has(offsetOf(node))) {
     const { start, end } = spans.get(offsetOf(node));
     return {
-      type: INLINE_RAW,
+      type: 'inlineCode',
+      [INLINE_RAW]: true,
       value: text.slice(start, end),
       position: node.position,
     };
