@@ -12,3 +12,11 @@ A short table that padding would carry past the width:
 | a | b | c |
 |---|---|---|
 | one | two | a cell long enough that padding the others to it runs the row past seventy-two |
+
+Dashes with no pipe under a row underline a heading:
+
+Choose A | B
+------
+
+| Neither | does this |
+---

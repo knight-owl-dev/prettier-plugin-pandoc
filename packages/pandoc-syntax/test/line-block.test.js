@@ -43,6 +43,10 @@ const CASES = {
   'inline markup and indented verse':
     '| *em* and **strong**\n|    indented verse\n',
   'a heading straight after': '| a\n# H\n',
+  'a bar line over dashes': '| a\n---\n',
+  'a bar line over equals signs': '| a\n===\n',
+  'verse over dashes': '| a\n| b\n---\n',
+  'a continuation of dashes': '| a\n --\n',
   'verse inside a div': '::: poem\n| a\n| b\n:::\n',
   'a pipe table': '| a | b |\n|---|---|\n| 1 | 2 |\n',
   'bars in a code block': '```\n| a\n```\n',

@@ -30,8 +30,10 @@ const opening = perSyntax((syntax) => ({
 
 const opensPipeRow = (text, syntax) =>
   PIPE_ROW.test(text) && indentOf(text, syntax.tabStop) < syntax.codeIndent;
+// A pipe table's separator, which holds a pipe whatever its header does:
+// dashes alone under a line are a setext underline.
 export const PIPE_SEPARATOR =
-  /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+  /^(?=[^|]*\|)[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
 
 // The last line from `at` on for which `continues` holds of each line after it.
 function lastWhile(lines, at, continues) {

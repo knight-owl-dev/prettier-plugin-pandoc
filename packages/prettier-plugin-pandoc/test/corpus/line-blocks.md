@@ -15,3 +15,8 @@
   the rest of the first line, joined by Pandoc
 | and a last line.
 Text straight after the verse, which Pandoc reads as a paragraph, long enough to wrap.
+
+A bar line over dashes is a heading:
+
+| not verse
+---

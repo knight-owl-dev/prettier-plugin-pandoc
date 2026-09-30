@@ -88,6 +88,10 @@ const PIPE_CASES = {
   'an escaped pipe in a cell': 'a\\|b | c\n---|---\n1 | 2',
   'only an escaped pipe in the header': 'a \\| b\n---|---',
   'a header indented three spaces': '   a | b\n   ---|---',
+  'dashes with no pipe under a row': 'Choose A | B\n------',
+  'dashes with no pipe under outer pipes': '| a | b |\n---',
+  'one dash under a row': 'x | y\n-',
+  'a separator with one pipe': 'a | b\n|---',
 };
 
 for (const [name, text] of Object.entries(PIPE_CASES)) {
