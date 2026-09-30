@@ -1,0 +1,46 @@
+name: CI
+
+# No push trigger: main's ruleset requires a branch to be up to date before
+# merging, so a run here tests the tree its squash will land.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+# A superseded run tests a tree nothing will merge.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# One architecture: the packages are plain JavaScript, and Pandoc's reader
+# parses alike on either.
+#
+# No cache: a cold test image is two pulls and a copy, and the lockfile holds
+# prettier alone. Restoring either would cost what building it does.
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # No `container:` — the Makefile re-enters the pinned ci-tools image
+      # itself. GITHUB_TOKEN reaches validate-action-pins through LINT_RUNNER.
+      - name: Lint
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: make lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test
+        run: make test

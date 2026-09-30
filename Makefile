@@ -13,13 +13,15 @@ IS_TTY := $(shell test -t 0 && echo 1)
 # real terminal inside the container.
 DOCKER_TTY ?= $(if $(IS_TTY),-t)
 
-.PHONY: resolve test test-image lint lint-fix lint-docker lint-js lint-js-fix \
-	lint-md lint-md-fix lint-spell help
+.PHONY: resolve test test-image lint lint-fix lint-actions lint-docker lint-js \
+	lint-js-fix lint-md lint-md-fix lint-spell help
 
 # Node and npm come from the test image, never the host. It runs as the
 # invoking user, so node_modules on the mount stays the host's to delete.
+# Funding and update notices are noise in every log they reach.
 TEST_RUNNER = docker run --rm $(DOCKER_TTY) --user "$$(id -u):$$(id -g)" \
-	-e HOME=/tmp -v "$(CURDIR):/work" -w /work $(TEST_IMAGE)
+	-e HOME=/tmp -e NPM_CONFIG_FUND=false -e NPM_CONFIG_UPDATE_NOTIFIER=false \
+	-v "$(CURDIR):/work" -w /work $(TEST_IMAGE)
 
 # No build context: the image copies nothing from the repo.
 test-image:
@@ -39,9 +41,9 @@ test: test-image node_modules/.package-lock.json
 
 # The lint targets invoke their tools bare; the aggregate targets re-enter the
 # ci-tools image, so the toolchain is the pinned one wherever make runs.
-LINT_TARGETS := lint-docker lint-js lint-md lint-spell
+LINT_TARGETS := lint-actions lint-docker lint-js lint-md lint-spell
 
-LINT_RUNNER ?= docker run --rm $(DOCKER_TTY) \
+LINT_RUNNER ?= docker run --rm $(DOCKER_TTY) -e GITHUB_TOKEN \
 	-v "$(CURDIR):/work" -w /work $(CI_TOOLS_IMAGE) make
 
 lint:
@@ -49,6 +51,13 @@ lint:
 
 lint-fix:
 	@$(LINT_RUNNER) lint-js-fix lint-md-fix
+
+# validate-action-pins checks each SHA against its tag's comment through the
+# GitHub API, which GITHUB_TOKEN keeps under the rate limit.
+lint-actions:
+	@echo "Linting GitHub Actions..." && actionlint .github/workflows/*.yml && echo "OK"
+	@echo "Validating GitHub Actions pins..." \
+		&& validate-action-pins .github/workflows/*.yml && echo "OK"
 
 lint-docker:
 	@echo "Linting Dockerfile..." && hadolint test/Dockerfile && echo "OK"
@@ -78,6 +87,7 @@ help:
 	@echo "  make resolve           Re-resolve package-lock.json"
 	@echo "  make lint              Run all linters"
 	@echo "  make lint-fix          Fix all auto-fixable lint issues"
+	@echo "  make lint-actions      Lint workflows and verify action pins"
 	@echo "  make lint-docker       Lint the test image Dockerfile"
 	@echo "  make lint-js           Lint and format-check JavaScript (biome)"
 	@echo "  make lint-js-fix       Fix JavaScript formatting and lint issues"
