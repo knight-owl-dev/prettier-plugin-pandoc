@@ -18,6 +18,15 @@ const endsHere = (pattern, lines, at) =>
   pattern.test(lines[at].text) ? { last: at, after: 'start' } : null;
 
 /**
+ * Whether a line underlines the one-line paragraph above it as a heading.
+ *
+ * @param {string} text
+ * @param {import('../syntax.js').Syntax} syntax
+ */
+export const isSetextUnderline = (text, syntax) =>
+  patterns(syntax).setextUnderline.test(text);
+
+/**
  * Whether a line is a thematic break.
  *
  * @param {string} text

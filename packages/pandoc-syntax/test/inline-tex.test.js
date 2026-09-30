@@ -1,34 +1,40 @@
 // Where inline raw TeX is.
 //
-// Pandoc's parse keeps each raw inline's text. Every one must lie inside a
-// span the recognizer reports — wider is allowed, narrower is not — and no
-// span may hold text Pandoc reads as something opaque: code or math.
+// Pandoc's parse keeps each piece of raw TeX's text: inline, or a block an
+// environment written mid-line splits a paragraph with. Every one must lie
+// inside a span the recognizer reports — wider is allowed, narrower is not —
+// and no span may hold text Pandoc reads as something opaque: code or math.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { blocks, inlines } from '../src/index.js';
 import { readPandoc, TAB_STOPS } from './helpers/pandoc.js';
 
-function pandocRawInlines(text, tabStop) {
+const RAW = new Set(['RawInline', 'RawBlock']);
+
+function pandocRawTex(text, tabStop) {
   const stdout = readPandoc(text, tabStop);
   const found = [];
   JSON.parse(stdout, (_, value) => {
-    if (value?.t === 'RawInline' && value.c[0] === 'tex')
-      found.push(value.c[1]);
+    if (RAW.has(value?.t) && value.c[0] === 'tex') found.push(value.c[1]);
     return value;
   });
   return found;
 }
 
-// Each Pandoc raw inline, matched in order to the first span after the last
-// match that contains its text.
+// Each piece of Pandoc's raw TeX, matched in order to the first span after
+// the last match that contains its text.
 function uncovered(text, tabStop) {
-  const spans = inlines(text, blocks(text, { tabStop })).map((s) =>
-    text.slice(s.start, s.end),
-  );
+  const found = blocks(text, { tabStop });
+  const spans = [
+    ...found.filter((block) => block.type === 'raw-tex'),
+    ...inlines(text, found),
+  ]
+    .sort((a, b) => a.start - b.start)
+    .map((s) => text.slice(s.start, s.end));
   const missing = [];
   let at = 0;
-  for (const raw of pandocRawInlines(text, tabStop)) {
+  for (const raw of pandocRawTex(text, tabStop)) {
     const hit = spans.findIndex((span, i) => i >= at && span.includes(raw));
     if (hit === -1) missing.push(raw);
     else at = hit + 1;
@@ -56,6 +62,15 @@ const CASES = {
   'an argument one line down': 'a \\textbf\n{x} b',
   'an optional argument the command does not take': 'a \\emph[o]{x}[y] b',
   escapes: 'a \\\\ b \\$ c \\* d',
+  'an environment mid-line': 'a \\begin{center}x\\end{center} b',
+  'an environment across lines': 'a \\begin{center}\nx\n\\end{center} b',
+  'an environment across a blank line': 'a \\begin{x}\n\ny \\end{x} b',
+  'a nested environment': 'a \\begin{x}\\begin{x}y\\end{x}\\end{x} b',
+  'an environment in a heading': '# Head \\begin{x}y\\end{x} tail',
+  'an environment in a list item': '- item \\begin{x}y\\end{x} tail',
+  'an environment in emphasis': '*a \\begin{x}y\\end{x} b*',
+  'an environment ended by another name': 'a \\begin{x}y\\end{z} b',
+  'an environment never ended': 'a \\begin{x}y b',
   'an accent': 'a \\"o b',
   'an unclosed brace': 'a \\x{unclosed b',
   'an inline environment': 'a \\begin{em}x\\end{em} b',
@@ -71,7 +86,7 @@ const CASES = {
 
 for (const [name, text] of Object.entries(CASES)) {
   for (const tabStop of TAB_STOPS) {
-    test(`${name}: every raw inline Pandoc finds is inside a span (tab stop ${tabStop})`, () => {
+    test(`${name}: all the raw TeX Pandoc keeps is inside a span (tab stop ${tabStop})`, () => {
       assert.deepEqual(uncovered(`${text}\n`, tabStop), []);
     });
   }

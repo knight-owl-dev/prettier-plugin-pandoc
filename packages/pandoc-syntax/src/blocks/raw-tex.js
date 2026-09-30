@@ -5,6 +5,7 @@
 
 import { BLANK } from '../lines.js';
 import { perSyntax } from '../syntax.js';
+import { BEGIN, environmentEnd } from '../tex.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
@@ -12,7 +13,7 @@ import { perSyntax } from '../syntax.js';
 /** @typedef {import('../types.js').Match} Match */
 
 const patterns = perSyntax((syntax) => ({
-  begin: syntax.atBlockIndent('\\\\begin\\{([^}]+)\\}'),
+  begin: syntax.atBlockIndent(BEGIN),
 }));
 
 // Commands and their arguments, then optionally a comment. Prose after the
@@ -20,25 +21,6 @@ const patterns = perSyntax((syntax) => ({
 // only with its matching end, so neither half counts here.
 const COMMAND_LINE =
   /^(?!\\(?:begin|end)\{)(\\[A-Za-z]+\*?(?:[ \t]*(?:\{[^{}]*\}|\[[^\]]*\]))*)[ \t]*(?:%.*)?$/;
-
-const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-// Where the environment opened on line `at` ends: the line, and the offset just
-// past its matching `\end`, counting nested ones of the same name. Null when it
-// never closes, which Pandoc reads as paragraph text.
-function environmentEnd(lines, at, name) {
-  const marker = new RegExp(`\\\\(begin|end)\\{${escapeRegExp(name)}\\}`, 'g');
-  let depth = 0;
-  for (let n = at; n < lines.length; n++) {
-    for (const m of lines[n].text.matchAll(marker)) {
-      depth += m[1] === 'begin' ? 1 : -1;
-      if (depth === 0) {
-        return { line: n, end: lines[n].start + m.index + m[0].length };
-      }
-    }
-  }
-  return null;
-}
 
 // The raw span, and whether text left on its last line opens a paragraph.
 /** @returns {Match} */
@@ -59,11 +41,14 @@ function raw(lines, from, to, end, text) {
 export const texEnvironment = {
   name: 'tex-environment',
   interruptsParagraph: true,
+  opensAhead: (text, syntax) => patterns(syntax).begin.test(text),
   match(lines, at, { syntax, text }) {
     const name = patterns(syntax).begin.exec(lines[at].text)?.[1];
     if (name === undefined) return null;
-    const close = environmentEnd(lines, at, name);
-    return close === null ? null : raw(lines, at, close.line, close.end, text);
+    const close = environmentEnd(name, lines.slice(at));
+    return close === null
+      ? null
+      : raw(lines, at, at + close.chunk, close.end, text);
   },
 };
 

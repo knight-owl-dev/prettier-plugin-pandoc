@@ -9,7 +9,7 @@ import { BLANK, segmentsOf } from '../lines.js';
 import { DIV_CLOSE } from './div.js';
 import { definitionList } from './list.js';
 import { mergeAdjacent } from './raw-tex.js';
-import { INTERRUPTERS, REGISTRY } from './registry.js';
+import { INTERRUPTERS, ITEM_INTERRUPTERS, REGISTRY } from './registry.js';
 
 /** @typedef {import('../types.js').Block} Block */
 /** @typedef {import('../types.js').Context} Context */
@@ -78,6 +78,47 @@ function toContainer(lines, from, to, type, content) {
 }
 
 /**
+ * A context at a block start, outside any div.
+ *
+ * @param {string} text
+ * @param {import('../syntax.js').Syntax} syntax
+ * @returns {Context}
+ */
+function contextFor(text, syntax) {
+  /** @type {Context} */
+  const context = {
+    syntax,
+    text,
+    inDiv: false,
+    paragraph: null,
+    // Asked at a block start, which is where a term would open.
+    opensBlock: (lines, at) =>
+      firstMatch(NOT_TERMS, lines, at, { ...context, paragraph: null }) !==
+      null,
+  };
+  return context;
+}
+
+/**
+ * Whether line 1 ends the one-line paragraph on line 0: it interrupts the
+ * paragraph, or a block opening on line 0 claims it, as a definition list
+ * claims its term.
+ *
+ * @param {Line[]} lines
+ * @param {string} text
+ * @param {import('../syntax.js').Syntax} syntax
+ * @param {boolean} inItem Whether the paragraph is in a list item's content.
+ */
+export function endsParagraph(lines, text, syntax, inItem) {
+  const context = contextFor(text, syntax);
+  const opened = firstMatch(REGISTRY, lines, 0, context);
+  if (opened !== null && opened.last >= 1) return true;
+  const paragraph = { ...context, paragraph: { lines: 1 } };
+  const interrupters = inItem ? ITEM_INTERRUPTERS : INTERRUPTERS;
+  return firstMatch(interrupters, lines, 1, paragraph) !== null;
+}
+
+/**
  * Read `lines` into `out`: a document, or a container's content through views
  * whose offsets are still the source's.
  *
@@ -87,8 +128,9 @@ function toContainer(lines, from, to, type, content) {
  * @param {number} divDepth Divs open around this document, whose closing fence
  *   ends a container inside them.
  * @param {import('../syntax.js').Syntax} syntax
+ * @param {boolean} [inItem] Whether `lines` are a list item's content.
  */
-export function scan(lines, text, out, divDepth, syntax) {
+export function scan(lines, text, out, divDepth, syntax, inItem = false) {
   /** @type {Span[]} */
   const open = [];
   /** @type {SpanSpec[]} */
@@ -124,7 +166,8 @@ export function scan(lines, text, out, divDepth, syntax) {
     if (match.container !== undefined) {
       const { type, content } = match.container;
       out.push(toContainer(lines, at, match.last, type, content));
-      scan(content, text, out, divDepth + open.length, syntax);
+      const depth = divDepth + open.length;
+      scan(content, text, out, depth, syntax, type === 'list-item');
     }
     paragraph = match.after === 'paragraph' ? { lines: 1 } : null;
     return match.last;
@@ -148,8 +191,9 @@ export function scan(lines, text, out, divDepth, syntax) {
 
     context.inDiv = divDepth + open.length > 0;
     context.paragraph = paragraph;
+    const interrupters = inItem ? ITEM_INTERRUPTERS : INTERRUPTERS;
     const match = firstMatch(
-      paragraph === null ? REGISTRY : INTERRUPTERS,
+      paragraph === null ? REGISTRY : interrupters,
       lines,
       n,
       context,

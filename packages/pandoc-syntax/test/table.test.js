@@ -59,3 +59,48 @@ for (const [name, text] of Object.entries(CASES)) {
     });
   }
 }
+
+// Pipe tables, by their rows: Pandoc's header and body rows against the lines
+// of each span but the separator.
+function pandocPipeRows(text, tabStop) {
+  const rows = [];
+  JSON.parse(readPandoc(text, tabStop), (_, value) => {
+    if (value?.t === 'Table') {
+      const [, , , head, bodies] = value.c;
+      const body = bodies.reduce((n, b) => n + b[2].length + b[3].length, 0);
+      rows.push(head[1].length + body);
+    }
+    return value;
+  });
+  return rows;
+}
+
+const recognizerPipeRows = (text, tabStop) =>
+  blocks(text, { tabStop })
+    .filter((block) => block.type === 'pipe-table')
+    .map((block) => block.segments.length - 1);
+
+const PIPE_CASES = {
+  'a pipe table': '| a | b |\n|---|---|\n| 1 | 2 |',
+  'a pipe table without outer pipes': 'a | b\n---|---\n1 | 2\n3 | 4',
+  'outer pipes on some rows only': 'a | b\n|---|---|\n1 | 2\n| 3 | 4 |',
+  'a pipe table then a line without a pipe': 'a | b\n---|---\n1 | 2\ntext',
+  'an escaped pipe in a cell': 'a\\|b | c\n---|---\n1 | 2',
+  'only an escaped pipe in the header': 'a \\| b\n---|---',
+  'a header indented three spaces': '   a | b\n   ---|---',
+  'dashes with no pipe under a row': 'Choose A | B\n------',
+  'dashes with no pipe under outer pipes': '| a | b |\n---',
+  'one dash under a row': 'x | y\n-',
+  'a separator with one pipe': 'a | b\n|---',
+};
+
+for (const [name, text] of Object.entries(PIPE_CASES)) {
+  for (const tabStop of TAB_STOPS) {
+    test(`${name}: the recognizer and Pandoc agree on the pipe tables' rows (tab stop ${tabStop})`, () => {
+      assert.deepEqual(
+        recognizerPipeRows(`${text}\n`, tabStop),
+        pandocPipeRows(`${text}\n`, tabStop),
+      );
+    });
+  }
+}

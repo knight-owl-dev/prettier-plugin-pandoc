@@ -26,35 +26,26 @@ function closes(line, opener, fencePattern) {
   );
 }
 
-// The last non-blank line of `lines` from `at` on.
-function lastContent(lines, at) {
-  let last = at;
-  for (let n = at; n < lines.length; n++) {
-    if (!BLANK.test(lines[n].text)) last = n;
-  }
-  return last;
-}
-
 /**
- * A fence interrupts a paragraph. One never closed runs to the end of the
- * document.
+ * A backtick fence interrupts a paragraph; a tilde fence opens only at a block
+ * start. One never closed is paragraph text.
  *
  * @type {Recognizer}
  */
 export const fencedCode = {
   name: 'fenced-code',
   interruptsParagraph: true,
-  match(lines, at, { syntax }) {
+  opensAhead: (text, syntax) => patterns(syntax).fence.test(text),
+  match(lines, at, { syntax, paragraph }) {
     const { fence } = patterns(syntax);
     const opener = fence.exec(lines[at].text)?.[1];
     if (opener === undefined) return null;
-    let last = lastContent(lines, at);
-    for (let n = at + 1; n < lines.length; n++) {
-      if (closes(lines[n].text, opener, fence)) {
-        last = n;
-        break;
-      }
+    if (paragraph !== null && opener[0] === '~') return null;
+    let last = null;
+    for (let n = at + 1; n < lines.length && last === null; n++) {
+      if (closes(lines[n].text, opener, fence)) last = n;
     }
+    if (last === null) return null;
     return {
       last,
       after: 'start',

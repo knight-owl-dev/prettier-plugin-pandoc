@@ -1,5 +1,6 @@
 // Line blocks: verse, whose line breaks are its meaning.
 
+import { isSetextUnderline } from './heading.js';
 import { PIPE_SEPARATOR } from './table.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
@@ -12,16 +13,19 @@ const CONTINUATION = /^ +\S/;
 /**
  * A line block runs until a line is neither verse nor its continuation, and
  * what follows starts a block of its own. A bar line over a separator row is a
- * pipe table's header instead.
+ * pipe table's header instead, and over an underline a heading.
  *
  * @type {Recognizer}
  */
 export const lineBlock = {
   name: 'line-block',
   interruptsParagraph: false,
-  match(lines, at) {
+  match(lines, at, { syntax }) {
     if (!VERSE.test(lines[at].text)) return null;
-    if (PIPE_SEPARATOR.test(lines[at + 1]?.text ?? '')) return null;
+    const next = lines[at + 1]?.text ?? '';
+    if (PIPE_SEPARATOR.test(next)) return null;
+    if (isSetextUnderline(next, syntax) && !CONTINUATION.test(next))
+      return null;
     let last = at;
     while (
       last + 1 < lines.length &&

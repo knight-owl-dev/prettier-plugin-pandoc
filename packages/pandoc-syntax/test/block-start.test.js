@@ -58,6 +58,8 @@ const CASES = {
   'heading after a paragraph line': 'prose\n# H',
   'thematic break after a paragraph line': 'prose\n***',
   'fenced code after a paragraph line': 'prose\n```\nx\n```',
+  'tilde-fenced code after a paragraph line': 'prose\n~~~\nx\n~~~',
+  'an unclosed fence': '```\nx',
   'HTML comment after a paragraph line': 'prose\n<!-- c -->',
   'raw TeX environment after a paragraph line':
     'prose\n\\begin{center}\nx\n\\end{center}',

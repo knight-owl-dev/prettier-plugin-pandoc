@@ -2,7 +2,7 @@
 // table is CommonMark's too, and prettier prints one as Pandoc reads it, so it
 // is only passed over.
 
-import { BLANK } from '../lines.js';
+import { BLANK, indentOf } from '../lines.js';
 import { perSyntax } from '../syntax.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
@@ -15,20 +15,25 @@ import { perSyntax } from '../syntax.js';
 const GRID_ROW = /^[ \t]*[+|]/;
 const DASH_COLUMNS = /^[ \t]*-+([ \t]+-+)+[ \t]*$/;
 const DASH_LINE = /^[ \t]*-+([ \t]+-+)*[ \t]*$/;
-const PIPE_ROW = /^[ \t]*\|/;
+// A pipe table's row: any line with a pipe not escaped, outer ones optional.
+const PIPE_ROW = /(^|[^\\])\|/;
 
 // The line a table opens on sits short of indented code: a grid table's first
 // rule, the dash line a multiline or headerless table opens on, a simple
 // table's column line — whose header above it sits anywhere — and a pipe
-// table's first row.
+// table's first row (`opensPipeRow`).
 const opening = perSyntax((syntax) => ({
   gridRule: syntax.atBlockIndent('\\+[-=:]+(\\+[-=:]+)*\\+[ \\t]*$'),
   dashColumns: syntax.atBlockIndent('-+([ \\t]+-+)+[ \\t]*$'),
   dashLine: syntax.atBlockIndent('-+([ \\t]+-+)*[ \\t]*$'),
-  pipeRow: syntax.atBlockIndent('\\|'),
 }));
+
+const opensPipeRow = (text, syntax) =>
+  PIPE_ROW.test(text) && indentOf(text, syntax.tabStop) < syntax.codeIndent;
+// A pipe table's separator, which holds a pipe whatever its header does:
+// dashes alone under a line are a setext underline.
 export const PIPE_SEPARATOR =
-  /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+  /^(?=[^|]*\|)[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
 
 // The last line from `at` on for which `continues` holds of each line after it.
 function lastWhile(lines, at, continues) {
@@ -107,13 +112,15 @@ export const pipeTable = {
   interruptsParagraph: false,
   match(lines, at, { syntax }) {
     const next = lines[at + 1]?.text;
-    if (!opening(syntax).pipeRow.test(lines[at].text) || next === undefined) {
+    if (!opensPipeRow(lines[at].text, syntax) || next === undefined) {
       return null;
     }
     if (!PIPE_SEPARATOR.test(next)) return null;
+    const last = lastWhile(lines, at, (l) => PIPE_ROW.test(l));
     return {
-      last: lastWhile(lines, at, (l) => PIPE_ROW.test(l)),
+      last,
       after: 'start',
+      spans: [{ type: 'pipe-table', from: at, to: last }],
     };
   },
 };

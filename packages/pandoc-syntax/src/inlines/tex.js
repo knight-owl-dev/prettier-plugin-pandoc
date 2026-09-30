@@ -1,10 +1,14 @@
-// Inline raw TeX: a command and its arguments.
+// Inline raw TeX: a command and its arguments, or an environment.
 //
 // Pandoc's LaTeX reader knows each command's arity, which a scan cannot, so a
 // span here may run wider than the raw text Pandoc keeps — `\emph[o]{x}` is
 // raw only as far as `\emph[`. It never runs narrower.
+//
+// An environment runs from its `\begin` to the matching `\end`, blank lines
+// and all; Pandoc ends the paragraph around it, whatever holds it.
 
 import { breaksParagraph } from '../lines.js';
+import { BEGIN, environmentEnd } from '../tex.js';
 
 const LETTER = /[A-Za-z]/;
 const SPACE = /[ \t]/;
@@ -47,9 +51,20 @@ function pastGap(text, at) {
   return i;
 }
 
+const OPENS_ENVIRONMENT = new RegExp(`^${BEGIN}`);
+
+// The offset just past the environment beginning at `at`, or null.
+function environmentAt(text, at) {
+  const rest = text.slice(at);
+  const name = OPENS_ENVIRONMENT.exec(rest)?.[1];
+  if (name === undefined) return null;
+  return environmentEnd(name, [{ text: rest, start: at }])?.end ?? null;
+}
+
 /**
  * Where the command starting at `at` ends, or null when Pandoc keeps none of
- * it raw: an environment written inline, or a brace never closed.
+ * it raw: an environment never ended, an `\end` without its `\begin`, or a
+ * brace never closed.
  *
  * The first argument may sit after spaces, or one line down; the rest follow
  * it directly. With no argument, the command takes the spaces after it.
@@ -62,7 +77,8 @@ export function commandEnd(text, at) {
   let i = at + 1;
   while (i < text.length && LETTER.test(text[i])) i++;
   const name = text.slice(at + 1, i);
-  if (name === 'begin' || name === 'end') return null;
+  if (name === 'begin') return environmentAt(text, at);
+  if (name === 'end') return null;
   if (text[i] === '*') i++;
 
   let args = 0;

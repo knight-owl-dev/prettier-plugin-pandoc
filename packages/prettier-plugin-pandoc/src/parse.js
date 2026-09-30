@@ -7,16 +7,20 @@ import {
   inlines,
 } from '@knight-owl-dev/pandoc-syntax';
 import * as markdown from 'prettier/plugins/markdown';
-import { firstMisread, isContainer, stretchOf } from './containers.js';
+import { firstMisread, isContainer } from './containers.js';
 import { mask, maskable } from './mask.js';
+import { CONTAINERS } from './nodes.js';
 import { settle } from './settle.js';
+import { stretchAround } from './stretch.js';
+import { firstUnread } from './unread.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
 const base = markdown.parsers.markdown;
 
 // Printed as written: raw TeX is another language's source, verse is its line
-// breaks, and a Pandoc table's layout is its column alignment. Definition,
+// breaks, and a table's layout is its meaning — a pipe table past the column
+// width takes its column widths from its dashes. Definition,
 // example and fancy lists are CommonMark paragraphs to prettier's parser.
 // Indented code is code at Pandoc's tab stop, which CommonMark's fixed one of
 // four need not agree with.
@@ -24,6 +28,7 @@ const VERBATIM = new Set([
   'indented-code',
   'raw-tex',
   'line-block',
+  'pipe-table',
   'grid-table',
   'simple-table',
   'multiline-table',
@@ -31,6 +36,9 @@ const VERBATIM = new Set([
   'example-list',
   'fancy-list',
 ]);
+
+const ENVIRONMENT = '\\begin';
+const isEnvironment = (text, span) => text.startsWith(ENVIRONMENT, span.start);
 
 const startOf = (block) =>
   block.type === 'div' ? block.open.start : block.start;
@@ -68,24 +76,45 @@ export async function parse(text, options) {
     containers: found.filter(isContainer),
   };
 
-  // One misread shifts every container after it, so each is settled before
-  // the next is judged: the earliest printed as written, the rest parsed again.
-  // Every pass takes the misread container out, so the loop ends.
+  // One misread shifts everything after it, so each is settled before the
+  // next is judged: the earliest printed as written, the rest parsed again.
+  // Every pass prints more of the document as written, so the loop ends.
+  //
+  // An environment written mid-line is one too: Pandoc ends the paragraph
+  // around it and reads it raw through whatever lines it spans, which no
+  // CommonMark tree can hold.
+  const fences = found.filter((block) => block.type === 'fenced-code');
+  // A fence counts until a stretch printed as written holds all of it.
+  const unmasked = (blocks) =>
+    blocks.filter(
+      (b) =>
+        !constructs.verbatim.some((v) => v.start <= b.start && b.end <= v.end),
+    );
+  const misread = (ast, masked) => {
+    const at = (offset) =>
+      offset === undefined ? [] : [{ start: offset, end: offset }];
+    const misreads = [
+      ...at(firstMisread(constructs.containers, ast, text, masked)),
+      ...[firstUnread(ast, unmasked(fences), text)].filter(Boolean),
+      ...constructs.inlineRaw.filter((span) => isEnvironment(text, span)),
+    ];
+    if (misreads.length === 0) return undefined;
+    const first = misreads.reduce((a, b) => (b.start < a.start ? b : a));
+    return stretchAround(first, ast, constructs.containers, text);
+  };
   let masked = mask(text, constructs);
   let ast = await base.parse(masked, options);
   for (
-    let wrong = firstMisread(constructs.containers, ast, text, masked);
-    wrong !== undefined;
-    wrong = firstMisread(constructs.containers, ast, text, masked)
+    let stretch = misread(ast, masked);
+    stretch !== undefined;
+    stretch = misread(ast, masked)
   ) {
-    constructs = withStretch(
-      constructs,
-      stretchOf(wrong, constructs.containers, text),
-    );
+    constructs = withStretch(constructs, stretch);
     masked = mask(text, constructs);
     ast = await base.parse(masked, options);
   }
 
   settle(ast, constructs, text);
+  ast[CONTAINERS] = found.filter(isContainer);
   return ast;
 }

@@ -54,3 +54,9 @@ export const REGISTRY = [
 ];
 
 export const INTERRUPTERS = REGISTRY.filter((r) => r.interruptsParagraph);
+
+// In a list item's content a list may open straight after a paragraph line too.
+const LISTS = new Set([exampleList, fancyList, listItem]);
+export const ITEM_INTERRUPTERS = REGISTRY.filter(
+  (r) => r.interruptsParagraph || LISTS.has(r),
+);

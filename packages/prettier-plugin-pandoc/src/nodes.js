@@ -6,11 +6,19 @@
 export const DIV = 'pandocDiv';
 // A block printed exactly as written, container prefixes aside.
 export const VERBATIM = 'pandocVerbatim';
-// Inline raw TeX, printed exactly as written.
-export const INLINE_RAW = 'pandocInlineRaw';
 
 export const VISITOR_KEYS = {
   [DIV]: ['children'],
   [VERBATIM]: [],
-  [INLINE_RAW]: [],
 };
+
+// On the root: the recognizer's containers, whose content lines the printer
+// reads the source through.
+export const CONTAINERS = 'pandocContainers';
+
+// Inline raw TeX, printed exactly as written: a code span marked so. It stays
+// a code span to prettier, which joins a node's children by line breaks
+// wherever one is a type it does not know as inline.
+export const INLINE_RAW = 'pandocInlineRaw';
+export const isInlineRaw = (node) =>
+  node.type === 'inlineCode' && node[INLINE_RAW] === true;

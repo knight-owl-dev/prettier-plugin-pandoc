@@ -33,5 +33,9 @@ the host.
 - **Masking keeps offsets:** `mask.js`.
 - **The tab stop decides indentation:** `syntax.js`.
 - **Containers are collected, then read:** `containers.js`.
+- **Where the two parsers part, print as written, found by comparing their
+  trees:** `containers.js`, `unread.js`, `stretch.js`.
+- **A node the plugin puts inside inline content keeps a type prettier knows
+  as inline:** `nodes.js`.
 - **Stock prettier trims code blocks:** `print.js`.
 - **Keep issue numbers out of commit messages.** They belong in the PR.
