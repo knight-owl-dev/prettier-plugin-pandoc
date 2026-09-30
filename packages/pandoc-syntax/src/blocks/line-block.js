@@ -36,7 +36,6 @@ export const lineBlock = {
     }
     return {
       last,
-      after: 'start',
       spans: [{ type: 'line-block', from: at, to: last }],
     };
   },

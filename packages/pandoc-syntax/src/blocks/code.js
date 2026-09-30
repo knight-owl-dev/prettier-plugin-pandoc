@@ -48,7 +48,6 @@ export const fencedCode = {
     if (last === null) return null;
     return {
       last,
-      after: 'start',
       spans: [{ type: 'fenced-code', from: at, to: last }],
     };
   },
@@ -73,7 +72,6 @@ export const indentedCode = {
     }
     return {
       last,
-      after: 'start',
       spans: [{ type: 'indented-code', from: at, to: last }],
     };
   },

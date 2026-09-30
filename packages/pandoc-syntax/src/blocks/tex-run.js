@@ -270,9 +270,15 @@ function pieceEnd(lines, p) {
   return unknownEnd(lines, command);
 }
 
-// Past the whitespace between two pieces: spaces, and a line break before a
-// line that is not blank.
-function gapEnd(lines, p) {
+/**
+ * Past the whitespace after a piece: spaces, and a line break before a line
+ * that is not blank, with that line's indentation.
+ *
+ * @param {Line[]} lines
+ * @param {Place} p
+ * @returns {Place}
+ */
+export function gapEnd(lines, p) {
   const at = pastSpaces(lines, p);
   const next = lines[at.k + 1];
   if (at.i < textAt(lines, at).length || next === undefined) return at;

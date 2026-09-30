@@ -12,6 +12,7 @@ import { mask, maskable } from './mask.js';
 import { CONTAINERS } from './nodes.js';
 import { settle } from './settle.js';
 import { stretchAround } from './stretch.js';
+import { lineEnd } from './text.js';
 import { firstFolded, firstUnread } from './unread.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
@@ -39,6 +40,26 @@ const VERBATIM = new Set([
 
 const startOf = (block) =>
   block.type === 'div' ? block.open.start : block.start;
+
+const endOf = (block, text) =>
+  block.type === 'div' ? (block.close?.end ?? text.length) : block.end;
+
+// Each raw block with text after it on its line, through that line and any
+// block opening there: Pandoc reads blocks again after it, and CommonMark
+// never opens one mid-line, a paragraph included.
+function afterRaw(found, text) {
+  return found
+    .filter((raw) => raw.type === 'raw-tex')
+    .filter((raw) => text.slice(raw.end, lineEnd(text, raw.end)).trim() !== '')
+    .map((raw) => {
+      const line = lineEnd(text, raw.end);
+      const opened = found.filter(
+        (b) => b !== raw && raw.end <= startOf(b) && startOf(b) <= line,
+      );
+      const ends = opened.map((b) => endOf(b, text));
+      return { start: raw.start, end: Math.max(line, ...ends) };
+    });
+}
 
 /**
  * The constructs to mask with `stretch` printed as written instead: whatever
@@ -77,7 +98,8 @@ export async function parse(text, options) {
   // next is judged: the earliest printed as written, the rest parsed again.
   // Every pass prints more of the document as written, so the loop ends.
   const fences = found.filter((block) => block.type === 'fenced-code');
-  // A fence counts until a stretch printed as written holds all of it.
+  const resumed = afterRaw(found, text);
+  // A block counts until a stretch printed as written holds all of it.
   const unmasked = (blocks) =>
     blocks.filter(
       (b) =>
@@ -90,6 +112,7 @@ export async function parse(text, options) {
       ...at(firstMisread(constructs.containers, ast, text, masked)),
       ...[firstUnread(ast, unmasked(fences), text)].filter(Boolean),
       ...[firstFolded(ast, constructs.verbatim)].filter(Boolean),
+      ...unmasked(resumed),
     ];
     if (misreads.length === 0) return undefined;
     const first = misreads.reduce((a, b) => (b.start < a.start ? b : a));

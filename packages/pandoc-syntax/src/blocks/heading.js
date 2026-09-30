@@ -16,7 +16,7 @@ const patterns = perSyntax((syntax) => ({
 }));
 
 const endsHere = (pattern, lines, at) =>
-  pattern.test(lines[at].text) ? { last: at, after: 'start' } : null;
+  pattern.test(lines[at].text) ? { last: at } : null;
 
 /**
  * Whether a line underlines the one-line paragraph above it as a heading.
@@ -45,8 +45,8 @@ export const isThematicBreak = (text, syntax) =>
 export const atxHeading = {
   name: 'atx-heading',
   interruptsParagraph: false,
-  match: (lines, at, { text }) =>
-    holdsEnvironment(lines, at, text) ? null : endsHere(ATX, lines, at),
+  match: (lines, at) =>
+    holdsEnvironment(lines, at) ? null : endsHere(ATX, lines, at),
 };
 
 /**

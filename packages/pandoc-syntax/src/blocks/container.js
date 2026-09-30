@@ -55,7 +55,6 @@ export const blockQuote = {
     }
     return {
       last: n - 1,
-      after: 'start',
       container: { type: 'block-quote', content },
     };
   },
@@ -140,7 +139,7 @@ export const listItem = {
       endsLazily,
       syntax.tabStop,
     );
-    return { last, after: 'start', container: { type: 'list-item', content } };
+    return { last, container: { type: 'list-item', content } };
   },
 };
 
@@ -170,7 +169,6 @@ export const footnoteDefinition = {
     );
     return {
       last,
-      after: 'start',
       container: { type: 'footnote-definition', content },
     };
   },

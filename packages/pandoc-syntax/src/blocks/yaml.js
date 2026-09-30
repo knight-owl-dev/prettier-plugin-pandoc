@@ -26,7 +26,6 @@ export const yamlMetadata = {
       if (CLOSE.test(lines[n].text)) {
         return {
           last: n,
-          after: 'start',
           spans: [{ type: 'yaml-metadata', from: at, to: n }],
         };
       }

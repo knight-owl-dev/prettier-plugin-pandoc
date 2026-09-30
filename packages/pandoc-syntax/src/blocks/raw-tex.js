@@ -1,6 +1,6 @@
 // Raw TeX blocks: a run of environments and commands, `tex-run.js`. Each span
-// covers exactly the characters Pandoc keeps raw. A run can end mid-line, and
-// what follows on the line is a paragraph.
+// covers exactly the characters Pandoc keeps raw. Pandoc reads blocks again
+// past the whitespace after a run, mid-line or on the next line.
 //
 // An environment is no inline: in paragraph text it ends the paragraph at its
 // `\begin`, wherever that sits, unless balanced brackets hold it.
@@ -9,7 +9,7 @@ import { commandEnd, startsCommand } from '../command.js';
 import { BLANK, breaksParagraph } from '../lines.js';
 import { COMMENT_CLOSE, COMMENT_OPEN, opaqueEnd } from '../opaque.js';
 import { BEGIN } from '../tex.js';
-import { runEnd } from './tex-run.js';
+import { gapEnd, runEnd } from './tex-run.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
@@ -85,10 +85,9 @@ function viewFrom(lines, from, start, whole = false) {
  * @param {number} from
  * @param {number} start
  * @param {number} at
- * @param {string} text The whole source.
  * @returns {Match | null}
  */
-function inParagraph(lines, from, start, at, text) {
+function inParagraph(lines, from, start, at) {
   const line = lines[at];
   if (!line.text.includes(BEGIN_PREFIX)) return null;
   let view = viewFrom(lines, from, start);
@@ -113,27 +112,24 @@ function inParagraph(lines, from, start, at, text) {
     if (i >= lineStart) {
       const column = head + (i - lineStart);
       const end = runEnd(lines, { k: at, i: column });
-      if (end !== null) return raw(lines, at, line.start + column, end, text);
+      if (end !== null) return raw(lines, at, line.start + column, end);
     }
     i += BEGIN_PREFIX.length;
   }
   return null;
 }
 
-// The raw span from `start` on line `from` to the place `run` ends, and what
-// the text after it on that line holds.
+// The raw span from `start` on line `from` to the place `run` ends, and where
+// blocks are read again.
 /** @returns {Match} */
-function raw(lines, from, start, run, text) {
+function raw(lines, from, start, run) {
   const [to, end] = [run.k, lines[run.k].start + run.i];
   /** @type {SpanSpec} */
   const span = { type: 'raw-tex', from, to, start, end };
-  if (BLANK.test(text.slice(end, lines[to].end))) {
-    return { last: to, after: 'start', spans: [span] };
-  }
-  const next = inParagraph(lines, to, end, to, text);
-  return next === null
-    ? { last: to, after: 'paragraph', tail: end, spans: [span] }
-    : { ...next, spans: [span, ...next.spans] };
+  const at = gapEnd(lines, run);
+  return at.i < lines[at.k].text.length
+    ? { last: to, resume: lines[at.k].start + at.i, spans: [span] }
+    : { last: to, spans: [span] };
 }
 
 /**
@@ -141,10 +137,9 @@ function raw(lines, from, start, run, text) {
  *
  * @param {Line[]} lines
  * @param {number} at
- * @param {string} text
  */
-export const holdsEnvironment = (lines, at, text) =>
-  inParagraph(lines, at, lines[at].start, at, text) !== null;
+export const holdsEnvironment = (lines, at) =>
+  inParagraph(lines, at, lines[at].start, at) !== null;
 
 /**
  * A run opening a line at a block start. An environment in paragraph text is
@@ -155,9 +150,9 @@ export const holdsEnvironment = (lines, at, text) =>
 export const texBlock = {
   name: 'tex-block',
   interruptsParagraph: false,
-  match(lines, at, { text }) {
+  match(lines, at) {
     const end = runEnd(lines, { k: at, i: 0 });
-    return end === null ? null : raw(lines, at, lines[at].start, end, text);
+    return end === null ? null : raw(lines, at, lines[at].start, end);
   },
 };
 
@@ -170,9 +165,9 @@ export const texEnvironmentInParagraph = {
   name: 'tex-environment-in-paragraph',
   interruptsParagraph: true,
   opensAhead: (text) => text.includes(BEGIN_PREFIX),
-  match(lines, at, { paragraph, text }) {
+  match(lines, at, { paragraph }) {
     return paragraph === null
-      ? inParagraph(lines, at, lines[at].start, at, text)
-      : inParagraph(lines, at - paragraph.lines, paragraph.start, at, text);
+      ? inParagraph(lines, at, lines[at].start, at)
+      : inParagraph(lines, at - paragraph.lines, paragraph.start, at);
   },
 };

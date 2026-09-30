@@ -1,13 +1,15 @@
 // The scan: one document's lines, read line by line against the registry.
 //
-// A line is read in one of two positions. At a block start any construct may
-// open on it. Inside a paragraph only one that interrupts a paragraph may; any
-// other line is the paragraph's text, a fence included. The scan also keeps the
-// div stack, and reads each container's content as a document of its own.
+// A line is read in one of two positions. At a block start — a line's start,
+// or where Pandoc resumes after raw TeX — any construct may open on it.
+// Inside a paragraph only one that interrupts a paragraph may; any other line
+// is the paragraph's text, a fence included. The scan also keeps the div
+// stack, and reads each container's content as a document of its own.
 
-import { BLANK, segmentsOf } from '../lines.js';
+import { BLANK, segmentsOf, strip } from '../lines.js';
 import { DIV_CLOSE } from './div.js';
 import { definitionList } from './list.js';
+import { texEnvironmentInParagraph } from './raw-tex.js';
 import { INTERRUPTERS, ITEM_INTERRUPTERS, REGISTRY } from './registry.js';
 
 /** @typedef {import('../types.js').Block} Block */
@@ -18,8 +20,11 @@ import { INTERRUPTERS, ITEM_INTERRUPTERS, REGISTRY } from './registry.js';
 /** @typedef {import('../types.js').Span} Span */
 /** @typedef {import('../types.js').SpanSpec} SpanSpec */
 
-// Every block a definition term cannot be: a term is paragraph text.
-const NOT_TERMS = REGISTRY.filter((r) => r !== definitionList);
+// Every block a definition term cannot be: a term is paragraph text, which
+// Pandoc reads before an environment in it can end it.
+const NOT_TERMS = REGISTRY.filter(
+  (r) => r !== definitionList && r !== texEnvironmentInParagraph,
+);
 
 /**
  * @param {Recognizer[]} recognizers
@@ -151,7 +156,8 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
   };
 
   /**
-   * Report what a match at line `at` found, and return its last line.
+   * Report what a match at line `at` found, and return the line read last: at
+   * a resume point, the line before the one read again from it.
    *
    * @param {Match} match
    * @param {number} at
@@ -165,9 +171,15 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
       const depth = divDepth + open.length;
       scan(content, text, out, depth, syntax, type === 'list-item');
     }
-    paragraph =
-      match.after === 'paragraph' ? { lines: 1, start: match.tail } : null;
-    return match.last;
+    paragraph = null;
+    if (match.resume === undefined) return match.last;
+    const k =
+      match.resume <= lines[match.last].end ? match.last : match.last + 1;
+    lines[k] = {
+      ...lines[k],
+      ...strip(lines[k], match.resume - lines[k].start),
+    };
+    return k - 1;
   };
 
   for (let n = 0; n < lines.length; n++) {

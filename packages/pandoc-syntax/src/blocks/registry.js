@@ -26,9 +26,7 @@ export const REGISTRY = [
   setextUnderline,
   htmlBlockTag,
 
-  // These open only at a block start. Raw TeX claims its lines before
-  // anything else can read inside them.
-  texBlock,
+  // The rest open only at a block start.
   divOpen,
   // Before the thematic break and the tables its `---` would otherwise open.
   yamlMetadata,
@@ -42,6 +40,9 @@ export const REGISTRY = [
   // A line one tab stop deep is code, except where it opens a table: Pandoc
   // tries tables first, and a simple table's header may sit that deep.
   indentedCode,
+  // After the tables and indented code Pandoc tries first: a table's first
+  // cell may be raw TeX. Before the rest, which could read inside its lines.
+  texBlock,
   lineBlock,
   blockQuote,
   // Before the list item a `* * *` or `- - -` would otherwise open.
