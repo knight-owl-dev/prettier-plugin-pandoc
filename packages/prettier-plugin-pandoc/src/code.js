@@ -14,22 +14,25 @@ import { lineSpans } from './text.js';
 const lineOf = (text, offset) => text.slice(0, offset).split('\n').length;
 const lineStart = (text, offset) => text.lastIndexOf('\n', offset - 1) + 1;
 
-// Every fenced code node, with the sibling before it.
+// Every fenced code node, with its siblings.
 function fencedCode(node, out = []) {
-  (node.children ?? []).forEach((child, i) => {
+  (node.children ?? []).forEach((child, index) => {
     if (child.type === 'code' && !child.isIndented) {
-      out.push({ node: child, previous: node.children[i - 1] });
+      out.push({ node: child, siblings: node.children, index });
     }
     fencedCode(child, out);
   });
   return out;
 }
 
+// Whether two siblings sit on adjacent lines, no blank line between.
+const joined = (a, b) => a.position.end.line + 1 === b.position.start.line;
+
 /**
  * The stretch around the first fenced code Pandoc does not read as code, as
- * a verbatim block, or undefined. A block the fence follows with no blank
- * line between is Pandoc's text with it, and prints as written too; in a
- * container, the container's stretch does.
+ * a verbatim block, or undefined. The blocks joined to it with no blank line
+ * between, before or after, are one paragraph with it to Pandoc and print as
+ * written too; in a container, the container's stretch does.
  *
  * @param {object} ast
  * @param {Block[]} found What the recognizer found in `text`.
@@ -48,7 +51,7 @@ export function firstUnreadCode(ast, found, containers, text) {
   );
   if (unread === undefined) return undefined;
 
-  const { node, previous } = unread;
+  const { node, siblings, index } = unread;
   const holder = containers.find(
     (c) =>
       c.start <= node.position.start.offset &&
@@ -56,17 +59,18 @@ export function firstUnreadCode(ast, found, containers, text) {
   );
   if (holder !== undefined) return stretchOf(holder, containers, text);
 
-  const joined =
-    previous !== undefined &&
-    previous.position.end.line + 1 === node.position.start.line;
-  const start = lineStart(
-    text,
-    (joined ? previous : node).position.start.offset,
-  );
+  let [first, last] = [index, index];
+  while (first > 0 && joined(siblings[first - 1], siblings[first])) first--;
+  while (
+    last + 1 < siblings.length &&
+    joined(siblings[last], siblings[last + 1])
+  )
+    last++;
+  const start = lineStart(text, siblings[first].position.start.offset);
   // A fence never closed runs through the file's last newline, which the
   // printer writes again.
-  const end =
-    start + text.slice(start, node.position.end.offset).trimEnd().length;
+  const until = siblings[last].position.end.offset;
+  const end = start + text.slice(start, until).trimEnd().length;
   return {
     type: 'verbatim',
     start,

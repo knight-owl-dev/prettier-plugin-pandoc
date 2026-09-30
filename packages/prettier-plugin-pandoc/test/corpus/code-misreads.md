@@ -5,6 +5,12 @@ A tilde fence cannot interrupt a paragraph, so this is its text:
 not code to Pandoc
 ~~~
 
+A paragraph runs on past a fence Pandoc reads as its text:
+~~~
+not code
+~~~
+and this line is the same paragraph.
+
 In a block quote as well:
 
 > Quoted text the fence follows,
