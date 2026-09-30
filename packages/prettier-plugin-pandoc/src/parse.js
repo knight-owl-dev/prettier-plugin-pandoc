@@ -8,10 +8,11 @@ import {
 } from '@knight-owl-dev/pandoc-syntax';
 import * as markdown from 'prettier/plugins/markdown';
 import { firstUnreadCode } from './code.js';
-import { firstMisread, isContainer, stretchOf } from './containers.js';
+import { firstMisread, isContainer } from './containers.js';
 import { mask, maskable } from './mask.js';
 import { CONTAINERS } from './nodes.js';
 import { settle } from './settle.js';
+import { stretchAround } from './stretch.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
@@ -76,10 +77,17 @@ export async function parse(text, options) {
   // next is judged: the earliest printed as written, the rest parsed again.
   // Every pass prints more of the document as written, so the loop ends.
   const misread = (ast, masked) => {
-    const wrong = firstMisread(constructs.containers, ast, text, masked);
-    return wrong === undefined
-      ? firstUnreadCode(ast, found, constructs.containers, text)
-      : stretchOf(wrong, constructs.containers, text);
+    const offsets = [
+      firstMisread(constructs.containers, ast, text, masked),
+      firstUnreadCode(ast, found, text),
+    ].filter((offset) => offset !== undefined);
+    if (offsets.length === 0) return undefined;
+    return stretchAround(
+      Math.min(...offsets),
+      ast,
+      constructs.containers,
+      text,
+    );
   };
   let masked = mask(text, constructs);
   let ast = await base.parse(masked, options);

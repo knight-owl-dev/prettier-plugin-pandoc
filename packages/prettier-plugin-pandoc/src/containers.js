@@ -7,8 +7,6 @@
 // its tree can part from Pandoc's. Where they part, the container prints as
 // written — decided by comparing the trees, never predicted.
 
-import { lineSpans } from './text.js';
-
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
 // The node prettier's parser makes for each of the recognizer's containers.
@@ -25,9 +23,6 @@ const NODE_TYPES = new Set(Object.values(NODE_TYPE));
  */
 export const isContainer = (block) => NODE_TYPE[block.type] !== undefined;
 
-const within = (inner, outer) =>
-  inner !== outer && inner.start >= outer.start && inner.end <= outer.end;
-
 /**
  * Every container node of prettier's tree, in document order, a parent before
  * its children.
@@ -43,66 +38,44 @@ export function containerNodes(node, out = []) {
 }
 
 /**
- * The first container prettier's parser bounds where Pandoc does not, or
- * undefined. Each is found by where its marker sits. Their ends agree when all
- * between them is what the masks blanked, a quote's bare `>` included.
+ * Where the first container the two parsers bound differently sits, or
+ * undefined: one of the recognizer's that prettier's parser bounds elsewhere,
+ * or one of prettier's the recognizer never found. Each is found by where its
+ * marker sits. Their ends agree when all between them is what the masks
+ * blanked, a quote's bare `>` included.
  *
  * @param {Block[]} containers
  * @param {object} ast
  * @param {string} text
  * @param {string} masked
- * @returns {Block | undefined}
+ * @returns {number | undefined} The offset of the container's marker.
  */
 export function firstMisread(containers, ast, text, masked) {
+  const markerOf = (container) =>
+    container.start + /^[ \t]*/.exec(text.slice(container.start))[0].length;
+  const nodes = containerNodes(ast);
   const byMarker = new Map(
-    containerNodes(ast).map((n) => [`${n.type}@${n.position.start.offset}`, n]),
+    nodes.map((n) => [`${n.type}@${n.position.start.offset}`, n]),
   );
-  return containers.find((container) => {
-    const indent = /^[ \t]*/.exec(text.slice(container.start))[0].length;
-    const marker = container.start + indent;
-    const node = byMarker.get(`${NODE_TYPE[container.type]}@${marker}`);
+  const bounded = new Set(
+    containers.map((c) => `${NODE_TYPE[c.type]}@${markerOf(c)}`),
+  );
+  const parted = containers.find((container) => {
+    const node = byMarker.get(
+      `${NODE_TYPE[container.type]}@${markerOf(container)}`,
+    );
     if (node === undefined) return true;
     const end = node.position.end.offset;
     return (
       end > container.end || !/^[\s>]*$/.test(masked.slice(end, container.end))
     );
   });
-}
-
-// The start and end of the list a top-level item belongs to: every top-level
-// item beside it with only blank lines between.
-function listAround(item, top, text) {
-  const adjacent = (a, b) =>
-    a.type === 'list-item' &&
-    b.type === 'list-item' &&
-    /^\s*$/.test(text.slice(a.end, b.start));
-  let [first, last] = [top.indexOf(item), top.indexOf(item)];
-  while (first > 0 && adjacent(top[first - 1], top[first])) first--;
-  while (last + 1 < top.length && adjacent(top[last], top[last + 1])) last++;
-  return { start: top[first].start, end: top[last].end };
-}
-
-/**
- * The stretch of the document a misread container sits in, as a verbatim
- * block: its outermost container, and for a list item the whole list. No
- * smaller piece of it reads the same to both parsers.
- *
- * @param {Block} container
- * @param {Block[]} containers
- * @param {string} text
- * @returns {Block}
- */
-export function stretchOf(container, containers, text) {
-  const top = containers.filter((c) => !containers.some((o) => within(c, o)));
-  const outermost = top.find((c) => c === container || within(container, c));
-  const { start, end } =
-    outermost.type === 'list-item'
-      ? listAround(outermost, top, text)
-      : outermost;
-  return {
-    type: 'verbatim',
-    start,
-    end,
-    segments: lineSpans(text, start, end),
-  };
+  const extra = nodes.find(
+    (n) => !bounded.has(`${n.type}@${n.position.start.offset}`),
+  );
+  const offsets = [
+    parted === undefined ? undefined : markerOf(parted),
+    extra?.position.start.offset,
+  ].filter((offset) => offset !== undefined);
+  return offsets.length === 0 ? undefined : Math.min(...offsets);
 }

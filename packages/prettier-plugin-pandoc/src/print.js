@@ -11,12 +11,9 @@ const { align, hardline, literalline, markAsRoot } = doc.builders;
 const { replaceEndOfLine } = doc.utils;
 const mdast = markdown.printers.mdast;
 
-// CommonMark's shortest code fence, and the indentation that makes code to it.
-// Indented code Pandoc reads as code prints as written; a code node reaching
-// this printer is CommonMark's reading alone, re-emitted as CommonMark wrote
-// it — Pandoc's tab stop has no say in it.
+// CommonMark's shortest code fence. A code node reaching this printer is
+// fenced code both parsers read alike; code.js prints the rest as written.
 const SHORTEST_FENCE = 3;
-const COMMONMARK_CODE_INDENT = 4;
 
 // The longest run of `char` in `text`, for a fence that cannot close early.
 const longestRun = (text, char) =>
@@ -45,10 +42,6 @@ function printCode(node, options) {
   const atEnd = node.position.end.offset === options.originalText.length;
   if (atEnd && value.endsWith('\n') && options.originalText.endsWith('\n')) {
     value = value.slice(0, -1);
-  }
-  if (node.isIndented) {
-    const indent = ' '.repeat(COMMONMARK_CODE_INDENT);
-    return align(indent.length, [indent, asWritten(value)]);
   }
   const fence = '`'.repeat(
     Math.max(SHORTEST_FENCE, longestRun(value, '`') + 1),
