@@ -78,6 +78,45 @@ function toContainer(lines, from, to, type, content) {
 }
 
 /**
+ * A context at a block start, outside any div.
+ *
+ * @param {string} text
+ * @param {import('../syntax.js').Syntax} syntax
+ * @returns {Context}
+ */
+function contextFor(text, syntax) {
+  /** @type {Context} */
+  const context = {
+    syntax,
+    text,
+    inDiv: false,
+    paragraph: null,
+    // Asked at a block start, which is where a term would open.
+    opensBlock: (lines, at) =>
+      firstMatch(NOT_TERMS, lines, at, { ...context, paragraph: null }) !==
+      null,
+  };
+  return context;
+}
+
+/**
+ * Whether line 1 ends the one-line paragraph on line 0: it interrupts the
+ * paragraph, or a block opening on line 0 claims it, as a definition list
+ * claims its term.
+ *
+ * @param {Line[]} lines
+ * @param {string} text
+ * @param {import('../syntax.js').Syntax} syntax
+ */
+export function endsParagraph(lines, text, syntax) {
+  const context = contextFor(text, syntax);
+  const opened = firstMatch(REGISTRY, lines, 0, context);
+  if (opened !== null && opened.last >= 1) return true;
+  const paragraph = { ...context, paragraph: { lines: 1 } };
+  return firstMatch(INTERRUPTERS, lines, 1, paragraph) !== null;
+}
+
+/**
  * Read `lines` into `out`: a document, or a container's content through views
  * whose offsets are still the source's.
  *

@@ -8,17 +8,23 @@ import { perSyntax } from '../syntax.js';
 
 const COMMENT_END = '-->';
 
-// The tags that open an HTML block. Inline ones — `<span>`, `<em>` — open a
-// paragraph instead.
+// The tags that open an HTML block, as Pandoc lists them; test/interrupts.test.js
+// asks Pandoc about every HTML element. Inline ones — `<span>`, `<em>` — open
+// a paragraph instead.
 const BLOCK_TAGS = [
   'address',
   'article',
   'aside',
   'blockquote',
+  'body',
+  'canvas',
+  'caption',
   'center',
-  'details',
-  'dialog',
+  'col',
+  'colgroup',
   'dd',
+  'details',
+  'dir',
   'div',
   'dl',
   'dt',
@@ -27,13 +33,21 @@ const BLOCK_TAGS = [
   'figure',
   'footer',
   'form',
+  'frameset',
   'h[1-6]',
+  'head',
   'header',
+  'hgroup',
   'hr',
+  'html',
   'li',
   'main',
+  'menu',
+  'meta',
   'nav',
+  'noframes',
   'ol',
+  'output',
   'p',
   'pre',
   'section',
@@ -41,18 +55,23 @@ const BLOCK_TAGS = [
   'table',
   'tbody',
   'td',
+  'textarea',
   'tfoot',
   'th',
   'thead',
+  'title',
   'tr',
   'ul',
 ];
+// Block tags only as they open, never as they close.
+const OPENING_BLOCK_TAGS = ['script'];
+
+const TAG = `(</?(${BLOCK_TAGS.join('|')})|<(${OPENING_BLOCK_TAGS.join('|')}))(\\s|/?>|$)`;
+// A tag at any depth, for where indented code cannot open.
+const TAG_AT_ANY_INDENT = new RegExp(`^[ \\t]*${TAG}`, 'i');
 const patterns = perSyntax((syntax) => ({
   comment: syntax.atBlockIndent('<!--'),
-  blockTag: syntax.atBlockIndent(
-    `</?(${BLOCK_TAGS.join('|')})(\\s|/?>|$)`,
-    'i',
-  ),
+  blockTag: syntax.atBlockIndent(TAG, 'i'),
 }));
 
 /**
@@ -87,14 +106,18 @@ export const htmlComment = {
  * after it starts afresh. Prettier prints the tag as it stands, so nothing is
  * reported.
  *
+ * At a block start, a tag one tab stop deep is indented code. Inside a
+ * paragraph indented code cannot open, so a tag there ends the paragraph at
+ * any depth.
+ *
  * @type {Recognizer}
  */
 export const htmlBlockTag = {
   name: 'html-block-tag',
   interruptsParagraph: true,
-  match(lines, at, { syntax }) {
-    return patterns(syntax).blockTag.test(lines[at].text)
-      ? { last: at, after: 'start' }
-      : null;
+  match(lines, at, { syntax, paragraph }) {
+    const pattern =
+      paragraph === null ? patterns(syntax).blockTag : TAG_AT_ANY_INDENT;
+    return pattern.test(lines[at].text) ? { last: at, after: 'start' } : null;
   },
 };

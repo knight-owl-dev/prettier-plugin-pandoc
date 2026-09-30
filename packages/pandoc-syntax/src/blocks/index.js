@@ -2,9 +2,12 @@
 
 import { splitLines } from '../lines.js';
 import { DEFAULT_TAB_STOP, syntaxFor } from '../syntax.js';
-import { scan } from './scan.js';
+import { endsParagraph, scan } from './scan.js';
 
 /** @typedef {import('../types.js').Block} Block */
+
+// The paragraph `interruptsParagraph` asks about.
+const PARAGRAPH_LINE = 'text';
 
 const startOf = (block) =>
   block.type === 'div' ? block.open.start : block.start;
@@ -29,4 +32,22 @@ export function blocks(text, { tabStop = DEFAULT_TAB_STOP } = {}) {
   const out = [];
   scan(splitLines(text), text, out, 0, syntaxFor(tabStop));
   return out.sort((a, b) => startOf(a) - startOf(b));
+}
+
+/**
+ * Whether `line`, as the second line of a paragraph, would end it instead: a
+ * line a formatter must not wrap a paragraph onto.
+ *
+ * @param {string} line One line, without its newline.
+ * @param {{tabStop?: number, after?: string}} [options] `after` is what
+ *   follows the line, where a fence finds its close and an environment its
+ *   end.
+ * @returns {boolean}
+ */
+export function interruptsParagraph(
+  line,
+  { tabStop = DEFAULT_TAB_STOP, after = '' } = {},
+) {
+  const text = `${PARAGRAPH_LINE}\n${line}\n${after}`;
+  return endsParagraph(splitLines(text), text, syntaxFor(tabStop));
 }
