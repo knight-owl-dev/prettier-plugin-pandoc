@@ -82,6 +82,7 @@
  * @property {number} last
  * @property {'start' | 'paragraph'} after `paragraph` when text a mid-line end
  *   left on the last line is a paragraph's first line.
+ * @property {number} [tail] Where that text starts, for `paragraph`.
  * @property {SpanSpec[]} [spans]
  * @property {{type: ContainerBlock['type'], content: Line[]}} [container]
  * @property {Span} [divOpen]
@@ -93,8 +94,9 @@
  * @property {string} text The whole source.
  * @property {boolean} inDiv Whether a div is open around this line, at any
  *   level of nesting.
- * @property {{lines: number} | null} paragraph The paragraph this line would
- *   continue, or null at a block start.
+ * @property {{lines: number, start: number} | null} paragraph The paragraph
+ *   this line would continue, or null at a block start: its lines so far, and
+ *   where its text starts on the first.
  * @property {(lines: Line[], at: number) => boolean} opensBlock Whether a block
  *   other than paragraph text opens on a line.
  */

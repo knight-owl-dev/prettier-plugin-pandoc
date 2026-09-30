@@ -113,7 +113,10 @@ export function endsParagraph(lines, text, syntax, inItem) {
   const context = contextFor(text, syntax);
   const opened = firstMatch(REGISTRY, lines, 0, context);
   if (opened !== null && opened.last >= 1) return true;
-  const paragraph = { ...context, paragraph: { lines: 1 } };
+  const paragraph = {
+    ...context,
+    paragraph: { lines: 1, start: lines[0].start },
+  };
   const interrupters = inItem ? ITEM_INTERRUPTERS : INTERRUPTERS;
   return firstMatch(interrupters, lines, 1, paragraph) !== null;
 }
@@ -135,7 +138,7 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
   const open = [];
   /** @type {SpanSpec[]} */
   const raws = [];
-  /** @type {{lines: number} | null} */
+  /** @type {Context['paragraph']} */
   let paragraph = null;
 
   /** @type {Context} */
@@ -169,7 +172,8 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
       const depth = divDepth + open.length;
       scan(content, text, out, depth, syntax, type === 'list-item');
     }
-    paragraph = match.after === 'paragraph' ? { lines: 1 } : null;
+    paragraph =
+      match.after === 'paragraph' ? { lines: 1, start: match.tail } : null;
     return match.last;
   };
 
@@ -199,11 +203,13 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
       context,
     );
     if (match !== null) n = take(match, n);
-    else if (paragraph === null) paragraph = { lines: 1 };
+    else if (paragraph === null) paragraph = { lines: 1, start: line.start };
     else paragraph.lines++;
   }
 
   // A div never closed runs to the end of the document.
   for (const span of open) out.push({ type: 'div', open: span, close: null });
-  for (const spec of mergeAdjacent(raws)) out.push(toBlock(lines, spec));
+  for (const spec of mergeAdjacent(raws, lines, text)) {
+    out.push(toBlock(lines, spec));
+  }
 }

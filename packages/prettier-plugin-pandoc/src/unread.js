@@ -8,8 +8,9 @@
 // indented code or table prettier finds is CommonMark's alone: text at a wider
 // tab stop, a fence deeper than a list item's content, a table straight after
 // a paragraph line. A fence Pandoc opens where CommonMark closes one parts
-// them too. Where the two part, the block prints as written — found by
-// comparing the trees, never predicted.
+// them too. So does a block Pandoc starts mid-line, as an environment in
+// paragraph text: CommonMark folds it into the paragraph. Where the two part,
+// the block prints as written — found by comparing the trees, never predicted.
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
@@ -24,6 +25,28 @@ function suspects(node, out = []) {
     suspects(child, out);
   }
   return out;
+}
+
+// Every heading's start: where a verbatim block's mask opens one.
+function headingStarts(node, out = new Set()) {
+  for (const child of node.children ?? []) {
+    if (child.type === 'heading') out.add(child.position.start.offset);
+    headingStarts(child, out);
+  }
+  return out;
+}
+
+/**
+ * The first verbatim block whose mask prettier reads as no heading of its
+ * own, or undefined.
+ *
+ * @param {object} ast
+ * @param {Block[]} verbatim
+ * @returns {Block | undefined}
+ */
+export function firstFolded(ast, verbatim) {
+  const starts = headingStarts(ast);
+  return verbatim.find((block) => !starts.has(block.start));
 }
 
 /**

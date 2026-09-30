@@ -12,7 +12,7 @@ import { mask, maskable } from './mask.js';
 import { CONTAINERS } from './nodes.js';
 import { settle } from './settle.js';
 import { stretchAround } from './stretch.js';
-import { firstUnread } from './unread.js';
+import { firstFolded, firstUnread } from './unread.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
@@ -36,9 +36,6 @@ const VERBATIM = new Set([
   'example-list',
   'fancy-list',
 ]);
-
-const ENVIRONMENT = '\\begin';
-const isEnvironment = (text, span) => text.startsWith(ENVIRONMENT, span.start);
 
 const startOf = (block) =>
   block.type === 'div' ? block.open.start : block.start;
@@ -79,10 +76,6 @@ export async function parse(text, options) {
   // One misread shifts everything after it, so each is settled before the
   // next is judged: the earliest printed as written, the rest parsed again.
   // Every pass prints more of the document as written, so the loop ends.
-  //
-  // An environment written mid-line is one too: Pandoc ends the paragraph
-  // around it and reads it raw through whatever lines it spans, which no
-  // CommonMark tree can hold.
   const fences = found.filter((block) => block.type === 'fenced-code');
   // A fence counts until a stretch printed as written holds all of it.
   const unmasked = (blocks) =>
@@ -96,7 +89,7 @@ export async function parse(text, options) {
     const misreads = [
       ...at(firstMisread(constructs.containers, ast, text, masked)),
       ...[firstUnread(ast, unmasked(fences), text)].filter(Boolean),
-      ...constructs.inlineRaw.filter((span) => isEnvironment(text, span)),
+      ...[firstFolded(ast, constructs.verbatim)].filter(Boolean),
     ];
     if (misreads.length === 0) return undefined;
     const first = misreads.reduce((a, b) => (b.start < a.start ? b : a));

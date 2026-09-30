@@ -4,8 +4,8 @@
 
 import { breaksParagraph, paragraphEnd } from './lines.js';
 
-const COMMENT_OPEN = '<!--';
-const COMMENT_CLOSE = '-->';
+export const COMMENT_OPEN = '<!--';
+export const COMMENT_CLOSE = '-->';
 const DISPLAY_MATH = '$$';
 const INLINE_MATH = '$';
 
