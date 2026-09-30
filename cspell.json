@@ -4,6 +4,7 @@
   "dictionaries": ["docker", "node", "typescript"],
   "ignorePaths": ["package-lock.json", "packages/*/test/corpus/**"],
   "words": [
+    "autolinks",
     "COMMONMARK",
     "dedent",
     "dedented",

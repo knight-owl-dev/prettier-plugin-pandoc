@@ -118,3 +118,22 @@ export function breaksParagraph(text, at) {
   const next = text.indexOf('\n', at + 1);
   return BLANK.test(text.slice(at + 1, next === -1 ? text.length : next));
 }
+
+/**
+ * The offset of the newline that breaks the paragraph `at` is in, or the end
+ * of the text.
+ *
+ * @param {string} text
+ * @param {number} at
+ * @returns {number}
+ */
+export function paragraphEnd(text, at) {
+  for (
+    let i = text.indexOf('\n', at);
+    i !== -1;
+    i = text.indexOf('\n', i + 1)
+  ) {
+    if (breaksParagraph(text, i)) return i;
+  }
+  return text.length;
+}

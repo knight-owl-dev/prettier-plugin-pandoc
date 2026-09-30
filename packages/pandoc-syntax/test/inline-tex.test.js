@@ -77,6 +77,8 @@ const CASES = {
   'a code span': '`\\code{x}` b',
   'a double-backtick code span': '``a ` \\code{x}`` b',
   'inline math': '$\\frac{a}{b}$ and \\emph{x}',
+  'a code span broken by a blank line': 'a `b\n\nc` \\emph{x} d',
+  'display math broken by a blank line': 'a $$b\n\nc$$ \\emph{x} d',
   'a price': 'price $5 and \\emph{x} $6',
   'an HTML comment': 'a <!-- \\emph{x} --> b',
   'a code block': '```\n\\emph{x}\n```',
@@ -99,6 +101,7 @@ for (const [name, text] of Object.entries({
   'inline math': '$\\frac{a}{b}$',
   'a code block': '```\n\\emph{x}\n```',
   'an HTML comment': 'a <!-- \\emph{x} --> b',
+  'an autolink': 'a <http://x.y/\\emph{x}> b',
 })) {
   test(`${name}: no span claims it`, () => {
     assert.deepEqual(inlines(`${text}\n`), []);

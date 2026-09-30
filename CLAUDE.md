@@ -28,8 +28,7 @@ the host.
   starts for any consumer; a printer concern belongs in the plugin.
 - **Probe Pandoc before encoding a rule**, at more than one tab stop when the
   rule involves indentation.
-- **An inline span may be wider than Pandoc's, never narrower:**
-  `inlines/tex.js`.
+- **An inline span may be wider than Pandoc's, never narrower:** `command.js`.
 - **Masking keeps offsets:** `mask.js`.
 - **The tab stop decides indentation:** `syntax.js`.
 - **Containers are collected, then read:** `containers.js`.

@@ -3,6 +3,7 @@
 // start they leave behind, and nothing is reported.
 
 import { perSyntax } from '../syntax.js';
+import { holdsEnvironment } from './raw-tex.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 
@@ -37,13 +38,15 @@ export const isThematicBreak = (text, syntax) =>
 
 /**
  * Pandoc wants a blank line before a heading, so `#` continues a paragraph.
+ * An environment in its text makes it a paragraph.
  *
  * @type {Recognizer}
  */
 export const atxHeading = {
   name: 'atx-heading',
   interruptsParagraph: false,
-  match: (lines, at) => endsHere(ATX, lines, at),
+  match: (lines, at, { text }) =>
+    holdsEnvironment(lines, at, text) ? null : endsHere(ATX, lines, at),
 };
 
 /**

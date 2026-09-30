@@ -11,7 +11,11 @@ import { atxHeading, setextUnderline, thematicBreak } from './heading.js';
 import { htmlBlockTag, htmlComment } from './html.js';
 import { lineBlock } from './line-block.js';
 import { definitionList, exampleList, fancyList } from './list.js';
-import { texCommandLine, texEnvironment } from './raw-tex.js';
+import {
+  texCommandLine,
+  texEnvironment,
+  texEnvironmentInParagraph,
+} from './raw-tex.js';
 import { linkReference } from './reference.js';
 import { pandocTable, pipeTable } from './table.js';
 import { yamlMetadata } from './yaml.js';
@@ -20,14 +24,15 @@ import { yamlMetadata } from './yaml.js';
 
 /** @type {Recognizer[]} */
 export const REGISTRY = [
-  // Those that interrupt a paragraph. A fence and an environment claim
-  // their lines before anything else can read inside them.
+  // Those that interrupt a paragraph. A fence claims its lines before
+  // anything else can read inside them.
   fencedCode,
-  texEnvironment,
   setextUnderline,
   htmlBlockTag,
 
-  // The rest open only at a block start.
+  // These open only at a block start. An environment claims its lines before
+  // anything else can read inside them.
+  texEnvironment,
   divOpen,
   // Before the thematic break and the tables its `---` would otherwise open.
   yamlMetadata,
@@ -51,6 +56,9 @@ export const REGISTRY = [
   atxHeading,
   htmlComment,
   linkReference,
+  // Last, and in a paragraph too: a line is paragraph text only where nothing
+  // else opens on it.
+  texEnvironmentInParagraph,
 ];
 
 export const INTERRUPTERS = REGISTRY.filter((r) => r.interruptsParagraph);

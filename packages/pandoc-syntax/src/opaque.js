@@ -1,11 +1,18 @@
-// Inline constructs that hold no raw TeX: code spans, HTML comments, math.
+// Inline constructs that hold no raw TeX: code spans, HTML comments, math,
+// autolinks.
+// A paragraph break ends each but a comment.
 
-import { breaksParagraph } from '../lines.js';
+import { breaksParagraph, paragraphEnd } from './lines.js';
 
-const COMMENT_OPEN = '<!--';
-const COMMENT_CLOSE = '-->';
+export const COMMENT_OPEN = '<!--';
+export const COMMENT_CLOSE = '-->';
 const DISPLAY_MATH = '$$';
 const INLINE_MATH = '$';
+
+// Pandoc links many schemes; only the common ones are read here, the rest
+// left as text.
+const AUTOLINK =
+  /<(?:(?:https?|ftp|file|mailto):[^\s<>]*|[^\s<>@]+@[^\s<>]+)>/y;
 
 // A code span closes on a backtick run of the same length as its opener, and
 // no longer; one never closed leaves its backticks as text.
@@ -16,7 +23,9 @@ function codeSpanEnd(text, at) {
   const close = new RegExp(`(?<!\`)${run}(?!\`)`, 'g');
   close.lastIndex = n;
   const match = close.exec(text);
-  return match === null ? n : match.index + run.length;
+  return match === null || match.index > paragraphEnd(text, n)
+    ? n
+    : match.index + run.length;
 }
 
 // Inline math opens on a `$` before a non-space and closes on one after a
@@ -41,10 +50,10 @@ function inlineMathEnd(text, at) {
 }
 
 // The offset past the pair of `open` and `close` starting at `at`, or `at`
-// when it never closes.
-function pairEnd(text, at, open, close) {
+// when it never closes before `limit`.
+function pairEnd(text, at, open, close, limit = text.length) {
   const end = text.indexOf(close, at + open.length);
-  return end === -1 ? at : end + close.length;
+  return end === -1 || end > limit ? at : end + close.length;
 }
 
 /**
@@ -60,8 +69,14 @@ export function opaqueEnd(text, at) {
   if (text.startsWith(COMMENT_OPEN, at)) {
     return pairEnd(text, at, COMMENT_OPEN, COMMENT_CLOSE);
   }
+  if (text[at] === '<') {
+    AUTOLINK.lastIndex = at;
+    const link = AUTOLINK.exec(text);
+    if (link !== null) return at + link[0].length;
+  }
   if (text.startsWith(DISPLAY_MATH, at)) {
-    return pairEnd(text, at, DISPLAY_MATH, DISPLAY_MATH);
+    const limit = paragraphEnd(text, at);
+    return pairEnd(text, at, DISPLAY_MATH, DISPLAY_MATH, limit);
   }
   if (text[at] === INLINE_MATH) return inlineMathEnd(text, at);
   return at;
