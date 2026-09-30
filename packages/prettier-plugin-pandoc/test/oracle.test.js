@@ -43,9 +43,11 @@ const CONFIGURATIONS = WIDTHS.flatMap((printWidth) =>
   ),
 );
 
-// Pandoc's parse, soft breaks read as spaces. With embedded formatting on, a
-// markdown sample is formatted too, so what must hold is what Pandoc reads in
-// it; with it off, the sample prints as written and is compared as such.
+// Pandoc's parse, soft breaks read as spaces. With embedded formatting on,
+// prettier formats a sample by its tag: in a markdown one what must hold is
+// what Pandoc reads, and in any other tagged one the code is prettier's to
+// lay out. With it off, and for an untagged sample either way, the sample
+// prints as written and is compared as such.
 function pandoc(text, { samples, tabStop }) {
   const args = ['-f', 'markdown', '-t', 'json', `--tab-stop=${tabStop}`];
   const run = spawnSync('pandoc', args, { input: text, encoding: 'utf8' });
@@ -53,13 +55,14 @@ function pandoc(text, { samples, tabStop }) {
   if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);
   return JSON.parse(run.stdout, (_, value) => {
     if (value?.t === 'SoftBreak') return { t: 'Space' };
-    if (
-      samples === 'by-meaning' &&
-      value?.t === 'CodeBlock' &&
-      value.c[0][1].includes('markdown')
-    ) {
-      const read = pandoc(value.c[1], { samples, tabStop }).blocks;
-      return { t: 'CodeBlock', c: [value.c[0], read] };
+    if (samples === 'by-meaning' && value?.t === 'CodeBlock') {
+      const [attr, code] = value.c;
+      const tags = attr[1];
+      if (tags.includes('markdown')) {
+        const read = pandoc(code, { samples, tabStop }).blocks;
+        return { t: 'CodeBlock', c: [attr, read] };
+      }
+      if (tags.length > 0) return { t: 'CodeBlock', c: [attr] };
     }
     return value;
   });
