@@ -56,13 +56,14 @@ const joined = (a, b) => a.position.end.line + 1 === b.position.start.line;
 // Pandoc, whatever CommonMark made of them.
 function joinedAround(ast, { start, end }, text) {
   const blocks = ast.children;
+  // The last block starting at or before `offset`: the one holding it, or
+  // the one before the blank lines it falls in.
   const holding = (offset) =>
-    blocks.findIndex(
-      (b) =>
-        b.position.start.offset <= offset && offset < b.position.end.offset,
+    Math.max(
+      0,
+      blocks.findLastIndex((b) => b.position.start.offset <= offset),
     );
   let [first, last] = [holding(start), holding(Math.max(start, end - 1))];
-  if (last === -1) last = blocks.length - 1;
   while (first > 0 && joined(blocks[first - 1], blocks[first])) first--;
   while (last + 1 < blocks.length && joined(blocks[last], blocks[last + 1]))
     last++;

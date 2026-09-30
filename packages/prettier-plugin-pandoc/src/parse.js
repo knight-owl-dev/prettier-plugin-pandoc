@@ -7,12 +7,12 @@ import {
   inlines,
 } from '@knight-owl-dev/pandoc-syntax';
 import * as markdown from 'prettier/plugins/markdown';
-import { firstUnreadCode } from './code.js';
 import { firstMisread, isContainer } from './containers.js';
 import { mask, maskable } from './mask.js';
 import { CONTAINERS } from './nodes.js';
 import { settle } from './settle.js';
 import { stretchAround } from './stretch.js';
+import { firstUnread } from './unread.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
@@ -83,12 +83,19 @@ export async function parse(text, options) {
   // An environment written mid-line is one too: Pandoc ends the paragraph
   // around it and reads it raw through whatever lines it spans, which no
   // CommonMark tree can hold.
+  const fences = found.filter((block) => block.type === 'fenced-code');
+  // A fence counts until a stretch printed as written holds all of it.
+  const unmasked = (blocks) =>
+    blocks.filter(
+      (b) =>
+        !constructs.verbatim.some((v) => v.start <= b.start && b.end <= v.end),
+    );
   const misread = (ast, masked) => {
     const at = (offset) =>
       offset === undefined ? [] : [{ start: offset, end: offset }];
     const misreads = [
       ...at(firstMisread(constructs.containers, ast, text, masked)),
-      ...at(firstUnreadCode(ast, found, text)),
+      ...[firstUnread(ast, unmasked(fences), text)].filter(Boolean),
       ...constructs.inlineRaw.filter((span) => isEnvironment(text, span)),
     ];
     if (misreads.length === 0) return undefined;

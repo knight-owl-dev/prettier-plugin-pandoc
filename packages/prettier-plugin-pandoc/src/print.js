@@ -12,7 +12,7 @@ const { replaceEndOfLine } = doc.utils;
 const mdast = markdown.printers.mdast;
 
 // CommonMark's shortest code fence. A code node reaching this printer is
-// fenced code both parsers read alike; code.js prints the rest as written.
+// fenced code both parsers read alike; unread.js prints the rest as written.
 const SHORTEST_FENCE = 3;
 
 // The longest run of `char` in `text`, for a fence that cannot close early.

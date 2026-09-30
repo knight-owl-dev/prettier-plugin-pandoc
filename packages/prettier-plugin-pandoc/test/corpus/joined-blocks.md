@@ -7,3 +7,8 @@ paragraph's text:
 
 A numbered line straight after a paragraph line is text too:
 1. not a list either
+
+A table straight after a paragraph line is its text as well:
+a | b
+--|--
+1 | 2

@@ -11,6 +11,14 @@ not code
 ~~~
 and this line is the same paragraph.
 
+At a wide tab stop, Pandoc closes a fence deeper than CommonMark does:
+
+```
+code
+    ```
+after *the* fence
+```
+
 In a block quote as well:
 
 > Quoted text the fence follows,
