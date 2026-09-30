@@ -10,3 +10,11 @@ across its lines\end{center} and the text after it opens a paragraph of its own.
 One across a blank line: \begin{x}first
 
 second *part*\end{x} after.
+
+An environment ending inside what would be a quote reads through it raw: \begin{x} b
+
+> c \end{x} d
+
+Emphasis *around \begin{x} one
+
+that splits \end{x} the paragraph*.

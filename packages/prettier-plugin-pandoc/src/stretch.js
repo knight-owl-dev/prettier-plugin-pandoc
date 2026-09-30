@@ -51,46 +51,53 @@ const lineStart = (text, offset) => text.lastIndexOf('\n', offset - 1) + 1;
 // Whether two siblings sit on adjacent lines, no blank line between.
 const joined = (a, b) => a.position.end.line + 1 === b.position.start.line;
 
-// The top-level blocks around the one holding `offset`, joined to it with no
-// blank line between: one paragraph to Pandoc, whatever CommonMark made of
-// them.
-function joinedAround(ast, offset, text) {
+// The top-level blocks from the one holding `start` to the one holding `end`,
+// and those joined to them with no blank line between: one paragraph to
+// Pandoc, whatever CommonMark made of them.
+function joinedAround(ast, { start, end }, text) {
   const blocks = ast.children;
-  const at = blocks.findIndex(
-    (b) => b.position.start.offset <= offset && offset < b.position.end.offset,
-  );
-  let [first, last] = [at, at];
+  const holding = (offset) =>
+    blocks.findIndex(
+      (b) =>
+        b.position.start.offset <= offset && offset < b.position.end.offset,
+    );
+  let [first, last] = [holding(start), holding(Math.max(start, end - 1))];
+  if (last === -1) last = blocks.length - 1;
   while (first > 0 && joined(blocks[first - 1], blocks[first])) first--;
   while (last + 1 < blocks.length && joined(blocks[last], blocks[last + 1]))
     last++;
-  const start = lineStart(text, blocks[first].position.start.offset);
+  const from = lineStart(text, blocks[first].position.start.offset);
   // A fence never closed runs through the file's last newline, which the
   // printer writes again.
   const until = blocks[last].position.end.offset;
-  const end = start + text.slice(start, until).trimEnd().length;
+  const to = from + text.slice(from, until).trimEnd().length;
   return {
     type: 'verbatim',
-    start,
-    end,
-    segments: lineSpans(text, start, end),
+    start: from,
+    end: to,
+    segments: lineSpans(text, from, to),
   };
 }
 
 /**
- * The stretch around a misread at `offset`, as a verbatim block: inside one
- * of the recognizer's containers, its outermost container, and for a list
- * item the whole list; elsewhere the top-level block holding it, with every
- * block joined to it.
+ * The stretch around a misread, as a verbatim block: inside one of the
+ * recognizer's containers, its outermost container, and for a list item the
+ * whole list; elsewhere, or where the misread runs past that, the top-level
+ * blocks it spans, with every block joined to them.
  *
- * @param {number} offset
+ * @param {{start: number, end: number}} misread
  * @param {object} ast
  * @param {Block[]} containers
  * @param {string} text
  * @returns {Block}
  */
-export function stretchAround(offset, ast, containers, text) {
-  const holder = containers.find((c) => c.start <= offset && offset < c.end);
-  return holder === undefined
-    ? joinedAround(ast, offset, text)
-    : stretchOf(holder, containers, text);
+export function stretchAround(misread, ast, containers, text) {
+  const holder = containers.find(
+    (c) => c.start <= misread.start && misread.start < c.end,
+  );
+  if (holder !== undefined) {
+    const stretch = stretchOf(holder, containers, text);
+    if (misread.end <= stretch.end) return stretch;
+  }
+  return joinedAround(ast, misread, text);
 }
