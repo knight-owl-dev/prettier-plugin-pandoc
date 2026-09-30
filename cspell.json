@@ -1,15 +1,8 @@
 {
   "version": "0.2",
   "language": "en-US",
-  "dictionaries": [
-    "docker",
-    "node",
-    "typescript"
-  ],
-  "ignorePaths": [
-    "package-lock.json",
-    "packages/*/test/corpus/**"
-  ],
+  "dictionaries": ["docker", "node", "typescript"],
+  "ignorePaths": ["package-lock.json", "packages/*/test/corpus/**"],
   "words": [
     "COMMONMARK",
     "dedent",

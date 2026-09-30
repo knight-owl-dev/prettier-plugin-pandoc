@@ -10,9 +10,15 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
 
-# Markdown files
+# JavaScript, read by Biome
+[*.js]
+indent_size = 2
+max_line_length = 80
+
+# Markdown, read by prettier
 [*.md]
-max_line_length = off
+indent_size = 2
+max_line_length = 80
 trim_trailing_whitespace = false
 
 # YAML files
@@ -26,7 +32,7 @@ indent_style = space
 indent_size = 2
 
 # JSON
-[*.json]
+[*.{json,jsonc}]
 indent_style = space
 indent_size = 2
 

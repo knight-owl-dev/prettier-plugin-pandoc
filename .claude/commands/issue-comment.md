@@ -10,8 +10,10 @@ Post a comment to a GitHub issue with optional context about your progress.
 
 **Priority order for finding the issue number:**
 
-1. **From arguments**: If `$ARGUMENTS` contains an issue number (formats: `#93`, `93`, or URL), use it
-2. **From current branch**: If on a branch matching `<number>-*` pattern, extract the issue number
+1. **From arguments**: If `$ARGUMENTS` contains an issue number (formats: `#93`,
+   `93`, or URL), use it
+2. **From current branch**: If on a branch matching `<number>-*` pattern,
+   extract the issue number
 3. **Ask the user**: Prompt for the issue number
 
 **If extracting from branch:**
@@ -26,7 +28,8 @@ Parse the branch name (e.g., `93-add-issue-comment-command` → issue #93).
 
 - Question: "Which issue do you want to comment on?"
 - Header: "Issue"
-- Options: Show recent open issues assigned to the user, or allow free-form input
+- Options: Show recent open issues assigned to the user, or allow free-form
+  input
 
 ### 2. Fetch Issue Context
 
@@ -36,7 +39,8 @@ Retrieve the issue details and comments in a single call:
 gh issue view <number> --repo knight-owl-dev/prettier-plugin-pandoc --json number,title,state,body,labels,comments
 ```
 
-The `comments` field returns an array of all comments (gh does not support limiting comment count like Jira).
+The `comments` field returns an array of all comments (gh does not support
+limiting comment count like Jira).
 
 To get the last few comments in human-readable format:
 
@@ -65,13 +69,15 @@ Ask the user what kind of comment they want to post using AskUserQuestion:
 
 If the user chose "Simple comment":
 
-**If `$ARGUMENTS` contains text beyond the issue number**: Use that as the comment body.
+**If `$ARGUMENTS` contains text beyond the issue number**: Use that as the
+comment body.
 
 **Otherwise**: Ask for the comment using AskUserQuestion:
 
 - Question: "What would you like to say?"
 - Header: "Message"
-- Options: Provide a few quick responses, but primarily expect free-form "Other" input
+- Options: Provide a few quick responses, but primarily expect free-form "Other"
+  input
   - "Looks good, merging soon"
   - "Need more context on this"
   - "Working on this now"
@@ -94,12 +100,12 @@ If the user chose "Progress update":
    ```
 
 2. **Ask for a summary** using AskUserQuestion:
-    - Question: "Summarize your progress on this issue:"
-    - Header: "Summary"
-    - Options: Allow free-form input via "Other"
-        - "Implementation complete, ready for review"
-        - "Work in progress, blocked on..."
-        - "Started investigation"
+   - Question: "Summarize your progress on this issue:"
+   - Header: "Summary"
+   - Options: Allow free-form input via "Other"
+     - "Implementation complete, ready for review"
+     - "Work in progress, blocked on..."
+     - "Started investigation"
 
 3. **Format the comment** as a structured progress update:
 
@@ -109,31 +115,35 @@ If the user chose "Progress update":
    <user's summary>
 
    ### Commits
+
    - `abc1234` First commit message
    - `def5678` Second commit message
 
    ### Changed Files
+
    - `src/publish.sh` (+50, -10)
    - `scripts/assemble.sh` (+20, -5)
 
    ### Status
+
    - [ ] Ready for review
    - [x] Work in progress
    ```
 
-   Adjust the status checkboxes based on user's summary (e.g., if they said "ready for review", check that box).
+   Adjust the status checkboxes based on user's summary (e.g., if they said
+   "ready for review", check that box).
 
 ### 4c. Save Thoughts
 
 If the user chose "Save thoughts":
 
 1. **Ask for thoughts** using AskUserQuestion:
-    - Question: "What thoughts or notes do you want to save for later?"
-    - Header: "Notes"
-    - Options: Allow free-form input via "Other"
-        - "Need to investigate X before proceeding"
-        - "Consider alternative approach using Y"
-        - "Remember to update tests for Z"
+   - Question: "What thoughts or notes do you want to save for later?"
+   - Header: "Notes"
+   - Options: Allow free-form input via "Other"
+     - "Need to investigate X before proceeding"
+     - "Consider alternative approach using Y"
+     - "Remember to update tests for Z"
 
 2. **Format as a collapsible note**:
 
@@ -143,8 +153,8 @@ If the user chose "Save thoughts":
 
    <user's thoughts>
 
-   **Current branch:** `93-add-issue-comment-command`
-   **Last commit:** `abc1234 — commit message`
+   **Current branch:** `93-add-issue-comment-command` **Last commit:**
+   `abc1234 — commit message`
 
    </details>
    ```
@@ -184,7 +194,8 @@ EOF
 After successful posting:
 
 - Display "Comment posted to issue #`<number>`"
-- Show the issue URL: `https://github.com/knight-owl-dev/prettier-plugin-pandoc/issues/<number>`
+- Show the issue URL:
+  `https://github.com/knight-owl-dev/prettier-plugin-pandoc/issues/<number>`
 - Offer to open in browser:
 
   ```bash
@@ -196,5 +207,7 @@ After successful posting:
 - **Issue not found**: Inform user the issue doesn't exist
 - **No network/auth**: Remind user to check `gh auth status`
 - **Empty comment**: Do not allow posting empty comments
-- **Not on issue branch**: If a progress update is selected but the current branch does not match an issue pattern, fall
-  back to a simple comment and inform the user: "Note: No issue branch detected; git context will not be included."
+- **Not on issue branch**: If a progress update is selected but the current
+  branch does not match an issue pattern, fall back to a simple comment and
+  inform the user: "Note: No issue branch detected; git context will not be
+  included."

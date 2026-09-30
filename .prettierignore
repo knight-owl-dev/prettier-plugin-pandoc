@@ -1,0 +1,2 @@
+# Pandoc input under test. Prettier reads .gitignore too.
+packages/*/test/corpus/

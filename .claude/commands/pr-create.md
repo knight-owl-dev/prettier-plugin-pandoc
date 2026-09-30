@@ -2,8 +2,8 @@
 
 Create a pull request following the project's PR template and conventions.
 
-This command supports both **cloned** repositories (direct push access) and **forked**
-repositories (contributor forks).
+This command supports both **cloned** repositories (direct push access) and
+**forked** repositories (contributor forks).
 
 ## Arguments: $ARGUMENTS
 
@@ -27,8 +27,8 @@ git status --short
 gh repo view --json isFork,parent,nameWithOwner
 ```
 
-Stop if `git branch --show-current` returns the default branch: a PR opens from a
-feature branch, and every diff below is scoped to what that branch adds — on
+Stop if `git branch --show-current` returns the default branch: a PR opens from
+a feature branch, and every diff below is scoped to what that branch adds — on
 `main` they all come back empty and step 3 has no issue number to parse.
 
 ### 2. Determine Repository Topology
@@ -61,8 +61,10 @@ Analyze the `gh repo view` output to determine the workflow type:
 Store these values for later steps:
 
 - `is_fork`: boolean from `isFork`
-- `fork_owner`: extract from `nameWithOwner` (e.g., "alice" from "alice/prettier-plugin-pandoc")
-- `upstream_repo`: if fork, use `parent.owner.login/parent.name`; otherwise use `nameWithOwner`
+- `fork_owner`: extract from `nameWithOwner` (e.g., "alice" from
+  "alice/prettier-plugin-pandoc")
+- `upstream_repo`: if fork, use `parent.owner.login/parent.name`; otherwise use
+  `nameWithOwner`
 
 ### 3. Extract Issue Reference
 
@@ -99,8 +101,9 @@ clean PR, no follow-up "fix" commits chasing an open PR, no extra CI round).
 
 Choose what to offer from the diff (`git diff main...HEAD --stat`):
 
-- **Touches code** (`packages/`, `test/`, `.github/`, `Makefile`) — offer `/code-review` (correctness: logic and edge-case bugs).
-  This is the pass most easily missed by hand and the one CI will not run.
+- **Touches code** (`packages/`, `test/`, `.github/`, `Makefile`) — offer
+  `/code-review` (correctness: logic and edge-case bugs). This is the pass most
+  easily missed by hand and the one CI will not run.
 - **Docs/comment-only** — offer to skip; correctness is not `/code-review`'s
   lane on prose.
 - **Trivial one-liner** — offer to skip.
@@ -119,7 +122,7 @@ before continuing.
 Based on the issue labels and commit content, recommend applicable labels:
 
 | Label             | When to suggest                        |
-|-------------------|----------------------------------------|
+| ----------------- | -------------------------------------- |
 | `bug`             | Fixes something broken                 |
 | `enhancement`     | New feature or improvement             |
 | `documentation`   | Documentation-only changes             |
@@ -135,16 +138,16 @@ If the related issue has labels, prefer to match them.
 
 Follow the PR template (`.github/pull_request_template.md`):
 
-**Formatting**: Write paragraphs as flowing text without hard line breaks. GitHub's
-markdown renderer handles wrapping automatically. Only use line breaks between sections
-or for bullet lists. Keep it laconic and load-bearing — state the change and why,
-nothing more; cut flourish and drama.
+**Formatting**: Write paragraphs as flowing text without hard line breaks.
+GitHub's markdown renderer handles wrapping automatically. Only use line breaks
+between sections or for bullet lists. Keep it laconic and load-bearing — state
+the change and why, nothing more; cut flourish and drama.
 
 ```markdown
 ## Summary
 
-[Describe the outcome this PR delivers, derived from the issue's Goal.
-Focus on the WHY, not the HOW. Use flowing prose, not bullets.]
+[Describe the outcome this PR delivers, derived from the issue's Goal. Focus on
+the WHY, not the HOW. Use flowing prose, not bullets.]
 
 ## Related Issues
 
@@ -175,9 +178,9 @@ Create an outcome-focused title that:
 - Uses imperative mood ("Add...", "Enable...", "Fix...")
 - Matches the issue title style when applicable
 - Is concise (50-72 characters preferred)
-- **Does NOT include issue references** (e.g., avoid `Fix bug (#42)`)—GitHub automatically
-  appends the PR number during squash merge; issue linking belongs in the body via `Refs #NN`
-  or `Fixes #NN`
+- **Does NOT include issue references** (e.g., avoid `Fix bug (#42)`)—GitHub
+  automatically appends the PR number during squash merge; issue linking belongs
+  in the body via `Refs #NN` or `Fixes #NN`
 
 ### 10. Preview and Confirm
 
@@ -217,7 +220,8 @@ This works for both workflows:
 
 ### 12. Create the Pull Request
 
-Use gh CLI to create the PR. The `--head` flag format differs based on repository topology.
+Use gh CLI to create the PR. The `--head` flag format differs based on
+repository topology.
 
 **For cloned repositories** (direct access):
 
@@ -247,8 +251,8 @@ gh pr create \
   --body "<body>"
 ```
 
-The `--head` flag must include the fork owner prefix (e.g., `alice:my-feature-branch`) so
-GitHub knows which fork contains the branch.
+The `--head` flag must include the fork owner prefix (e.g.,
+`alice:my-feature-branch`) so GitHub knows which fork contains the branch.
 
 ### 13. Output
 
@@ -268,5 +272,7 @@ After successful creation:
 - **No commits**: Inform user there are no changes to create a PR for
 - **Branch not pushed**: Offer to push the branch automatically
 - **PR already exists**: Show the existing PR URL instead
-- **Fork not synced**: If the fork's main branch is behind upstream, suggest syncing first
-- **Head reference not found**: Likely missing fork owner prefix. Verify topology detection
+- **Fork not synced**: If the fork's main branch is behind upstream, suggest
+  syncing first
+- **Head reference not found**: Likely missing fork owner prefix. Verify
+  topology detection

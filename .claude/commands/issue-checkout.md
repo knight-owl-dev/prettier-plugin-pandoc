@@ -1,6 +1,7 @@
 # Issue Checkout Command
 
-Check out or create a branch for a GitHub issue and provide context for the work.
+Check out or create a branch for a GitHub issue and provide context for the
+work.
 
 ## Arguments: $ARGUMENTS
 
@@ -22,23 +23,28 @@ If there are uncommitted changes, **stop and warn the user**:
   - Header: "Uncommitted"
   - Options:
     - "Commit changes first" - let the user commit before continuing
-    - "Stash changes" - runs `git stash push -m "WIP before switching to issue #<number>"`
+    - "Stash changes" - runs
+      `git stash push -m "WIP before switching to issue #<number>"`
     - "Cancel" - abort the checkout
 
 **Do not proceed** until the working tree is clean or changes are stashed.
 
 ### 2. Parse Issue Number
 
-**If arguments are provided**: Extract the GitHub issue number from `$ARGUMENTS`.
+**If arguments are provided**: Extract the GitHub issue number from
+`$ARGUMENTS`.
 
-- Accept formats: `#91`, `91`, or a full URL like `https://github.com/owner/repo/issues/91`
+- Accept formats: `#91`, `91`, or a full URL like
+  `https://github.com/owner/repo/issues/91`
 - Normalize to just the number
 
-**If arguments are empty**: Ask the user for the issue number using AskUserQuestion:
+**If arguments are empty**: Ask the user for the issue number using
+AskUserQuestion:
 
 - Question: "Which issue do you want to work on?"
 - Header: "Issue"
-- Options: Provide a few recent open issues if available, or allow free-form input
+- Options: Provide a few recent open issues if available, or allow free-form
+  input
 
 ### 3. Fetch GitHub Issue Details
 
@@ -93,10 +99,10 @@ If a branch exists:
    ```
 
 3. **Present context to user**:
-    - Summarize the GitHub issue (title, state, description)
-    - Show what commits have been made on this branch
-    - Show any uncommitted work in progress
-    - Suggest next steps based on the current state
+   - Summarize the GitHub issue (title, state, description)
+   - Show what commits have been made on this branch
+   - Show any uncommitted work in progress
+   - Suggest next steps based on the current state
 
 4. **Offer to rebase** (optional, only if branch is behind main):
 
@@ -109,13 +115,14 @@ If a branch exists:
 
    If main has moved ahead, ask the user using AskUserQuestion:
 
-    - Question: "Main has new commits. Would you like to rebase your branch?"
-    - Header: "Rebase"
-    - Options:
-        - "Yes, rebase now" - runs `git pull --rebase origin main`
-        - "No, I'll handle it later" - continues without rebasing
+   - Question: "Main has new commits. Would you like to rebase your branch?"
+   - Header: "Rebase"
+   - Options:
+     - "Yes, rebase now" - runs `git pull --rebase origin main`
+     - "No, I'll handle it later" - continues without rebasing
 
-   **Do not rebase automatically** - let the user decide when to deal with potential conflicts.
+   **Do not rebase automatically** - let the user decide when to deal with
+   potential conflicts.
 
 ### 5b. No Existing Branch
 
@@ -129,9 +136,10 @@ If no branch exists:
    ```
 
 2. **Generate branch name** from issue number and title:
-    - Format: `<issue-number>-<title-slug>`
-    - Slug rules: lowercase, hyphens for spaces, remove special chars, max ~50 chars
-    - Example: `91-add-issue-checkout-command`
+   - Format: `<issue-number>-<title-slug>`
+   - Slug rules: lowercase, hyphens for spaces, remove special chars, max ~50
+     chars
+   - Example: `91-add-issue-checkout-command`
 
 3. **Create and check out the branch**:
 
@@ -140,8 +148,8 @@ If no branch exists:
    ```
 
 4. **Present full issue context to user**:
-    - Display the complete GitHub issue details (title, description, labels)
-    - Suggest entering plan mode to design the implementation approach
+   - Display the complete GitHub issue details (title, description, labels)
+   - Suggest entering plan mode to design the implementation approach
 
 ### 6. Suggest Next Steps
 
@@ -224,5 +232,7 @@ If the issue has no assignee, offer to self-assign:
 
 - **Issue not found**: Inform user the issue doesn't exist
 - **No network/auth**: Remind user to check `gh auth status`
-- **Uncommitted changes on current branch**: Handled in step 1 - must resolve before proceeding
-- **Branch conflicts**: If local and remote branches differ, explain and offer options
+- **Uncommitted changes on current branch**: Handled in step 1 - must resolve
+  before proceeding
+- **Branch conflicts**: If local and remote branches differ, explain and offer
+  options

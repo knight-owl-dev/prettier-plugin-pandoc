@@ -14,7 +14,7 @@ IS_TTY := $(shell test -t 0 && echo 1)
 DOCKER_TTY ?= $(if $(IS_TTY),-t)
 
 .PHONY: resolve test test-image lint lint-fix lint-actions lint-docker lint-js \
-	lint-js-fix lint-md lint-md-fix lint-spell help
+	lint-js-fix lint-md lint-md-fix lint-md-fmt lint-md-fmt-fix lint-spell help
 
 # Node and npm come from the test image, never the host. It runs as the
 # invoking user, so node_modules on the mount stays the host's to delete.
@@ -41,7 +41,7 @@ test: test-image node_modules/.package-lock.json
 
 # The lint targets invoke their tools bare; the aggregate targets re-enter the
 # ci-tools image, so the toolchain is the pinned one wherever make runs.
-LINT_TARGETS := lint-actions lint-docker lint-js lint-md lint-spell
+LINT_TARGETS := lint-actions lint-docker lint-js lint-md lint-md-fmt lint-spell
 
 LINT_RUNNER ?= docker run --rm $(DOCKER_TTY) -e GITHUB_TOKEN \
 	-v "$(CURDIR):/work" -w /work $(CI_TOOLS_IMAGE) make
@@ -50,7 +50,7 @@ lint:
 	@$(LINT_RUNNER) $(LINT_TARGETS)
 
 lint-fix:
-	@$(LINT_RUNNER) lint-js-fix lint-md-fix
+	@$(LINT_RUNNER) lint-js-fix lint-md-fmt-fix lint-md-fix
 
 # validate-action-pins checks each SHA against its tag's comment through the
 # GitHub API, which GITHUB_TOKEN keeps under the rate limit.
@@ -65,16 +65,23 @@ lint-docker:
 # --error-on-warnings: Biome reports most rules as warnings, which would
 # otherwise exit 0.
 lint-js:
-	@echo "Checking JavaScript..." && biome check --error-on-warnings && echo "OK"
+	@echo "Checking JavaScript and JSON..." && biome check --error-on-warnings && echo "OK"
 
 lint-js-fix:
-	@echo "Fixing JavaScript..." && biome check --write && echo "OK"
+	@echo "Fixing JavaScript and JSON..." && biome check --write && echo "OK"
 
 lint-md:
 	@echo "Linting Markdown..." && markdownlint-cli2 '**/*.md' && echo "OK"
 
 lint-md-fix:
 	@echo "Fixing Markdown..." && markdownlint-cli2 --fix '**/*.md' && echo "OK"
+
+# Options live in the files prettier reads, so an editor formats as this does.
+lint-md-fmt:
+	@echo "Checking Markdown formatting..." && prettier --check '**/*.md' && echo "OK"
+
+lint-md-fmt-fix:
+	@echo "Formatting Markdown..." && prettier --write --log-level warn '**/*.md' && echo "OK"
 
 # --gitignore reuses .gitignore, so ignore paths live in one place.
 lint-spell:
@@ -89,10 +96,12 @@ help:
 	@echo "  make lint-fix          Fix all auto-fixable lint issues"
 	@echo "  make lint-actions      Lint workflows and verify action pins"
 	@echo "  make lint-docker       Lint the test image Dockerfile"
-	@echo "  make lint-js           Lint and format-check JavaScript (biome)"
-	@echo "  make lint-js-fix       Fix JavaScript formatting and lint issues"
+	@echo "  make lint-js           Lint and format-check JavaScript and JSON (biome)"
+	@echo "  make lint-js-fix       Fix JavaScript and JSON formatting and lint issues"
 	@echo "  make lint-md           Lint Markdown files"
 	@echo "  make lint-md-fix       Fix Markdown files"
+	@echo "  make lint-md-fmt       Check Markdown formatting (prettier)"
+	@echo "  make lint-md-fmt-fix   Format Markdown files (prettier)"
 	@echo "  make lint-spell        Check spelling"
 	@echo "  make help              Show this message"
 	@echo ""

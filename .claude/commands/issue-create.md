@@ -10,12 +10,13 @@ Create a new GitHub issue following project templates.
 
 **If arguments are provided**: Use `$ARGUMENTS` as the issue description.
 
-**If arguments are empty**: Ask the user to describe the issue using AskUserQuestion:
+**If arguments are empty**: Ask the user to describe the issue using
+AskUserQuestion:
 
 - Question: "What would you like to create an issue for?"
 - Header: "Description"
-- Options: Provide 2-3 example categories as options (e.g., "Bug report", "New feature",
-  "Documentation update") but allow free-form input via "Other"
+- Options: Provide 2-3 example categories as options (e.g., "Bug report", "New
+  feature", "Documentation update") but allow free-form input via "Other"
 
 ### 2. Determine Issue Type
 
@@ -23,22 +24,22 @@ The organization defines three issue types. Pick one — step 8 sets it at
 creation, and it is distinct from the labels in step 3.
 
 | Type      | When to pick it                                                  |
-|-----------|------------------------------------------------------------------|
+| --------- | ---------------------------------------------------------------- |
 | `Bug`     | Broken, failing, or unexpected behavior — including a regression |
 | `Feature` | New functionality someone formatting a document would notice     |
 | `Task`    | Everything else — internal work, docs, CI, refactors, gates      |
 
 `Feature` is narrower than it reads, and `Task` is the common case: work on the
-the repo's own plumbing is a `Task` even when it carries the `enhancement` label.
-The type answers *what kind of work is this*; the label answers *what does it
-touch*.
+the repo's own plumbing is a `Task` even when it carries the `enhancement`
+label. The type answers _what kind of work is this_; the label answers _what
+does it touch_.
 
 ### 3. Suggest Labels
 
 Based on the description, recommend applicable labels from this list:
 
 | Label              | When to suggest                                |
-|--------------------|------------------------------------------------|
+| ------------------ | ---------------------------------------------- |
 | `bug`              | Something is broken or not working as expected |
 | `enhancement`      | New feature, improvement, or planned work      |
 | `documentation`    | Documentation-only changes                     |
@@ -50,7 +51,8 @@ Based on the description, recommend applicable labels from this list:
 | `good-first-issue` | Simple issues suitable for newcomers           |
 | `help-wanted`      | Issues needing extra attention or expertise    |
 
-Always suggest at least one primary label (`bug`, `enhancement`, or `documentation`).
+Always suggest at least one primary label (`bug`, `enhancement`, or
+`documentation`).
 
 ### 4. Confirm with User
 
@@ -64,10 +66,10 @@ Use AskUserQuestion to confirm the issue type and labels:
 
 Based on the confirmed type, draft the issue following the appropriate template.
 
-**Formatting**: Write paragraphs as flowing text without hard line breaks. GitHub's
-markdown renderer handles wrapping automatically. Only use line breaks between sections
-or for bullet lists. Keep it laconic and load-bearing — state the goal and scope,
-nothing more; cut flourish and drama.
+**Formatting**: Write paragraphs as flowing text without hard line breaks.
+GitHub's markdown renderer handles wrapping automatically. Only use line breaks
+between sections or for bullet lists. Keep it laconic and load-bearing — state
+the goal and scope, nothing more; cut flourish and drama.
 
 **For Bug Reports** (template: `.github/ISSUE_TEMPLATE/bug.md`):
 
