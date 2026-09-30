@@ -9,7 +9,7 @@ import { BLANK, segmentsOf } from '../lines.js';
 import { DIV_CLOSE } from './div.js';
 import { definitionList } from './list.js';
 import { mergeAdjacent } from './raw-tex.js';
-import { INTERRUPTERS, REGISTRY } from './registry.js';
+import { INTERRUPTERS, ITEM_INTERRUPTERS, REGISTRY } from './registry.js';
 
 /** @typedef {import('../types.js').Block} Block */
 /** @typedef {import('../types.js').Context} Context */
@@ -126,8 +126,9 @@ export function endsParagraph(lines, text, syntax) {
  * @param {number} divDepth Divs open around this document, whose closing fence
  *   ends a container inside them.
  * @param {import('../syntax.js').Syntax} syntax
+ * @param {boolean} [inItem] Whether `lines` are a list item's content.
  */
-export function scan(lines, text, out, divDepth, syntax) {
+export function scan(lines, text, out, divDepth, syntax, inItem = false) {
   /** @type {Span[]} */
   const open = [];
   /** @type {SpanSpec[]} */
@@ -163,7 +164,8 @@ export function scan(lines, text, out, divDepth, syntax) {
     if (match.container !== undefined) {
       const { type, content } = match.container;
       out.push(toContainer(lines, at, match.last, type, content));
-      scan(content, text, out, divDepth + open.length, syntax);
+      const depth = divDepth + open.length;
+      scan(content, text, out, depth, syntax, type === 'list-item');
     }
     paragraph = match.after === 'paragraph' ? { lines: 1 } : null;
     return match.last;
@@ -187,8 +189,9 @@ export function scan(lines, text, out, divDepth, syntax) {
 
     context.inDiv = divDepth + open.length > 0;
     context.paragraph = paragraph;
+    const interrupters = inItem ? ITEM_INTERRUPTERS : INTERRUPTERS;
     const match = firstMatch(
-      paragraph === null ? REGISTRY : INTERRUPTERS,
+      paragraph === null ? REGISTRY : interrupters,
       lines,
       n,
       context,
