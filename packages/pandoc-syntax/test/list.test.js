@@ -43,6 +43,8 @@ const CASES = {
   'a marker indented five spaces': 'Term\n     : Def',
   'a two-space line after a blank': 'Term\n:   Def\n\n  more',
   'a marker with no space after': 'Term\n:Def',
+  'an empty definition': 'Term\n:',
+  'an empty definition then another': 'Term\n:\n:   Two',
   'a term after a paragraph line': 'prose\nTerm\n:   Def',
   'a two-line term': 'Term one\nterm two\n:   Def',
   'a heading over a marker': '# Heading\n:   Def',

@@ -12,7 +12,8 @@ import { perSyntax } from '../syntax.js';
 /** @typedef {import('../syntax.js').Syntax} Syntax */
 
 const patterns = perSyntax((syntax) => ({
-  definitionMarker: syntax.atBlockIndent('[:~][ \\t]+\\S'),
+  // A marker, and its definition on the line or nothing at all.
+  definitionMarker: syntax.atBlockIndent('[:~]([ \\t]+\\S|[ \\t]*$)'),
 }));
 
 // A definition list resumes past a blank line on content one tab stop deep.
