@@ -8,7 +8,6 @@
 import { BLANK, segmentsOf } from '../lines.js';
 import { DIV_CLOSE } from './div.js';
 import { definitionList } from './list.js';
-import { mergeAdjacent } from './raw-tex.js';
 import { INTERRUPTERS, ITEM_INTERRUPTERS, REGISTRY } from './registry.js';
 
 /** @typedef {import('../types.js').Block} Block */
@@ -136,8 +135,6 @@ export function endsParagraph(lines, text, syntax, inItem) {
 export function scan(lines, text, out, divDepth, syntax, inItem = false) {
   /** @type {Span[]} */
   const open = [];
-  /** @type {SpanSpec[]} */
-  const raws = [];
   /** @type {Context['paragraph']} */
   let paragraph = null;
 
@@ -160,11 +157,7 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
    * @param {number} at
    */
   const take = (match, at) => {
-    for (const spec of match.spans ?? []) {
-      // Raw spans wait to be merged with their neighbors.
-      if (spec.type === 'raw-tex') raws.push(spec);
-      else out.push(toBlock(lines, spec));
-    }
+    for (const spec of match.spans ?? []) out.push(toBlock(lines, spec));
     if (match.divOpen !== undefined) open.push(match.divOpen);
     if (match.container !== undefined) {
       const { type, content } = match.container;
@@ -209,7 +202,4 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
 
   // A div never closed runs to the end of the document.
   for (const span of open) out.push({ type: 'div', open: span, close: null });
-  for (const spec of mergeAdjacent(raws, lines, text)) {
-    out.push(toBlock(lines, spec));
-  }
 }

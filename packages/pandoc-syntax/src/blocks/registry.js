@@ -11,11 +11,7 @@ import { atxHeading, setextUnderline, thematicBreak } from './heading.js';
 import { htmlBlockTag, htmlComment } from './html.js';
 import { lineBlock } from './line-block.js';
 import { definitionList, exampleList, fancyList } from './list.js';
-import {
-  texCommandLine,
-  texEnvironment,
-  texEnvironmentInParagraph,
-} from './raw-tex.js';
+import { texBlock, texEnvironmentInParagraph } from './raw-tex.js';
 import { linkReference } from './reference.js';
 import { pandocTable, pipeTable } from './table.js';
 import { yamlMetadata } from './yaml.js';
@@ -30,9 +26,9 @@ export const REGISTRY = [
   setextUnderline,
   htmlBlockTag,
 
-  // These open only at a block start. An environment claims its lines before
+  // These open only at a block start. Raw TeX claims its lines before
   // anything else can read inside them.
-  texEnvironment,
+  texBlock,
   divOpen,
   // Before the thematic break and the tables its `---` would otherwise open.
   yamlMetadata,
@@ -47,7 +43,6 @@ export const REGISTRY = [
   // tries tables first, and a simple table's header may sit that deep.
   indentedCode,
   lineBlock,
-  texCommandLine,
   blockQuote,
   // Before the list item a `* * *` or `- - -` would otherwise open.
   thematicBreak,

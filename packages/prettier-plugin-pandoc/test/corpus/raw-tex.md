@@ -24,3 +24,12 @@ A paragraph after the page breaks, long enough that the formatter must wrap it s
 \begin{center}
 x
 \end{center} and text after the end, which Pandoc reads as a paragraph of its own.
+
+\newpage \begin{center}
+a run
+\end{center} \vspace{1em} and text after the run, which Pandoc reads as a paragraph that the formatter may wrap.
+
+\section*{Heading} text after a block command, a paragraph of its own.
+
+\foo \newpage
+\clearpage
