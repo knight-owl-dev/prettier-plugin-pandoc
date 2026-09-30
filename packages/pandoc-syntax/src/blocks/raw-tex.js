@@ -1,7 +1,6 @@
-// Raw TeX blocks: an environment from `\begin` to its matching `\end`, or a
-// line of commands. Each span covers exactly the characters Pandoc keeps raw.
-// An environment can end mid-line, and a command line can carry a `%` comment;
-// either way what follows on the line is a paragraph.
+// Raw TeX blocks: a run of environments and commands, `tex-run.js`. Each span
+// covers exactly the characters Pandoc keeps raw. A run can end mid-line, and
+// what follows on the line is a paragraph.
 //
 // An environment is no inline: in paragraph text it ends the paragraph at its
 // `\begin`, wherever that sits, unless balanced brackets hold it.
@@ -9,27 +8,17 @@
 import { commandEnd, startsCommand } from '../command.js';
 import { BLANK, breaksParagraph } from '../lines.js';
 import { COMMENT_CLOSE, COMMENT_OPEN, opaqueEnd } from '../opaque.js';
-import { perSyntax } from '../syntax.js';
-import { BEGIN, environmentEnd } from '../tex.js';
+import { BEGIN } from '../tex.js';
+import { runEnd } from './tex-run.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
 /** @typedef {import('../types.js').SpanSpec} SpanSpec */
 /** @typedef {import('../types.js').Match} Match */
 
-const patterns = perSyntax((syntax) => ({
-  begin: syntax.atBlockIndent(BEGIN),
-}));
-
 const OPENS_ENVIRONMENT = new RegExp(BEGIN, 'y');
 
 const BEGIN_PREFIX = '\\begin{';
-
-// Commands and their arguments, then optionally a comment. Prose after the
-// last argument makes the whole line a paragraph, and an environment is raw
-// only with its matching end, so neither half counts here.
-const COMMAND_LINE =
-  /^(?!\\(?:begin|end)\{)(\\[A-Za-z]+\*?(?:[ \t]*(?:\{[^{}]*\}|\[[^\]]*\]))*)[ \t]*(?:%.*)?$/;
 
 // Past what opens at `at` in inline text: an opaque construct, a command and
 // its arguments, an escape, or a character. A `\begin` is only its own text:
@@ -122,22 +111,20 @@ function inParagraph(lines, from, start, at, text) {
       continue;
     }
     if (i >= lineStart) {
-      const begin = line.start + head + (i - lineStart);
-      const rest = { text: line.text.slice(begin - line.start), start: begin };
-      const close = environmentEnd(name, [rest, ...lines.slice(at + 1)]);
-      if (close !== null) {
-        return raw(lines, at, at + close.chunk, begin, close.end, text);
-      }
+      const column = head + (i - lineStart);
+      const end = runEnd(lines, { k: at, i: column });
+      if (end !== null) return raw(lines, at, line.start + column, end, text);
     }
     i += BEGIN_PREFIX.length;
   }
   return null;
 }
 
-// The raw span from `start` on line `from` to `end` on line `to`, and what
+// The raw span from `start` on line `from` to the place `run` ends, and what
 // the text after it on that line holds.
 /** @returns {Match} */
-function raw(lines, from, to, start, end, text) {
+function raw(lines, from, start, run, text) {
+  const [to, end] = [run.k, lines[run.k].start + run.i];
   /** @type {SpanSpec} */
   const span = { type: 'raw-tex', from, to, start, end };
   if (BLANK.test(text.slice(end, lines[to].end))) {
@@ -160,21 +147,17 @@ export const holdsEnvironment = (lines, at, text) =>
   inParagraph(lines, at, lines[at].start, at, text) !== null;
 
 /**
- * An environment opening a line at a block start; in a paragraph it is
+ * A run opening a line at a block start. An environment in paragraph text is
  * `texEnvironmentInParagraph`'s.
  *
  * @type {Recognizer}
  */
-export const texEnvironment = {
-  name: 'tex-environment',
+export const texBlock = {
+  name: 'tex-block',
   interruptsParagraph: false,
-  match(lines, at, { syntax, text }) {
-    const name = patterns(syntax).begin.exec(lines[at].text)?.[1];
-    if (name === undefined) return null;
-    const close = environmentEnd(name, lines.slice(at));
-    return close === null
-      ? null
-      : raw(lines, at, at + close.chunk, lines[at].start, close.end, text);
+  match(lines, at, { text }) {
+    const end = runEnd(lines, { k: at, i: 0 });
+    return end === null ? null : raw(lines, at, lines[at].start, end, text);
   },
 };
 
@@ -193,53 +176,3 @@ export const texEnvironmentInParagraph = {
       : inParagraph(lines, at - paragraph.lines, paragraph.start, at, text);
   },
 };
-
-/**
- * A command line continues a paragraph, so it opens only at a block start.
- *
- * @type {Recognizer}
- */
-export const texCommandLine = {
-  name: 'tex-command-line',
-  interruptsParagraph: false,
-  match(lines, at, { text }) {
-    const commands = COMMAND_LINE.exec(lines[at].text)?.[1];
-    if (commands === undefined) return null;
-    const { start } = lines[at];
-    return raw(lines, at, at, start, start + commands.length, text);
-  },
-};
-
-// Read by line, since inside a container one line's content does not start
-// where the last one's ended.
-function joins(a, b, lines, text) {
-  if (b.from === a.to) return BLANK.test(text.slice(a.end, b.start));
-  return (
-    b.from === a.to + 1 &&
-    BLANK.test(text.slice(a.end, lines[a.to].end)) &&
-    BLANK.test(text.slice(lines[b.from].start, b.start))
-  );
-}
-
-/**
- * Merge raw spans with only whitespace between them, one line break at most:
- * Pandoc reads them as one block.
- *
- * @param {SpanSpec[]} spans Raw TeX spans, in source order.
- * @param {Line[]} lines
- * @param {string} text
- * @returns {SpanSpec[]}
- */
-export function mergeAdjacent(spans, lines, text) {
-  const merged = [];
-  for (const span of spans) {
-    const last = merged.at(-1);
-    if (last !== undefined && joins(last, span, lines, text)) {
-      last.to = span.to;
-      last.end = span.end;
-    } else {
-      merged.push({ ...span });
-    }
-  }
-  return merged;
-}

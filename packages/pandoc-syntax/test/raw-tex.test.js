@@ -5,6 +5,9 @@
 // open inside one. Pandoc drops an environment's indentation from what it
 // keeps, so both sides are compared with each line's leading space removed.
 
+// cspell:ignore foreignblockquote iffoo newif newtheorem textcolor titleformat
+// cspell:ignore newenvironment usepackage
+
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { blocks } from '../src/index.js';
@@ -73,6 +76,69 @@ const CASES = {
     '\\begin{x}y\\end{x} b \\begin{z}w\\end{z} c\n',
   'an environment, text, then another below':
     '\\begin{x}y\\end{x} tail\n\\begin{z}w\\end{z}\n',
+
+  // Environments and commands run on as one block, whitespace and a line
+  // break at most between them.
+  'an environment then a command': '\\begin{x}y\\end{x} \\newpage b\n',
+  'an environment then an inline command': '\\begin{x}y\\end{x} \\emph{z} b\n',
+  'an environment then a command of no known kind, text after':
+    '\\begin{x}y\\end{x} \\foo b\n',
+  'an environment then a sectioning command':
+    '\\begin{x}y\\end{x} \\section{s} b\n',
+  'an environment then a definition':
+    '\\begin{x}y\\end{x} \\newcommand{\\a}{b} b\n',
+  'an environment then commands below':
+    '\\begin{x}y\\end{x}\n\\newpage\n\\clearpage b\n',
+  'spaces around the line break in a run':
+    '\\begin{x}y\\end{x}   \n   \\newpage\n',
+  'a percent sign after an environment': '\\begin{x}y\\end{x} % c\n\\newpage\n',
+  'a command then an environment': '\\newpage \\begin{x}y\\end{x}\n',
+  'two commands': '\\newpage \\clearpage\n',
+  'a command then text on its line': '\\newpage b\n',
+  'a command then one of no known kind': '\\newpage \\foo\n',
+  'a command then one of no known kind, text after': '\\newpage \\foo b\n',
+  'one of no known kind then a command': '\\foo \\newpage\n',
+  'one of no known kind alone': '\\foo\n',
+  'one of no known kind, an argument, then a command': '\\foo{a} \\newpage\n',
+  'one of no known kind above a command': '\\foo{a}\n\\newpage\n',
+  'commands a blank line apart': '\\newpage\n\n\\clearpage\n',
+  'an indented command': '  \\newpage\n',
+  'indented commands': '   \\newpage \\clearpage\n',
+  'a spaced option then text': '\\newpage [x] b\n',
+  'an argument a line down': '\\vspace\n{1em} b\n',
+  'a spaced argument': '\\section {s}\n',
+  'a starred command then text': '\\section*{s} b\n',
+  'an argument across lines': '\\section{a\nb} c\n',
+  'an argument across a blank line': '\\newpage{a\n\nb} c\n',
+  'a sectioning command then a label': '\\section{s} \\label{l}\n',
+  'an item then text': '\\item x tail\n',
+  'a caption then text': '\\caption{x} tail\n',
+  'a package then text': '\\usepackage{x} tail\n',
+  'colored text': '\\textcolor{red}{x}\n',
+  'colored text then text': '\\textcolor{red}{x} b\n',
+  'a command then colored text': '\\newpage \\textcolor{red}{x}\n',
+  'a definition by newcommand, unbraced': '\\newcommand\\foo{bar}\n',
+  'a definition by def, then a command': '\\def\\foo#1{bar #1} \\newpage\n',
+  'a definition by let': '\\let\\a\\b\n',
+  'a global definition': '\\global\\def\\foo{x}\n',
+  'a conditional': '\\newif\\iffoo\n',
+  'an option after a group, then text': '\\vspace{1em}[x] b\n',
+  'a definition with its arity': '\\newcommand{\\foo}[1]{bar #1} b\n',
+  'an environment definition':
+    '\\newenvironment{e}[1]{\\begin{center}}{\\end{center}} b\n',
+  'a theorem numbered like another': '\\newtheorem{thm}[eq]{Lemma} b\n',
+  'a theorem numbered within sections':
+    '\\newtheorem{thm}{Theorem}[section] b\n',
+  'a title format': '\\titleformat{\\section}[block]{a}{b}{0pt}{c} d\n',
+  'a foreign block quote': '\\foreignblockquote{german}[cite]{text} b\n',
+  'a comment in a group': '\\section{a % }\nb} c\n',
+  'a comment in an environment': '\\begin{x} % \\end{x}\n\\end{x}\n',
+  'a comment in a mid-line environment':
+    'a \\begin{x} % \\end{x}\n\\end{x} b\n',
+  'a command above a definition line': '\\newpage\n:   def\n',
+  'a run in a block quote': '> \\newpage \\begin{x}y\\end{x}\n> \\clearpage\n',
+  'a mid-line environment then a command':
+    'a \\begin{x}y\\end{x} \\newpage b\n',
 
   // An environment in paragraph text ends the paragraph at its `\begin`.
   'an environment mid-line': 'a \\begin{x}y\\end{x} b\n',
