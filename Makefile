@@ -65,10 +65,10 @@ lint-docker:
 # --error-on-warnings: Biome reports most rules as warnings, which would
 # otherwise exit 0.
 lint-js:
-	@echo "Checking JavaScript..." && biome check --error-on-warnings && echo "OK"
+	@echo "Checking JavaScript and JSON..." && biome check --error-on-warnings && echo "OK"
 
 lint-js-fix:
-	@echo "Fixing JavaScript..." && biome check --write && echo "OK"
+	@echo "Fixing JavaScript and JSON..." && biome check --write && echo "OK"
 
 lint-md:
 	@echo "Linting Markdown..." && markdownlint-cli2 '**/*.md' && echo "OK"
@@ -96,8 +96,8 @@ help:
 	@echo "  make lint-fix          Fix all auto-fixable lint issues"
 	@echo "  make lint-actions      Lint workflows and verify action pins"
 	@echo "  make lint-docker       Lint the test image Dockerfile"
-	@echo "  make lint-js           Lint and format-check JavaScript (biome)"
-	@echo "  make lint-js-fix       Fix JavaScript formatting and lint issues"
+	@echo "  make lint-js           Lint and format-check JavaScript and JSON (biome)"
+	@echo "  make lint-js-fix       Fix JavaScript and JSON formatting and lint issues"
 	@echo "  make lint-md           Lint Markdown files"
 	@echo "  make lint-md-fix       Fix Markdown files"
 	@echo "  make lint-md-fmt       Check Markdown formatting (prettier)"
