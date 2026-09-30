@@ -7,6 +7,7 @@ import {
   inlines,
 } from '@knight-owl-dev/pandoc-syntax';
 import * as markdown from 'prettier/plugins/markdown';
+import { firstUnreadCode } from './code.js';
 import { firstMisread, isContainer, stretchOf } from './containers.js';
 import { mask, maskable } from './mask.js';
 import { settle } from './settle.js';
@@ -70,20 +71,23 @@ export async function parse(text, options) {
     containers: found.filter(isContainer),
   };
 
-  // One misread shifts every container after it, so each is settled before
-  // the next is judged: the earliest printed as written, the rest parsed again.
-  // Every pass takes the misread container out, so the loop ends.
+  // One misread shifts everything after it, so each is settled before the
+  // next is judged: the earliest printed as written, the rest parsed again.
+  // Every pass prints more of the document as written, so the loop ends.
+  const misread = (ast, masked) => {
+    const wrong = firstMisread(constructs.containers, ast, text, masked);
+    return wrong === undefined
+      ? firstUnreadCode(ast, found, constructs.containers, text)
+      : stretchOf(wrong, constructs.containers, text);
+  };
   let masked = mask(text, constructs);
   let ast = await base.parse(masked, options);
   for (
-    let wrong = firstMisread(constructs.containers, ast, text, masked);
-    wrong !== undefined;
-    wrong = firstMisread(constructs.containers, ast, text, masked)
+    let stretch = misread(ast, masked);
+    stretch !== undefined;
+    stretch = misread(ast, masked)
   ) {
-    constructs = withStretch(
-      constructs,
-      stretchOf(wrong, constructs.containers, text),
-    );
+    constructs = withStretch(constructs, stretch);
     masked = mask(text, constructs);
     ast = await base.parse(masked, options);
   }
