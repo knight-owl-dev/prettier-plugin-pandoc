@@ -20,12 +20,13 @@ Status: pre-release. Nothing is published yet.
 | Fenced divs | Handled |
 | Line blocks | Handled |
 | Definition lists | Handled, verbatim |
-| Grid tables | Handled |
-| Simple and multiline tables | Handled |
+| Pipe tables | Handled, verbatim |
+| Grid tables | Handled, verbatim |
+| Simple and multiline tables | Handled, verbatim |
 | Example lists | Handled, verbatim |
 | Raw TeX blocks | Handled |
 | Fancy lists (`a.`, `i.`, `#.`, `(a)`, `1)`) | Handled, verbatim |
-| Inline raw TeX (`\footnote{…}`) | Handled |
+| Inline raw TeX (`\footnote{…}`, `\begin{…}…\end{…}`) | Handled |
 
 Each holds inside block quotes, list items and footnotes as at the top level: Pandoc collects a container's text before parsing it, and so does the recognizer.
 
