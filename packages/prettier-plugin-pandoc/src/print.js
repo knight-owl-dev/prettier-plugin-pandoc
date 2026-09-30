@@ -96,6 +96,26 @@ function printFootnoteDefinition(path, options, printChild) {
   return ['[^', path.node.label, ']: ', align(tabStop, body)];
 }
 
+const isHardline = (part) =>
+  Array.isArray(part) && part[0]?.type === 'line' && part[0].hard === true;
+
+// A list: its items as the stock printer prints them, apart as the source has
+// them. Prettier puts a blank line after an item holding one of its own; to
+// Pandoc a blank line between items makes the whole list loose.
+function printList(path, options, printChild) {
+  const parts = mdast.print(path, options, printChild);
+  const items = parts.filter((part) => !isHardline(part));
+  const { children } = path.node;
+  if (items.length !== children.length) {
+    throw new Error('prettier printed a list as other than its items');
+  }
+  const apart = (i) =>
+    children[i - 1].position.end.line + 1 < children[i].position.start.line;
+  return items.flatMap((item, i) =>
+    i === 0 ? [item] : [apart(i) ? [hardline, hardline] : hardline, item],
+  );
+}
+
 // A div: its fences as written, its body formatted. An unclosed div prints no
 // close, since adding one would repair it.
 function printDiv(path, printChild) {
@@ -124,6 +144,8 @@ export function print(path, options, printChild) {
       return replaceEndOfLine(node.value);
     case 'code':
       return printCode(node, options);
+    case 'list':
+      return printList(path, options, printChild);
     case 'footnoteDefinition':
       return printFootnoteDefinition(path, options, printChild);
     case 'emphasis':
