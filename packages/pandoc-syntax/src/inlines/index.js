@@ -6,8 +6,8 @@
 // leaves Pandoc's raw text alone.
 
 import { blocks } from '../blocks/index.js';
-import { opaqueEnd } from './opaque.js';
-import { commandEnd, startsCommand } from './tex.js';
+import { commandEnd, startsCommand } from '../command.js';
+import { opaqueEnd } from '../opaque.js';
 
 /** @typedef {import('../types.js').Block} Block */
 /** @typedef {import('../types.js').InlineSpan} InlineSpan */

@@ -5,10 +5,11 @@
 // raw only as far as `\emph[`. It never runs narrower.
 //
 // An environment runs from its `\begin` to the matching `\end`, blank lines
-// and all; Pandoc ends the paragraph around it, whatever holds it.
+// and all. In paragraph text it is a raw block, `blocks/raw-tex.js`; one read
+// here sits where it is none, as in brackets.
 
-import { breaksParagraph } from '../lines.js';
-import { BEGIN, environmentEnd } from '../tex.js';
+import { breaksParagraph } from './lines.js';
+import { BEGIN, environmentEnd } from './tex.js';
 
 const LETTER = /[A-Za-z]/;
 const SPACE = /[ \t]/;
