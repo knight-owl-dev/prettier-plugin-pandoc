@@ -16,7 +16,8 @@ import { settle } from './settle.js';
 const base = markdown.parsers.markdown;
 
 // Printed as written: raw TeX is another language's source, verse is its line
-// breaks, and a Pandoc table's layout is its column alignment. Definition,
+// breaks, and a table's layout is its meaning — a pipe table past the column
+// width takes its column widths from its dashes. Definition,
 // example and fancy lists are CommonMark paragraphs to prettier's parser.
 // Indented code is code at Pandoc's tab stop, which CommonMark's fixed one of
 // four need not agree with.
@@ -24,6 +25,7 @@ const VERBATIM = new Set([
   'indented-code',
   'raw-tex',
   'line-block',
+  'pipe-table',
   'grid-table',
   'simple-table',
   'multiline-table',

@@ -111,9 +111,11 @@ export const pipeTable = {
       return null;
     }
     if (!PIPE_SEPARATOR.test(next)) return null;
+    const last = lastWhile(lines, at, (l) => PIPE_ROW.test(l));
     return {
-      last: lastWhile(lines, at, (l) => PIPE_ROW.test(l)),
+      last,
       after: 'start',
+      spans: [{ type: 'pipe-table', from: at, to: last }],
     };
   },
 };
