@@ -43,6 +43,6 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           # The action is SHA-pinned, but its default renovate-version is a
           # floating major tag — this names the container that actually runs.
-          renovate-version: '44.115.10'
+          renovate-version: '44.121.4'
         env:
           RENOVATE_REPOSITORIES: ${{ github.repository }}
