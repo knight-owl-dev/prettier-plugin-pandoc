@@ -54,6 +54,17 @@ const CASES = {
   'an example continuation': '(@)  one long\n     continued',
   'examples split by a paragraph': '(@)  one\n\nExplain.\n\n(@)  two',
   'examples split by a blank line': '(@)  one\n\n(@)  two',
+  'a counted example': '(1@)  one\n(@)  two',
+  'a counted, labeled example': '(3@good)  one',
+  'a period after the @': '@.  one\n@.  two',
+  'a parenthesis after the @': '@)  one',
+  'a parenthesis after a label': '@good)  one',
+  'a period after a count': '1@.  one',
+  'an example with nothing after it': '(@)\n(@)  two',
+  'an example indented three spaces': '   (@)  one',
+  'an example indented four spaces': '    (@)  one',
+  'a letter before the @': '(a@)  one',
+  'a space inside the marker': '(1 @)  one',
   'a definition list inside a div': '::: note\nTerm\n:   Def\n:::',
 };
 

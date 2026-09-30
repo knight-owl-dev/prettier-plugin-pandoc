@@ -14,7 +14,6 @@ import { perSyntax } from '../syntax.js';
 const patterns = perSyntax((syntax) => ({
   definitionMarker: syntax.atBlockIndent('[:~][ \\t]+\\S'),
 }));
-const EXAMPLE_ITEM = /^\(@[\w-]*\)[ \t]+\S/;
 
 // A definition list resumes past a blank line on content one tab stop deep.
 const resumesDefinition = (text, syntax) =>
@@ -27,6 +26,15 @@ const resumesDefinition = (text, syntax) =>
 const NARROWEST_ITEM_CONTENT = 2;
 const resumesItem = (text, syntax) =>
   !BLANK.test(text) && indentOf(text, syntax.tabStop) >= NARROWEST_ITEM_CONTENT;
+
+// An example list marker: an `@`, a label after it and a count before it both
+// optional, in parentheses or closed by a period or a parenthesis.
+//
+//   (@) (@good) (3@) (3@good)   @. @good. 3@.   @) @good) 3@)
+//
+// `indent` is how far in the marker sits.
+const EXAMPLE_MARKER =
+  /^(?<indent>[ \t]*)(?:\(\d*@[\w-]*\)|\d*@[\w-]*[.)])(?:[ \t]+\S|[ \t]*$)/;
 
 // An ordered list marker, in any of Pandoc's styles:
 //
@@ -44,21 +52,26 @@ const ORDERED_MARKER =
 // The one marker style prettier prints as Pandoc reads it.
 const PLAIN_MARKER = /^[ \t]*\d+\.[ \t]/;
 
-/**
- * Whether a line opens an ordered list item, in any of Pandoc's styles: its
- * marker short of indented code.
- *
- * @param {string} text
- * @param {Syntax} syntax
- * @returns {boolean}
- */
-export function isOrderedItem(text, syntax) {
-  const marker = ORDERED_MARKER.exec(text);
+// Whether `pattern` finds a list marker on the line, short of indented code.
+function opensItem(pattern, text, syntax) {
+  const marker = pattern.exec(text);
   return (
     marker !== null &&
     indentOf(marker.groups.indent, syntax.tabStop) < syntax.codeIndent
   );
 }
+
+const isExampleItem = (text, syntax) => opensItem(EXAMPLE_MARKER, text, syntax);
+
+/**
+ * Whether a line opens an ordered list item, in any of Pandoc's styles.
+ *
+ * @param {string} text
+ * @param {Syntax} syntax
+ * @returns {boolean}
+ */
+export const isOrderedItem = (text, syntax) =>
+  opensItem(ORDERED_MARKER, text, syntax);
 
 // The last line of a list opening on line `at`. Every non-blank line straight
 // after an item continues it, lazily or not; past a blank line the list goes on
@@ -116,9 +129,10 @@ export const exampleList = {
   name: 'example-list',
   interruptsParagraph: false,
   match(lines, at, { syntax }) {
-    if (!EXAMPLE_ITEM.test(lines[at].text)) return null;
+    if (!isExampleItem(lines[at].text, syntax)) return null;
     const resumes = (lines, n) =>
-      resumesItem(lines[n].text, syntax) || EXAMPLE_ITEM.test(lines[n].text);
+      resumesItem(lines[n].text, syntax) ||
+      isExampleItem(lines[n].text, syntax);
     return list('example-list', lines, at, resumes);
   },
 };
