@@ -107,13 +107,15 @@ function contextFor(text, syntax) {
  * @param {Line[]} lines
  * @param {string} text
  * @param {import('../syntax.js').Syntax} syntax
+ * @param {boolean} inItem Whether the paragraph is in a list item's content.
  */
-export function endsParagraph(lines, text, syntax) {
+export function endsParagraph(lines, text, syntax, inItem) {
   const context = contextFor(text, syntax);
   const opened = firstMatch(REGISTRY, lines, 0, context);
   if (opened !== null && opened.last >= 1) return true;
   const paragraph = { ...context, paragraph: { lines: 1 } };
-  return firstMatch(INTERRUPTERS, lines, 1, paragraph) !== null;
+  const interrupters = inItem ? ITEM_INTERRUPTERS : INTERRUPTERS;
+  return firstMatch(interrupters, lines, 1, paragraph) !== null;
 }
 
 /**

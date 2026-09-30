@@ -32,3 +32,6 @@ In a block quote, a fence finds its close on the quote's own lines:
 > ```
 > code
 > ```
+
+- the rain came down on every quiet road a) and a marker that would open a nested list
+- the rain came down on every quiet road (@) or an example

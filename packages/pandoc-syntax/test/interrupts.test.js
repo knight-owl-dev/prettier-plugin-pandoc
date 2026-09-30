@@ -74,3 +74,35 @@ for (const [name, value] of Object.entries(CASES)) {
     });
   }
 }
+
+// Inside a list item, a list may open straight after a paragraph line. The
+// paragraph ran on when the item's first block is text holding more than the
+// line above.
+const TEXT = new Set(['Plain', 'Para']);
+
+function pandocInterruptsInItem(line, tabStop) {
+  const [list] = JSON.parse(readPandoc(`- text\n  ${line}\n`, tabStop)).blocks;
+  const [first] = list.c[0];
+  return !(TEXT.has(first.t) && first.c.length > 1);
+}
+
+const IN_ITEM = {
+  'a bullet': '- b',
+  'a numbered marker': '1. b',
+  'a fancy marker': 'a) b',
+  'an example marker': '(@) b',
+  'a hash marker': '#. b',
+  'more text': 'more text',
+  'a setext underline': '--',
+};
+
+for (const [name, line] of Object.entries(IN_ITEM)) {
+  for (const tabStop of TAB_STOPS) {
+    test(`${name} in a list item: the recognizer and Pandoc agree whether it ends a paragraph (tab stop ${tabStop})`, () => {
+      assert.equal(
+        interruptsParagraph(line, { tabStop, inItem: true }),
+        pandocInterruptsInItem(line, tabStop),
+      );
+    });
+  }
+}

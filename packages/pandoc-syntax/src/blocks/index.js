@@ -2,7 +2,7 @@
 
 import { splitLines } from '../lines.js';
 import { DEFAULT_TAB_STOP, syntaxFor } from '../syntax.js';
-import { INTERRUPTERS } from './registry.js';
+import { REGISTRY } from './registry.js';
 import { endsParagraph, scan } from './scan.js';
 
 /** @typedef {import('../types.js').Block} Block */
@@ -44,25 +44,32 @@ export function blocks(text, { tabStop = DEFAULT_TAB_STOP } = {}) {
  *   tabStop?: number,
  *   before?: string,
  *   after?: string | (() => string),
+ *   inItem?: boolean,
  * }} [options] `before` is the paragraph's line above, where a pipe table
  *   finds its header. `after` is what follows, where a fence finds its close
  *   and an environment its end; given as a function, it is asked for only
- *   where it could decide.
+ *   where it could decide. `inItem` says the paragraph is in a list item's
+ *   content, where a list may open straight after it.
  * @returns {boolean}
  */
 export function interruptsParagraph(
   line,
-  { tabStop = DEFAULT_TAB_STOP, before = PARAGRAPH_LINE, after = '' } = {},
+  {
+    tabStop = DEFAULT_TAB_STOP,
+    before = PARAGRAPH_LINE,
+    after = '',
+    inItem = false,
+  } = {},
 ) {
   const syntax = syntaxFor(tabStop);
   const above = before.replaceAll('\n', ' ');
   const endsWith = (following) => {
     const text = `${above}\n${line}\n${following}`;
-    return endsParagraph(splitLines(text), text, syntax);
+    return endsParagraph(splitLines(text), text, syntax, inItem);
   };
   // What follows is read only where it could decide: a formatter asks this of
   // every word, and most open nothing.
   if (endsWith('')) return true;
-  if (!INTERRUPTERS.some((r) => r.opensAhead?.(line, syntax))) return false;
+  if (!REGISTRY.some((r) => r.opensAhead?.(line, syntax))) return false;
   return endsWith(typeof after === 'function' ? after() : after);
 }

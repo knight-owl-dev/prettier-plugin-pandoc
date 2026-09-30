@@ -66,8 +66,16 @@ function around(path, options) {
   };
 }
 
+// Prettier's containers, whose content Pandoc reads as a document of its own.
+const CONTAINER_NODES = new Set([
+  'blockquote',
+  'listItem',
+  'footnoteDefinition',
+]);
+
 /**
- * Whether a line must not break at the whitespace `path` points to.
+ * Whether a line must not break at the whitespace `path` points to. In a list
+ * item's own content a list may open straight after a line of text.
  *
  * @param {object} path
  * @param {object} options
@@ -76,7 +84,11 @@ function around(path, options) {
 export function breaksParagraph(path, options) {
   const { lines, before, after } = around(path, options);
   const tabStop = options.pandocTabStop ?? DEFAULT_TAB_STOP;
+  const holder = path.findAncestor((node) => CONTAINER_NODES.has(node.type));
+  const inItem = holder?.type === 'listItem';
   return lines
     .filter((line) => line !== '')
-    .some((line) => interruptsParagraph(line, { tabStop, before, after }));
+    .some((line) =>
+      interruptsParagraph(line, { tabStop, before, after, inItem }),
+    );
 }
