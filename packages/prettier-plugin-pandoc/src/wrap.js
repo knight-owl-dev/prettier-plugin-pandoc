@@ -6,7 +6,7 @@ import {
   DEFAULT_TAB_STOP,
   interruptsParagraph,
 } from '@knight-owl-dev/pandoc-syntax';
-import { CONTAINERS } from './nodes.js';
+import { CONTAINERS, isInlineRaw } from './nodes.js';
 import { lineEnd } from './text.js';
 
 // The source from `offset` on as Pandoc reads it there: in a container, the
@@ -91,4 +91,26 @@ export function breaksParagraph(path, options) {
     .some((line) =>
       interruptsParagraph(line, { tabStop, before, after, inItem }),
     );
+}
+
+// The last of the commands an inline span holds, when it takes no arguments.
+const ENDS_BARE = /\\[A-Za-z]+\*?[ \t]*$/;
+
+/**
+ * Whether the line break at the whitespace `path` points to must stay: after a
+ * command with no arguments, Pandoc ends the raw text at a break, but takes
+ * the spaces that would replace it.
+ *
+ * @param {object} path
+ * @returns {boolean}
+ */
+export function keepsBreak(path) {
+  if (path.node.value !== '\n' || path.parent.children[0] !== path.node) {
+    return false;
+  }
+  const siblings = path.grandparent?.children ?? [];
+  const before = siblings[siblings.indexOf(path.parent) - 1];
+  return (
+    before !== undefined && isInlineRaw(before) && ENDS_BARE.test(before.value)
+  );
 }

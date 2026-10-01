@@ -6,208 +6,19 @@
 
 import { BLANK } from '../lines.js';
 import { BEGIN, environmentEnd } from '../tex.js';
+import {
+  ALSO_INLINE,
+  BLOCK_COMMANDS,
+  DEFINITIONS,
+  DEFS,
+  INLINE_COMMANDS,
+  INTERLEAVED,
+  REQUIRED_GROUPS,
+  SECTIONING,
+} from '../tex-names.js';
 
 /** @typedef {import('../types.js').Line} Line */
 /** @typedef {{k: number, i: number}} Place */
-
-// cspell:disable
-// Pandoc 3.11's block commands: its LaTeX reader's `blockCommands` and
-// `treatAsBlock`. Pandoc reads some of their arguments by a rule of the
-// command's own; here each takes options, then groups, but `INTERLEAVED`.
-const BLOCK_COMMANDS = new Set([
-  'addbibresource',
-  'addcontentsline',
-  'address',
-  'addtocontents',
-  'addtocounter',
-  'author',
-  'bibliography',
-  'bibliographystyle',
-  'blockcquote',
-  'blockquote',
-  'caption',
-  'centerline',
-  'chapter',
-  'clearpage',
-  'closing',
-  'date',
-  'dedication',
-  'documentclass',
-  'endinput',
-  'epigraph',
-  'extratitle',
-  'fancybreak',
-  'foreignblockcquote',
-  'foreignblockquote',
-  'framesubtitle',
-  'frametitle',
-  'frontispiece',
-  'graphicspath',
-  'hrule',
-  'hspace',
-  'hyperdef',
-  'hypertarget',
-  'hyphenblockcquote',
-  'hyphenblockquote',
-  'iftoggle',
-  'ignore',
-  'include',
-  'input',
-  'inputminted',
-  'item',
-  'listoffigures',
-  'listoftables',
-  'lowertitleback',
-  'lstinputlisting',
-  'makeglossary',
-  'makeindex',
-  'maketitle',
-  'markboth',
-  'markleft',
-  'markright',
-  'minisec',
-  'newpage',
-  'newtheorem',
-  'newtoggle',
-  'opening',
-  'PackageError',
-  'pagebreak',
-  'par',
-  'paragraph',
-  'parbox',
-  'part',
-  'pdfannot',
-  'pdfstringdef',
-  'pfbreak',
-  'plainbreak',
-  'plainfancybreak',
-  'publishers',
-  'raggedright',
-  'rule',
-  'section',
-  'setdefaultlanguage',
-  'setmainlanguage',
-  'signature',
-  'special',
-  'strut',
-  'subfile',
-  'subject',
-  'subparagraph',
-  'subsection',
-  'subsubsection',
-  'subtitle',
-  'theoremstyle',
-  'title',
-  'titleformat',
-  'titlehead',
-  'togglefalse',
-  'toggletrue',
-  'uppertitleback',
-  'usepackage',
-  'vspace',
-  'write',
-]);
-
-// Those whose own parser takes options among their groups.
-const INTERLEAVED = new Set([
-  'foreignblockcquote',
-  'foreignblockquote',
-  'hyphenblockcquote',
-  'hyphenblockquote',
-  'newtheorem',
-  'titleformat',
-]);
-
-// In Pandoc's block map, but its parser for them reads inline text.
-const INLINE_COMMANDS = new Set(['colorbox', 'textcolor']);
-
-// Block commands Pandoc reads inline in paragraph text: its `treatAsInline`,
-// and those in its inline map.
-const ALSO_INLINE = new Set([
-  'clearpage',
-  'hspace',
-  'hypertarget',
-  'iftoggle',
-  'input',
-  'newpage',
-  'newtoggle',
-  'pagebreak',
-  'togglefalse',
-  'toggletrue',
-  'vspace',
-]);
-
-// The groups a block command needs before Pandoc reads it as a block in
-// paragraph text; none for the rest.
-const REQUIRED_GROUPS = new Map([
-  ...[
-    'addbibresource',
-    'author',
-    'bibliography',
-    'blockquote',
-    'chapter',
-    'documentclass',
-    'fancybreak',
-    'framesubtitle',
-    'frametitle',
-    'graphicspath',
-    'lstinputlisting',
-    'minisec',
-    'newtheorem',
-    'paragraph',
-    'part',
-    'plainbreak',
-    'rule',
-    'section',
-    'setdefaultlanguage',
-    'setmainlanguage',
-    'signature',
-    'subparagraph',
-    'subsection',
-    'subsubsection',
-    'theoremstyle',
-    'title',
-    'write',
-  ].map((name) => [name, 1]),
-  ...[
-    'blockcquote',
-    'epigraph',
-    'foreignblockquote',
-    'hyphenblockquote',
-    'inputminted',
-    'parbox',
-  ].map((name) => [name, 2]),
-  ...[
-    'foreignblockcquote',
-    'hyphenblockcquote',
-    'PackageError',
-    'plainfancybreak',
-  ].map((name) => [name, 3]),
-  ['titleformat', 5],
-]);
-
-// Definitions, which name what they define before their arguments.
-const DEFINITIONS = new Set([
-  'DeclareMathOperator',
-  'DeclareRobustCommand',
-  'def',
-  'edef',
-  'gdef',
-  'global',
-  'let',
-  'newcommand',
-  'newenvironment',
-  'newif',
-  'providecommand',
-  'provideenvironment',
-  'renewcommand',
-  'renewenvironment',
-  'xdef',
-]);
-
-// Those whose parameters run up to the body's group.
-const DEFS = new Set(['def', 'edef', 'gdef', 'xdef']);
-// cspell:enable
 
 const OPENS_ENVIRONMENT = new RegExp(BEGIN, 'y');
 const COMMAND = /\\([A-Za-z]+)\*?/y;
@@ -337,6 +148,31 @@ function unknownEnd(lines, command) {
 const opensPiece = ({ name }) =>
   name !== 'begin' && name !== 'end' && !INLINE_COMMANDS.has(name);
 
+// Past the whitespace from `p` on, as TeX reads it: spaces, comments and line
+// breaks, blank lines among them.
+/** @returns {Place} */
+function pastWhitespace(lines, p) {
+  for (let { k, i } = p; k < lines.length; k++, i = 0) {
+    const at = pastSpaces(lines, { k, i });
+    if (at.i < lines[k].text.length && lines[k].text[at.i] !== '%') return at;
+  }
+  return { k: lines.length - 1, i: lines.at(-1).text.length };
+}
+
+const LABEL = /\\label(?![A-Za-z])/y;
+
+// Past the label a sectioning command takes from `p`, or null when none
+// follows.
+function labelEnd(lines, p) {
+  const at = pastWhitespace(lines, p);
+  LABEL.lastIndex = at.i;
+  if (!LABEL.test(textAt(lines, at))) return null;
+  const group = pastWhitespace(lines, { k: at.k, i: LABEL.lastIndex });
+  return textAt(lines, group)[group.i] === '{'
+    ? groupEnd(lines, group, ...GROUP)
+    : null;
+}
+
 // The text from `p` on, a line at a time.
 function* textFrom(lines, p) {
   const line = lines[p.k];
@@ -358,7 +194,8 @@ function pieceEnd(lines, p) {
   if (command === null || !opensPiece(command)) return null;
   if (DEFINITIONS.has(command.name)) return definitionEnd(lines, command);
   if (BLOCK_COMMANDS.has(command.name)) {
-    return argumentsEnd(lines, command.end, INTERLEAVED.has(command.name));
+    const end = argumentsEnd(lines, command.end, INTERLEAVED.has(command.name));
+    return SECTIONING.has(command.name) ? (labelEnd(lines, end) ?? end) : end;
   }
   return unknownEnd(lines, command);
 }

@@ -29,6 +29,23 @@ const codeSpan = (length) =>
 const SHORTEST_CODE_SPAN = 2 * CODE_SPAN.length + 1;
 
 /**
+ * The spans, each run of touching ones joined into one: code spans side by
+ * side would run their backticks together.
+ *
+ * @param {Span[]} spans In source order.
+ * @returns {Span[]}
+ */
+export function joinTouching(spans) {
+  const joined = [];
+  for (const span of spans) {
+    const last = joined.at(-1);
+    if (last !== undefined && last.end === span.start) last.end = span.end;
+    else joined.push({ start: span.start, end: span.end });
+  }
+  return joined;
+}
+
+/**
  * Whether an inline span can be masked. A backtick beside it would lengthen
  * the run its code span opens or closes on; such a span is left as it is.
  *

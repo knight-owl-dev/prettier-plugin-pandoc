@@ -5,7 +5,7 @@ import { DEFAULT_TAB_STOP } from '@knight-owl-dev/pandoc-syntax';
 import { doc } from 'prettier';
 import * as markdown from 'prettier/plugins/markdown';
 import { DIV, isInlineRaw, VERBATIM } from './nodes.js';
-import { breaksParagraph } from './wrap.js';
+import { breaksParagraph, keepsBreak } from './wrap.js';
 
 const { align, hardline, literalline, markAsRoot } = doc.builders;
 const { replaceEndOfLine } = doc.utils;
@@ -138,6 +138,7 @@ export function print(path, options, printChild) {
     case 'code':
       return printCode(node, options);
     case 'whitespace':
+      if (keepsBreak(path)) return asWritten('\n');
       return breaksParagraph(path, options)
         ? mdast.print(path, { ...options, proseWrap: 'never' }, printChild)
         : mdast.print(path, options, printChild);

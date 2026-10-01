@@ -15,3 +15,5 @@ Opaque neighbors: `\code{x}` in a code span, $\frac{a}{b}$ in math, and a price 
 
 Emphasis *around \emph{a command}* and **strong \textbf{too}**, and a
 [link holding \emph{one}](https://example.com).
+
+Touching commands \foo \emph{x} and \noindent\textbf{bold} print as written, in a paragraph long enough to wrap.

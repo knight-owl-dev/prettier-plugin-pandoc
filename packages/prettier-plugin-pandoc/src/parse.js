@@ -8,7 +8,7 @@ import {
 } from '@knight-owl-dev/pandoc-syntax';
 import * as markdown from 'prettier/plugins/markdown';
 import { firstMisread, isContainer } from './containers.js';
-import { mask, maskable } from './mask.js';
+import { joinTouching, mask, maskable } from './mask.js';
 import { CONTAINERS } from './nodes.js';
 import { settle } from './settle.js';
 import { stretchAround } from './stretch.js';
@@ -100,7 +100,9 @@ export async function parse(text, options) {
   let constructs = {
     divs: found.filter((block) => block.type === 'div'),
     verbatim: found.filter((block) => VERBATIM.has(block.type)),
-    inlineRaw: inlines(text, found).filter((span) => maskable(text, span)),
+    inlineRaw: joinTouching(inlines(text, found)).filter((span) =>
+      maskable(text, span),
+    ),
     containers: found.filter(isContainer),
   };
 
