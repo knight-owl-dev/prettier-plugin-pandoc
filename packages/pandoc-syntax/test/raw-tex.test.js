@@ -6,7 +6,7 @@
 // keeps, so both sides are compared with each line's leading space removed.
 
 // cspell:ignore foreignblockquote iffoo newif newtheorem textcolor titleformat
-// cspell:ignore newenvironment usepackage
+// cspell:ignore newenvironment usepackage textgerman
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -117,6 +117,17 @@ const CASES = {
   'colored text': '\\textcolor{red}{x}\n',
   'colored text then text': '\\textcolor{red}{x} b\n',
   'a command then colored text': '\\newpage \\textcolor{red}{x}\n',
+  'an inline command alone': '\\noindent\n',
+  'an inline command alone above text': '\\noindent\ntext\n',
+  'an index entry alone': '\\index{x}\n',
+  'a citation alone': '\\cite{k}\n',
+  'a language command alone': '\\textgerman{x}\n',
+  'a block command then an inline one': '\\newpage \\emph{x}\n',
+  'one of no known kind then an inline one': '\\foo \\emph{x}\n',
+  'a bare inline command then a block command': '\\noindent \\newpage\n',
+  'an inline command below a command': '\\newpage\n\\noindent\n',
+  'an inline command below an environment':
+    '\\begin{x}y\\end{x}\n\\noindent text\n',
   'a definition by newcommand, unbraced': '\\newcommand\\foo{bar}\n',
   'a definition by def, then a command': '\\def\\foo#1{bar #1} \\newpage\n',
   'a definition by let': '\\let\\a\\b\n',
