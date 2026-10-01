@@ -13,6 +13,18 @@ export function lineEnd(text, at) {
 }
 
 /**
+ * Where the text from `start` to `end` stops, short of trailing whitespace: a
+ * block's end as a stretch printed as written measures it.
+ *
+ * @param {string} text
+ * @param {number} start
+ * @param {number} end
+ * @returns {number}
+ */
+export const stopOf = (text, start, end) =>
+  start + text.slice(start, end).trimEnd().length;
+
+/**
  * The lines from `start` to `end`, each as its own span.
  *
  * @param {string} text

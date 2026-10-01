@@ -1,7 +1,7 @@
 // Stretches printed as written: where the two parsers read a stretch of the
 // document differently, no smaller piece of it reads the same to both.
 
-import { lineEnd, lineSpans } from './text.js';
+import { lineEnd, lineSpans, stopOf } from './text.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
@@ -115,7 +115,9 @@ function lineStop(text, at) {
 function widen(stretch, verbatim, text) {
   let { start, end } = stretch;
   const cut = (v) =>
-    v.start < end && start < v.end && (v.start < start || v.end > end);
+    v.start < end &&
+    start < v.end &&
+    (v.start < start || stopOf(text, v.start, v.end) > end);
   for (let v = verbatim.find(cut); v !== undefined; v = verbatim.find(cut)) {
     start = Math.min(start, lineStart(text, v.start));
     end = Math.max(end, lineStop(text, v.end));

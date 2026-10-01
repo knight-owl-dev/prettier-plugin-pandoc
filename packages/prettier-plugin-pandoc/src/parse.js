@@ -12,7 +12,7 @@ import { mask, maskable } from './mask.js';
 import { CONTAINERS } from './nodes.js';
 import { settle } from './settle.js';
 import { stretchAround } from './stretch.js';
-import { lineEnd } from './text.js';
+import { lineEnd, stopOf } from './text.js';
 import { firstUnread, folded } from './unread.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
@@ -114,7 +114,9 @@ export async function parse(text, options) {
   const unmasked = (blocks) =>
     blocks.filter(
       (b) =>
-        !constructs.verbatim.some((v) => v.start <= b.start && b.end <= v.end),
+        !constructs.verbatim.some(
+          (v) => v.start <= b.start && stopOf(text, b.start, b.end) <= v.end,
+        ),
     );
   // The stretches this parse settles, in order.
   const misread = (ast, masked) => {
