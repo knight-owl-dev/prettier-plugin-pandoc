@@ -95,7 +95,6 @@ export const htmlComment = {
     }
     return {
       last,
-      after: 'start',
       spans: [{ type: 'html-comment', from: at, to: last }],
     };
   },
@@ -118,6 +117,6 @@ export const htmlBlockTag = {
   match(lines, at, { syntax, paragraph }) {
     const pattern =
       paragraph === null ? patterns(syntax).blockTag : TAG_AT_ANY_INDENT;
-    return pattern.test(lines[at].text) ? { last: at, after: 'start' } : null;
+    return pattern.test(lines[at].text) ? { last: at } : null;
   },
 };

@@ -37,16 +37,15 @@ function headingStarts(node, out = new Set()) {
 }
 
 /**
- * The first verbatim block whose mask prettier reads as no heading of its
- * own, or undefined.
+ * The verbatim blocks whose masks prettier reads as no heading of their own.
  *
  * @param {object} ast
  * @param {Block[]} verbatim
- * @returns {Block | undefined}
+ * @returns {Block[]}
  */
-export function firstFolded(ast, verbatim) {
+export function folded(ast, verbatim) {
   const starts = headingStarts(ast);
-  return verbatim.find((block) => !starts.has(block.start));
+  return verbatim.filter((block) => !starts.has(block.start));
 }
 
 /**

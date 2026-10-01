@@ -73,16 +73,15 @@
  */
 
 /**
- * What a recognizer found at a line: the block's last line, what the line after
- * it continues, and what to report. A container carries its content, which the
- * scan reads as a document of its own; a div's opening fence is noted for the
- * scan's stack.
+ * What a recognizer found at a line: the block's last line, and what to report.
+ * A container carries its content, which the scan reads as a document of its
+ * own; a div's opening fence is noted for the scan's stack.
  *
  * @typedef {object} Match
  * @property {number} last
- * @property {'start' | 'paragraph'} after `paragraph` when text a mid-line end
- *   left on the last line is a paragraph's first line.
- * @property {number} [tail] Where that text starts, for `paragraph`.
+ * @property {number} [resume] Where blocks are read again, when not at the
+ *   start of the line after `last`: on `last` after a mid-line end, or past
+ *   the next line's indentation.
  * @property {SpanSpec[]} [spans]
  * @property {{type: ContainerBlock['type'], content: Line[]}} [container]
  * @property {Span} [divOpen]

@@ -16,7 +16,7 @@ export const linkReference = {
   interruptsParagraph: false,
   match(lines, at, { syntax }) {
     return patterns(syntax).definition.test(lines[at].text)
-      ? { last: at, after: 'start' }
+      ? { last: at }
       : null;
   },
 };

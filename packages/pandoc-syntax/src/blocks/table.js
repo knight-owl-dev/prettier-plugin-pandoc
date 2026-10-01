@@ -95,7 +95,6 @@ export const pandocTable = {
     if (table === null) return null;
     return {
       last: table.last,
-      after: 'start',
       spans: [{ type: table.type, from: at, to: table.last }],
     };
   },
@@ -119,7 +118,6 @@ export const pipeTable = {
     const last = lastWhile(lines, at, (l) => PIPE_ROW.test(l));
     return {
       last,
-      after: 'start',
       spans: [{ type: 'pipe-table', from: at, to: last }],
     };
   },

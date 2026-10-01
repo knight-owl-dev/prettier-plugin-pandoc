@@ -19,18 +19,19 @@ export const BEGIN = '\\\\begin\\{([^}]+)\\}';
  * Pandoc reads as text.
  *
  * @param {string} name
- * @param {{text: string, start: number}[]} chunks The text in order, each
- *   piece with its offset into the source.
+ * @param {Iterable<{text: string, start: number}>} chunks The text in order,
+ *   each piece with its offset into the source, read only as far as the end.
  * @returns {{chunk: number, end: number} | null}
  */
 export function environmentEnd(name, chunks) {
   const marker = new RegExp(`\\\\(begin|end)\\{${escapeRegExp(name)}\\}`, 'g');
-  let depth = 0;
-  for (const [chunk, { text, start }] of chunks.entries()) {
+  let [depth, chunk] = [0, 0];
+  for (const { text, start } of chunks) {
     for (const m of uncommented(text).matchAll(marker)) {
       depth += m[1] === 'begin' ? 1 : -1;
       if (depth === 0) return { chunk, end: start + m.index + m[0].length };
     }
+    chunk++;
   }
   return null;
 }

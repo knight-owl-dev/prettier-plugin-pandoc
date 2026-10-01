@@ -135,6 +135,8 @@ const CASES = {
   'a comment in an environment': '\\begin{x} % \\end{x}\n\\end{x}\n',
   'a comment in a mid-line environment':
     'a \\begin{x} % \\end{x}\n\\end{x} b\n',
+  'an environment in a definition term':
+    'Term \\begin{x}y\\end{x}\n\n:   def\n',
   'a command above a definition line': '\\newpage\n:   def\n',
   'a run in a block quote': '> \\newpage \\begin{x}y\\end{x}\n> \\clearpage\n',
   'a mid-line environment then a command':

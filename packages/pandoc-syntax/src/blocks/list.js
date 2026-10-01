@@ -90,7 +90,7 @@ function listEnd(lines, at, resumes) {
 // A whole list, reported as one span.
 function list(type, lines, at, resumes) {
   const last = listEnd(lines, at, resumes);
-  return { last, after: 'start', spans: [{ type, from: at, to: last }] };
+  return { last, spans: [{ type, from: at, to: last }] };
 }
 
 /**
@@ -159,7 +159,6 @@ export const fancyList = {
     return fancy
       ? {
           last,
-          after: 'start',
           spans: [{ type: 'fancy-list', from: at, to: last }],
         }
       : null;

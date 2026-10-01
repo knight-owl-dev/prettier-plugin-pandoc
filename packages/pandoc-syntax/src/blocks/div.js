@@ -18,7 +18,6 @@ export const divOpen = {
     if (!OPEN.test(line.text)) return null;
     return {
       last: at,
-      after: 'start',
       divOpen: { start: line.start, end: line.end },
     };
   },
