@@ -33,3 +33,12 @@ a run
 
 \foo \newpage
 \clearpage
+
+\begin{x}
+
+z
+\end{x}
+text
+    lazy
+- item
+  \begin{x}a\end{x} b

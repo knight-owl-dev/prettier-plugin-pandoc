@@ -13,7 +13,7 @@ import { CONTAINERS } from './nodes.js';
 import { settle } from './settle.js';
 import { stretchAround } from './stretch.js';
 import { lineEnd } from './text.js';
-import { firstFolded, firstUnread } from './unread.js';
+import { firstUnread, folded } from './unread.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
@@ -40,6 +40,16 @@ const VERBATIM = new Set([
 
 const startOf = (block) =>
   block.type === 'div' ? block.open.start : block.start;
+
+const byStart = (a, b) => a.start - b.start;
+
+const BLANK_AFTER = /[ \t]*(\n[ \t]*(\n|$)|$)/y;
+
+// Whether only a blank line, or the end, follows the line `at` ends.
+const beforeBlank = (text, at) => {
+  BLANK_AFTER.lastIndex = at;
+  return BLANK_AFTER.test(text);
+};
 
 const endOf = (block, text) =>
   block.type === 'div' ? (block.close?.end ?? text.length) : block.end;
@@ -94,9 +104,10 @@ export async function parse(text, options) {
     containers: found.filter(isContainer),
   };
 
-  // One misread shifts everything after it, so each is settled before the
-  // next is judged: the earliest printed as written, the rest parsed again.
-  // Every pass prints more of the document as written, so the loop ends.
+  // A misread in a container or a fence can shift everything after it, so
+  // none after it is judged before the document is parsed again. One printed
+  // as written up to a blank line shifts nothing, so the next is settled on
+  // the same parse. Every pass prints more as written, so the loop ends.
   const fences = found.filter((block) => block.type === 'fenced-code');
   const resumed = afterRaw(found, text);
   // A block counts until a stretch printed as written holds all of it.
@@ -105,27 +116,38 @@ export async function parse(text, options) {
       (b) =>
         !constructs.verbatim.some((v) => v.start <= b.start && b.end <= v.end),
     );
+  // The stretches this parse settles, in order.
   const misread = (ast, masked) => {
     const at = (offset) =>
       offset === undefined ? [] : [{ start: offset, end: offset }];
-    const misreads = [
+    const [shifting] = [
       ...at(firstMisread(constructs.containers, ast, text, masked)),
       ...[firstUnread(ast, unmasked(fences), text)].filter(Boolean),
-      ...[firstFolded(ast, constructs.verbatim)].filter(Boolean),
-      ...unmasked(resumed),
-    ];
-    if (misreads.length === 0) return undefined;
-    const first = misreads.reduce((a, b) => (b.start < a.start ? b : a));
-    return stretchAround(first, ast, constructs.containers, text);
+    ].sort(byStart);
+    const local = [...folded(ast, constructs.verbatim), ...unmasked(resumed)]
+      .filter((m) => shifting === undefined || m.start < shifting.start)
+      .sort(byStart);
+    const stretches = [];
+    for (const m of [...local, shifting].filter(Boolean)) {
+      const last = stretches.at(-1);
+      if (last !== undefined && m.start <= last.end) continue;
+      const stretch = stretchAround(m, ast, constructs, text);
+      if (last !== undefined && stretch.start <= last.end) break;
+      stretches.push(stretch);
+      if (m === shifting || !beforeBlank(text, stretch.end)) break;
+    }
+    return stretches;
   };
   let masked = mask(text, constructs);
   let ast = await base.parse(masked, options);
   for (
-    let stretch = misread(ast, masked);
-    stretch !== undefined;
-    stretch = misread(ast, masked)
+    let stretches = misread(ast, masked);
+    stretches.length > 0;
+    stretches = misread(ast, masked)
   ) {
-    constructs = withStretch(constructs, stretch);
+    for (const stretch of stretches) {
+      constructs = withStretch(constructs, stretch);
+    }
     masked = mask(text, constructs);
     ast = await base.parse(masked, options);
   }

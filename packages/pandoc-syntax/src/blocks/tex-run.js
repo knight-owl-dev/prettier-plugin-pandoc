@@ -249,14 +249,19 @@ function unknownEnd(lines, command) {
 const opensPiece = ({ name }) =>
   name !== 'begin' && name !== 'end' && !INLINE_COMMANDS.has(name);
 
+// The text from `p` on, a line at a time.
+function* textFrom(lines, p) {
+  const line = lines[p.k];
+  yield { text: line.text.slice(p.i), start: line.start + p.i };
+  for (let k = p.k + 1; k < lines.length; k++) yield lines[k];
+}
+
 // Past the piece of raw TeX at `p`, or null when none opens there.
 function pieceEnd(lines, p) {
   OPENS_ENVIRONMENT.lastIndex = p.i;
   const name = OPENS_ENVIRONMENT.exec(textAt(lines, p))?.[1];
   if (name !== undefined) {
-    const line = lines[p.k];
-    const rest = { text: line.text.slice(p.i), start: line.start + p.i };
-    const close = environmentEnd(name, [rest, ...lines.slice(p.k + 1)]);
+    const close = environmentEnd(name, textFrom(lines, p));
     if (close === null) return null;
     const k = p.k + close.chunk;
     return { k, i: close.end - lines[k].start };

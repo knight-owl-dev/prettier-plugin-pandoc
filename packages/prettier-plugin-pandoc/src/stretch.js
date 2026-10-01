@@ -1,7 +1,7 @@
 // Stretches printed as written: where the two parsers read a stretch of the
 // document differently, no smaller piece of it reads the same to both.
 
-import { lineSpans } from './text.js';
+import { lineEnd, lineSpans } from './text.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
@@ -69,8 +69,9 @@ function joinedAround(ast, { start, end }, text) {
     last++;
   const from = lineStart(text, blocks[first].position.start.offset);
   // A fence never closed runs through the file's last newline, which the
-  // printer writes again.
-  const until = blocks[last].position.end.offset;
+  // printer writes again. A misread's end may lie on a line the mask blanked,
+  // past every block.
+  const until = Math.max(blocks[last].position.end.offset, end);
   const to = from + text.slice(from, until).trimEnd().length;
   return {
     type: 'verbatim',
@@ -88,17 +89,42 @@ function joinedAround(ast, { start, end }, text) {
  *
  * @param {{start: number, end: number}} misread
  * @param {object} ast
- * @param {Block[]} containers
+ * @param {{containers: Block[], verbatim: Block[]}} constructs
  * @param {string} text
  * @returns {Block}
  */
-export function stretchAround(misread, ast, containers, text) {
+export function stretchAround(misread, ast, { containers, verbatim }, text) {
   const holder = containers.find(
     (c) => c.start <= misread.start && misread.start < c.end,
   );
   if (holder !== undefined) {
     const stretch = stretchOf(holder, containers, text);
-    if (misread.end <= stretch.end) return stretch;
+    if (misread.end <= stretch.end) return widen(stretch, verbatim, text);
   }
-  return joinedAround(ast, misread, text);
+  return widen(joinedAround(ast, misread, text), verbatim, text);
+}
+
+// The end of the line `at` is on, short of its trailing spaces.
+function lineStop(text, at) {
+  const from = lineStart(text, at);
+  return from + text.slice(from, lineEnd(text, at)).trimEnd().length;
+}
+
+// `stretch` grown to hold each verbatim block it cuts into, whole lines and
+// all: two masks over one line print it twice.
+function widen(stretch, verbatim, text) {
+  let { start, end } = stretch;
+  const cut = (v) =>
+    v.start < end && start < v.end && (v.start < start || v.end > end);
+  for (let v = verbatim.find(cut); v !== undefined; v = verbatim.find(cut)) {
+    start = Math.min(start, lineStart(text, v.start));
+    end = Math.max(end, lineStop(text, v.end));
+  }
+  if (start === stretch.start && end === stretch.end) return stretch;
+  return {
+    type: 'verbatim',
+    start,
+    end,
+    segments: lineSpans(text, start, end),
+  };
 }
