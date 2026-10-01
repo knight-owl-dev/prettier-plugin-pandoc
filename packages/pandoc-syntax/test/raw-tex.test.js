@@ -215,7 +215,78 @@ const CASES = {
   'a bracket in a code span': 'a `[` \\begin{x}y\\end{x} ] c\n',
   'brackets before it': 'a [b] \\begin{x}y\\end{x} c\n',
   'a space between brackets and parentheses': '[a] (u \\begin{x}y\\end{x}) b\n',
+
+  // A block command Pandoc does not also read inline ends the paragraph too.
+  'a block command mid-line': 'a \\section{x} b\n',
+  'a starred block command with options mid-line': 'a \\section*[o]{x} b\n',
+  'a block command of no arguments mid-line': 'a \\hrule b\n',
+  'a block command with a spaced argument mid-line': 'a \\section {x} b\n',
+  'a block command with an argument across lines': 'a \\section{x\ny} b\n',
+  'a block command ending a paragraph line': 'a \\section{x}\nb\n',
+  'a block command starting a paragraph line': 'a\n\\section{x} b\n',
+  'a block command then a run': 'a \\section{x} \\label{y}\nb\n',
+  'a run below a mid-line block command': 'a \\section{x}\n\\label{y}\n\nb\n',
+  'an inline command then a block command': 'a \\newpage \\section{x} b\n',
+  'an inline command then a block command on a paragraph line':
+    'a\n\\newpage \\section{S} text\n',
+  'one of no known kind then a block command': '\\foo \\section{x} b\n',
+  'a block command in a heading': '# a \\section{x} b\n',
+  'a block command in a list item': '- a \\section{x} b\n',
+  'a block command in a block quote': '> a \\section{x} b\n',
+  'a block command in emphasis': '*a \\section{x} b*\n',
+  'a block command in link text': '[a \\section{x} b](u)\n',
+  'a block command in brackets': '[a \\section{x}] b\n',
+  'a block command in a code span': 'a `\\section{x}` b\n',
+  'a block command in math': 'a $\\section{x}$ b\n',
+  'an escaped block command': 'a \\\\section{x} b\n',
+  "a block command in an unknown command's argument":
+    'a \\foo{\\section{x}} b\n',
+  'a block command in a definition term': 'Term \\section{x}\n\n:   def\n',
+  'a block command then an environment mid-line':
+    'a \\section{x} \\begin{y}z\\end{y} b\n',
+  'an environment then a block command mid-line':
+    'a \\begin{y}z\\end{y} b \\section{x} c\n',
+  'a block command without its argument mid-line': 'a \\section b\n',
+  'a block command with only options mid-line': 'a \\section[o] b\n',
+  'a block command short of its groups mid-line': 'a \\epigraph{x} b\n',
+  'a block command with its groups mid-line': 'a \\epigraph{x}{y} b\n',
+  'options among the groups of a block command mid-line':
+    'a \\epigraph{x}[o]{y} b\n',
+  'a block command without its argument in a heading': '# a \\section b\n',
+  'a block command short of its groups in a heading': '# a \\epigraph{x} b\n',
+  'a block command in an HTML attribute':
+    'a <span title="\\section{x}">c</span> b\n',
+  'a block command in an unquoted HTML attribute':
+    'a <span title=\\section{x}>c</span> b\n',
+  'a block command in an HTML tag across lines':
+    'a <span\ntitle="\\section{x}">c</span> b\n',
+  'a block command in a closing HTML tag': 'a </span x="\\section{x}"> b\n',
+  'a block command in what is no HTML tag': 'a <b \\section{x}> c\n',
+  'an environment in an HTML attribute':
+    'a <span title="\\begin{x}y\\end{x}">c</span> b\n',
 };
+
+// cspell:disable
+// Block commands Pandoc also reads inline, which stay in the paragraph.
+for (const name of [
+  'clearpage',
+  'colorbox',
+  'hspace',
+  'hypertarget',
+  'iftoggle',
+  'input',
+  'newpage',
+  'newtoggle',
+  'pagebreak',
+  'textcolor',
+  'togglefalse',
+  'toggletrue',
+  'vspace',
+]) {
+  CASES[`\\${name} mid-line`] = `a \\${name}{x} b\n`;
+  CASES[`\\${name} on a paragraph line`] = `a\n\\${name}{x} b\n`;
+}
+// cspell:enable
 
 for (const [name, text] of Object.entries(CASES)) {
   for (const tabStop of TAB_STOPS) {
