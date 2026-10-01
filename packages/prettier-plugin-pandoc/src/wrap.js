@@ -93,12 +93,13 @@ export function breaksParagraph(path, options) {
     );
 }
 
-const BARE_COMMAND = /^\\[A-Za-z]+\*?[ \t]*$/;
+// The last of the commands an inline span holds, when it takes no arguments.
+const ENDS_BARE = /\\[A-Za-z]+\*?[ \t]*$/;
 
 /**
- * Whether the line break at the whitespace `path` points to must stay one: it
- * follows a command with no arguments, whose raw text Pandoc ends there, and
- * which takes the spaces after it into its raw text where no break comes.
+ * Whether the line break at the whitespace `path` points to must stay: after a
+ * command with no arguments, Pandoc ends the raw text at a break, but takes
+ * the spaces that would replace it.
  *
  * @param {object} path
  * @returns {boolean}
@@ -110,8 +111,6 @@ export function keepsBreak(path) {
   const siblings = path.grandparent?.children ?? [];
   const before = siblings[siblings.indexOf(path.parent) - 1];
   return (
-    before !== undefined &&
-    isInlineRaw(before) &&
-    BARE_COMMAND.test(before.value)
+    before !== undefined && isInlineRaw(before) && ENDS_BARE.test(before.value)
   );
 }

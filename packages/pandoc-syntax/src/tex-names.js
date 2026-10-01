@@ -3,7 +3,8 @@
 // cspell:disable
 // Pandoc 3.11's block commands: its LaTeX reader's `blockCommands` and
 // `treatAsBlock`. Pandoc reads some of their arguments by a rule of the
-// command's own; here each takes options, then groups, but `INTERLEAVED`.
+// command's own; here each takes options, then groups, but as the sets below
+// say.
 export const BLOCK_COMMANDS = new Set([
   'addbibresource',
   'addcontentsline',
@@ -98,7 +99,17 @@ export const BLOCK_COMMANDS = new Set([
   'write',
 ]);
 
-// Those Pandoc reads as headings, which take a label after them.
+// Those whose own parser takes options among their groups.
+export const INTERLEAVED = new Set([
+  'foreignblockcquote',
+  'foreignblockquote',
+  'hyphenblockcquote',
+  'hyphenblockquote',
+  'newtheorem',
+  'titleformat',
+]);
+
+// Block commands Pandoc reads as headings, each taking a label after it.
 export const SECTIONING = new Set([
   'chapter',
   'framesubtitle',
@@ -110,16 +121,6 @@ export const SECTIONING = new Set([
   'subparagraph',
   'subsection',
   'subsubsection',
-]);
-
-// Those whose own parser takes options among their groups.
-export const INTERLEAVED = new Set([
-  'foreignblockcquote',
-  'foreignblockquote',
-  'hyphenblockcquote',
-  'hyphenblockquote',
-  'newtheorem',
-  'titleformat',
 ]);
 
 // Block commands Pandoc reads inline in paragraph text: its `treatAsInline`,
@@ -209,10 +210,10 @@ export const DEFINITIONS = new Set([
 // Those whose parameters run up to the body's group.
 export const DEFS = new Set(['def', 'edef', 'gdef', 'xdef']);
 
-// Pandoc 3.11's inline commands: its LaTeX reader's `inlineCommands` (the
-// LaTeX, Inline, Citation, Lang and SIunitx modules, `\text<lang>` for each
-// polyglossia language) and `treatAsInline`, block commands and definitions
-// aside. Each is a name Pandoc reads alone on a line as no raw block.
+// Pandoc 3.11's inline commands, block commands and definitions aside: its
+// LaTeX reader's `inlineCommands`, a `\text<lang>` for each polyglossia
+// language among them, and `treatAsInline`. Pandoc reads each alone on a line
+// as no raw block.
 export const INLINE_COMMANDS = new Set(
   `
     AA AE Ac Acf Acfp Acl Aclp Acp Acrfull Acrlong Acrshort Acs Acsp Autocite

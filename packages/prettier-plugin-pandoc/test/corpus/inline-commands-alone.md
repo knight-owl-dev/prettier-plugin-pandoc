@@ -15,6 +15,9 @@ and going on below it, long enough that the formatter would join the three lines
 \noindent  
 Trailing spaces after one, long enough that the formatter would join the lines and wrap.
 
+\foo\noindent
+Touching commands ending in a bare one, long enough that the formatter would join the lines.
+
 > \noindent
 > A quote opening with one, long enough that the formatter would join and wrap it.
 
