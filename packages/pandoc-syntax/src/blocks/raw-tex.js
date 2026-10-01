@@ -2,15 +2,14 @@
 // covers exactly the characters Pandoc keeps raw. Pandoc reads blocks again
 // past the whitespace after a run, mid-line or on the next line.
 //
-// An environment is no inline, nor is a block command Pandoc does not read
-// inline: in paragraph text either ends the paragraph where it opens, unless
-// balanced brackets hold it.
+// In paragraph text, an environment or a block command Pandoc does not read
+// inline ends the paragraph where it opens, unless balanced brackets hold it.
 
 import { commandEnd, startsCommand } from '../command.js';
 import { BLANK, breaksParagraph } from '../lines.js';
 import { COMMENT_CLOSE, COMMENT_OPEN, opaqueEnd } from '../opaque.js';
 import { BEGIN } from '../tex.js';
-import { endsParagraph, gapEnd, runEnd } from './tex-run.js';
+import { endsParagraph, gapEnd, paragraphRunEnd, runEnd } from './tex-run.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
@@ -115,7 +114,7 @@ function inParagraph(lines, from, start, at) {
     }
     if (i >= lineStart) {
       const column = head + (i - lineStart);
-      const end = runEnd(lines, { k: at, i: column });
+      const end = paragraphRunEnd(lines, { k: at, i: column });
       if (end !== null) return raw(lines, at, line.start + column, end);
     }
     i = past(view.text, i);

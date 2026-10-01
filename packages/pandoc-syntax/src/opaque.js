@@ -1,6 +1,6 @@
-// Inline constructs that hold no raw TeX: code spans, HTML comments, math,
-// autolinks.
-// A paragraph break ends each but a comment.
+// Inline constructs that hold no raw TeX: code spans, HTML comments and tags,
+// math, autolinks.
+// A paragraph break ends each but a comment or a tag.
 
 import { breaksParagraph, paragraphEnd } from './lines.js';
 
@@ -13,6 +13,10 @@ const INLINE_MATH = '$';
 // left as text.
 const AUTOLINK =
   /<(?:(?:https?|ftp|file|mailto):[^\s<>]*|[^\s<>@]+@[^\s<>]+)>/y;
+
+// A tag, its attribute values included.
+const TAG =
+  /<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][-\w:.]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/y;
 
 // A code span closes on a backtick run of the same length as its opener, and
 // no longer; one never closed leaves its backticks as text.
@@ -73,6 +77,9 @@ export function opaqueEnd(text, at) {
     AUTOLINK.lastIndex = at;
     const link = AUTOLINK.exec(text);
     if (link !== null) return at + link[0].length;
+    TAG.lastIndex = at;
+    const tag = TAG.exec(text);
+    if (tag !== null) return at + tag[0].length;
   }
   if (text.startsWith(DISPLAY_MATH, at)) {
     const limit = paragraphEnd(text, at);

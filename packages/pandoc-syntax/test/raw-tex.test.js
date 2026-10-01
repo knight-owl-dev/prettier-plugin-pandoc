@@ -216,7 +216,7 @@ const CASES = {
   'brackets before it': 'a [b] \\begin{x}y\\end{x} c\n',
   'a space between brackets and parentheses': '[a] (u \\begin{x}y\\end{x}) b\n',
 
-  // So does a block command Pandoc does not also read inline.
+  // A block command Pandoc does not also read inline ends the paragraph too.
   'a block command mid-line': 'a \\section{x} b\n',
   'a starred block command with options mid-line': 'a \\section*[o]{x} b\n',
   'a block command of no arguments mid-line': 'a \\hrule b\n',
@@ -246,6 +246,24 @@ const CASES = {
     'a \\section{x} \\begin{y}z\\end{y} b\n',
   'an environment then a block command mid-line':
     'a \\begin{y}z\\end{y} b \\section{x} c\n',
+  'a block command without its argument mid-line': 'a \\section b\n',
+  'a block command with only options mid-line': 'a \\section[o] b\n',
+  'a block command short of its groups mid-line': 'a \\epigraph{x} b\n',
+  'a block command with its groups mid-line': 'a \\epigraph{x}{y} b\n',
+  'options among the groups of a block command mid-line':
+    'a \\epigraph{x}[o]{y} b\n',
+  'a block command without its argument in a heading': '# a \\section b\n',
+  'a block command short of its groups in a heading': '# a \\epigraph{x} b\n',
+  'a block command in an HTML attribute':
+    'a <span title="\\section{x}">c</span> b\n',
+  'a block command in an unquoted HTML attribute':
+    'a <span title=\\section{x}>c</span> b\n',
+  'a block command in an HTML tag across lines':
+    'a <span\ntitle="\\section{x}">c</span> b\n',
+  'a block command in a closing HTML tag': 'a </span x="\\section{x}"> b\n',
+  'a block command in what is no HTML tag': 'a <b \\section{x}> c\n',
+  'an environment in an HTML attribute':
+    'a <span title="\\begin{x}y\\end{x}">c</span> b\n',
 };
 
 // cspell:disable

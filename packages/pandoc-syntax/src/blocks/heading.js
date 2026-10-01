@@ -38,7 +38,7 @@ export const isThematicBreak = (text, syntax) =>
 
 /**
  * Pandoc wants a blank line before a heading, so `#` continues a paragraph.
- * Raw TeX ending a paragraph in its text makes it a paragraph.
+ * Raw TeX that would end a paragraph in its text makes it one.
  *
  * @type {Recognizer}
  */

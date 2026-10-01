@@ -137,6 +137,55 @@ const ALSO_INLINE = new Set([
   'vspace',
 ]);
 
+// The groups a block command needs before Pandoc reads it as a block in
+// paragraph text; none for the rest.
+const REQUIRED_GROUPS = new Map([
+  ...[
+    'addbibresource',
+    'author',
+    'bibliography',
+    'blockquote',
+    'chapter',
+    'documentclass',
+    'fancybreak',
+    'framesubtitle',
+    'frametitle',
+    'graphicspath',
+    'lstinputlisting',
+    'minisec',
+    'newtheorem',
+    'paragraph',
+    'part',
+    'plainbreak',
+    'rule',
+    'section',
+    'setdefaultlanguage',
+    'setmainlanguage',
+    'signature',
+    'subparagraph',
+    'subsection',
+    'subsubsection',
+    'theoremstyle',
+    'title',
+    'write',
+  ].map((name) => [name, 1]),
+  ...[
+    'blockcquote',
+    'epigraph',
+    'foreignblockquote',
+    'hyphenblockquote',
+    'inputminted',
+    'parbox',
+  ].map((name) => [name, 2]),
+  ...[
+    'foreignblockcquote',
+    'hyphenblockcquote',
+    'PackageError',
+    'plainfancybreak',
+  ].map((name) => [name, 3]),
+  ['titleformat', 5],
+]);
+
 // Definitions, which name what they define before their arguments.
 const DEFINITIONS = new Set([
   'DeclareMathOperator',
@@ -219,22 +268,27 @@ function groupEnd(lines, p, open, close) {
 const OPTION = ['[', ']'];
 const GROUP = ['{', '}'];
 
-// Past the options, then the groups, a command takes from `p`, each after
-// spaces on its line; with `interleaved`, the two in any order.
-function argumentsEnd(lines, p, interleaved = false) {
+// The options, then the groups, a command takes from `p`, each after spaces
+// on its line; with `interleaved`, the two in any order. Past them, and how
+// many groups.
+function argumentsOf(lines, p, interleaved = false) {
   const runs = interleaved ? [[OPTION, GROUP]] : [[OPTION], [GROUP]];
-  let end = p;
+  let [end, groups] = [p, 0];
   for (const kinds of runs) {
     for (;;) {
       const at = pastSpaces(lines, end);
       const kind = kinds.find(([open]) => textAt(lines, at)[at.i] === open);
       const past = kind === undefined ? null : groupEnd(lines, at, ...kind);
       if (past === null) break;
+      if (kind === GROUP) groups++;
       end = past;
     }
   }
-  return end;
+  return { end, groups };
 }
+
+const argumentsEnd = (lines, p, interleaved) =>
+  argumentsOf(lines, p, interleaved).end;
 
 // cspell:ignore newif
 // Past the definition `command` opens, or null when it defines nothing.
@@ -322,6 +376,27 @@ export function gapEnd(lines, p) {
   const next = lines[at.k + 1];
   if (at.i < textAt(lines, at).length || next === undefined) return at;
   return BLANK.test(next.text) ? at : pastSpaces(lines, { k: at.k + 1, i: 0 });
+}
+
+/**
+ * Where the run of raw TeX ending a paragraph at `p` ends, or null when none
+ * does: a block command there needs its groups.
+ *
+ * @param {Line[]} lines
+ * @param {Place} p
+ * @returns {Place | null}
+ */
+export function paragraphRunEnd(lines, p) {
+  const command = commandAt(lines, p);
+  if (command !== null && command.name !== 'begin') {
+    const { groups } = argumentsOf(
+      lines,
+      command.end,
+      INTERLEAVED.has(command.name),
+    );
+    if (groups < (REQUIRED_GROUPS.get(command.name) ?? 0)) return null;
+  }
+  return runEnd(lines, p);
 }
 
 /**

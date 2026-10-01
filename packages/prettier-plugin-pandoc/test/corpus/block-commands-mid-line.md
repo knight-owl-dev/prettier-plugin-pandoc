@@ -28,5 +28,11 @@ Brackets [hold \section{x}] it, and so does link text [with \section{x}](https:/
 
 Code `\section{x}` and math $\section{x}$ hold it, and so does an escape, \\section{x}.
 
+Too few groups keep one in the paragraph: \section alone, \section[o] with options only, and \epigraph{one group}, so this wraps as prose.
+
+# A heading holding a bare \section stays a heading
+
+An HTML tag holds one too, <span title="\section{x}">here</span>, so this paragraph wraps as prose.
+
 Before a quote \section{x} > the quote opening after it, long enough to wrap,
 > going on here.
