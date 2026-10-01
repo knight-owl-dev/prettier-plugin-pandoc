@@ -11,7 +11,7 @@ import { atxHeading, setextUnderline, thematicBreak } from './heading.js';
 import { htmlBlockTag, htmlComment } from './html.js';
 import { lineBlock } from './line-block.js';
 import { definitionList, exampleList, fancyList } from './list.js';
-import { texBlock, texEnvironmentInParagraph } from './raw-tex.js';
+import { texBlock, texInParagraph } from './raw-tex.js';
 import { linkReference } from './reference.js';
 import { pandocTable, pipeTable } from './table.js';
 import { yamlMetadata } from './yaml.js';
@@ -54,7 +54,7 @@ export const REGISTRY = [
   linkReference,
   // Last, and in a paragraph too: a line is paragraph text only where nothing
   // else opens on it.
-  texEnvironmentInParagraph,
+  texInParagraph,
 ];
 
 export const INTERRUPTERS = REGISTRY.filter((r) => r.interruptsParagraph);

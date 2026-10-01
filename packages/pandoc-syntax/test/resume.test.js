@@ -93,6 +93,10 @@ const CASES = {
     Object.entries(TAILS).flatMap(([name, tail]) => [
       [`${name} after an environment`, `\\begin{x}y\\end{x} ${tail}`],
       [`${name} after one in paragraph text`, `a \\begin{x}y\\end{x} ${tail}`],
+      [
+        `${name} after a block command in paragraph text`,
+        `a \\section{x} ${tail}`,
+      ],
     ]),
   ),
   'code a line after a command': '\\newpage\n        code',

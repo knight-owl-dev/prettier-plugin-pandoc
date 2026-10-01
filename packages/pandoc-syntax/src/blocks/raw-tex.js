@@ -2,14 +2,15 @@
 // covers exactly the characters Pandoc keeps raw. Pandoc reads blocks again
 // past the whitespace after a run, mid-line or on the next line.
 //
-// An environment is no inline: in paragraph text it ends the paragraph at its
-// `\begin`, wherever that sits, unless balanced brackets hold it.
+// An environment is no inline, nor is a block command Pandoc does not read
+// inline: in paragraph text either ends the paragraph where it opens, unless
+// balanced brackets hold it.
 
 import { commandEnd, startsCommand } from '../command.js';
 import { BLANK, breaksParagraph } from '../lines.js';
 import { COMMENT_CLOSE, COMMENT_OPEN, opaqueEnd } from '../opaque.js';
 import { BEGIN } from '../tex.js';
-import { gapEnd, runEnd } from './tex-run.js';
+import { endsParagraph, gapEnd, runEnd } from './tex-run.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
@@ -77,9 +78,13 @@ function viewFrom(lines, from, start, whole = false) {
   return { text, parts };
 }
 
+// Whether raw TeX may end a paragraph somewhere in `text`.
+const opensAhead = (text) => text.includes(BEGIN_PREFIX) || endsParagraph(text);
+
 /**
- * The environment in paragraph text on line `at`, and each after it on the
- * line it ends on. The paragraph is read from `start` on line `from`.
+ * The raw TeX ending the paragraph on line `at`: an environment or block
+ * command, and the run after it. The paragraph is read from `start` on line
+ * `from`.
  *
  * @param {Line[]} lines
  * @param {number} from
@@ -89,7 +94,7 @@ function viewFrom(lines, from, start, whole = false) {
  */
 function inParagraph(lines, from, start, at) {
   const line = lines[at];
-  if (!line.text.includes(BEGIN_PREFIX)) return null;
+  if (!opensAhead(line.text)) return null;
   let view = viewFrom(lines, from, start);
   const { at: lineStart, head } = view.parts[at - from];
   const lineEnd = lineStart + line.text.length - head;
@@ -102,8 +107,7 @@ function inParagraph(lines, from, start, at) {
       view = viewFrom(lines, from, start, true);
     }
     OPENS_ENVIRONMENT.lastIndex = i;
-    const name = OPENS_ENVIRONMENT.exec(view.text)?.[1];
-    if (name === undefined) {
+    if (!OPENS_ENVIRONMENT.test(view.text) && !endsParagraph(view.text, i)) {
       i =
         (view.text[i] === '[' && bracketsEnd(view.text, i)) ||
         past(view.text, i);
@@ -114,7 +118,7 @@ function inParagraph(lines, from, start, at) {
       const end = runEnd(lines, { k: at, i: column });
       if (end !== null) return raw(lines, at, line.start + column, end);
     }
-    i += BEGIN_PREFIX.length;
+    i = past(view.text, i);
   }
   return null;
 }
@@ -133,17 +137,17 @@ function raw(lines, from, start, run) {
 }
 
 /**
- * Whether line `at` holds an environment that would end a paragraph there.
+ * Whether line `at` holds raw TeX that would end a paragraph there.
  *
  * @param {Line[]} lines
  * @param {number} at
  */
-export const holdsEnvironment = (lines, at) =>
+export const holdsRaw = (lines, at) =>
   inParagraph(lines, at, lines[at].start, at) !== null;
 
 /**
- * A run opening a line at a block start. An environment in paragraph text is
- * `texEnvironmentInParagraph`'s.
+ * A run opening a line at a block start. One in paragraph text is
+ * `texInParagraph`'s.
  *
  * @type {Recognizer}
  */
@@ -157,14 +161,14 @@ export const texBlock = {
 };
 
 /**
- * An environment in paragraph text.
+ * Raw TeX in paragraph text.
  *
  * @type {Recognizer}
  */
-export const texEnvironmentInParagraph = {
-  name: 'tex-environment-in-paragraph',
+export const texInParagraph = {
+  name: 'tex-in-paragraph',
   interruptsParagraph: true,
-  opensAhead: (text) => text.includes(BEGIN_PREFIX),
+  opensAhead,
   match(lines, at, { paragraph }) {
     return paragraph === null
       ? inParagraph(lines, at, lines[at].start, at)

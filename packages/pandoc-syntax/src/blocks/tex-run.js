@@ -121,6 +121,22 @@ const INTERLEAVED = new Set([
 // In Pandoc's block map, but its parser for them reads inline text.
 const INLINE_COMMANDS = new Set(['colorbox', 'textcolor']);
 
+// Block commands Pandoc reads inline in paragraph text: its `treatAsInline`,
+// and those in its inline map.
+const ALSO_INLINE = new Set([
+  'clearpage',
+  'hspace',
+  'hypertarget',
+  'iftoggle',
+  'input',
+  'newpage',
+  'newtoggle',
+  'pagebreak',
+  'togglefalse',
+  'toggletrue',
+  'vspace',
+]);
+
 // Definitions, which name what they define before their arguments.
 const DEFINITIONS = new Set([
   'DeclareMathOperator',
@@ -146,6 +162,24 @@ const DEFS = new Set(['def', 'edef', 'gdef', 'xdef']);
 
 const OPENS_ENVIRONMENT = new RegExp(BEGIN, 'y');
 const COMMAND = /\\([A-Za-z]+)\*?/y;
+const ENDS_PARAGRAPH = new RegExp(
+  `\\\\(?:${[...BLOCK_COMMANDS].filter((name) => !ALSO_INLINE.has(name)).join('|')})(?![A-Za-z])`,
+);
+const ENDS_PARAGRAPH_AT = new RegExp(ENDS_PARAGRAPH.source, 'y');
+
+/**
+ * Whether a command in `text` may end the paragraph it sits in: a block
+ * command Pandoc does not read inline. With `at`, one at that offset.
+ *
+ * @param {string} text
+ * @param {number} [at]
+ */
+export function endsParagraph(text, at) {
+  if (at === undefined) return ENDS_PARAGRAPH.test(text);
+  ENDS_PARAGRAPH_AT.lastIndex = at;
+  return ENDS_PARAGRAPH_AT.test(text);
+}
+
 const SPACES = /[ \t]*/y;
 
 const textAt = (lines, p) => lines[p.k].text;

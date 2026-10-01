@@ -9,7 +9,7 @@
 import { BLANK, segmentsOf, strip } from '../lines.js';
 import { DIV_CLOSE } from './div.js';
 import { definitionList } from './list.js';
-import { texEnvironmentInParagraph } from './raw-tex.js';
+import { texInParagraph } from './raw-tex.js';
 import { INTERRUPTERS, ITEM_INTERRUPTERS, REGISTRY } from './registry.js';
 
 /** @typedef {import('../types.js').Block} Block */
@@ -21,9 +21,9 @@ import { INTERRUPTERS, ITEM_INTERRUPTERS, REGISTRY } from './registry.js';
 /** @typedef {import('../types.js').SpanSpec} SpanSpec */
 
 // Every block a definition term cannot be: a term is paragraph text, which
-// Pandoc reads before an environment in it can end it.
+// Pandoc reads before raw TeX in it can end it.
 const NOT_TERMS = REGISTRY.filter(
-  (r) => r !== definitionList && r !== texEnvironmentInParagraph,
+  (r) => r !== definitionList && r !== texInParagraph,
 );
 
 /**
