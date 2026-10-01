@@ -13,18 +13,24 @@ import { opaqueEnd } from '../opaque.js';
 /** @typedef {import('../types.js').InlineSpan} InlineSpan */
 /** @typedef {import('../types.js').Span} Span */
 
-const CONTAINERS = new Set(['block-quote', 'list-item', 'footnote-definition']);
+// Blocks whose text Pandoc reads as markdown.
+const READ = new Set([
+  'block-quote',
+  'list-item',
+  'footnote-definition',
+  'heading',
+]);
 
 /**
- * Where markdown is not read, in source order: every block but a container
- * or a div's body, whose fence lines are markup of their own.
+ * Where markdown is not read, in source order: every block but a container,
+ * a heading or a div's body, whose fence lines are markup of their own.
  *
  * @param {Block[]} found
  * @returns {Span[]}
  */
 function unread(found) {
   return found
-    .filter((block) => !CONTAINERS.has(block.type))
+    .filter((block) => !READ.has(block.type))
     .flatMap((block) =>
       block.type === 'div'
         ? [block.open, block.close].filter((span) => span !== null)

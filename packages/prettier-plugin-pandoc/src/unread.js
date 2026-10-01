@@ -48,6 +48,47 @@ export function folded(ast, verbatim) {
   return verbatim.filter((block) => !starts.has(block.start));
 }
 
+// Prettier's headings and thematic breaks, by the recognizer's names.
+const LINE_BLOCKS = { heading: 'heading', thematicBreak: 'thematic-break' };
+
+function lineBlocks(node, out = []) {
+  for (const child of node.children ?? []) {
+    if (LINE_BLOCKS[child.type] !== undefined) out.push(child);
+    lineBlocks(child, out);
+  }
+  return out;
+}
+
+/**
+ * Each heading or thematic break prettier finds where Pandoc reads none, as
+ * the point it starts: CommonMark lets either interrupt a paragraph, and
+ * underlines a paragraph of any length. A verbatim block's mask is a heading
+ * of the plugin's own.
+ *
+ * @param {object} ast
+ * @param {Block[]} found The recognizer's blocks.
+ * @param {Block[]} verbatim
+ * @param {string} text
+ * @returns {{start: number, end: number}[]}
+ */
+export function unreadLines(ast, found, verbatim, text) {
+  const key = (type, offset) => `${type}:${text.lastIndexOf('\n', offset - 1)}`;
+  const read = new Set(found.map((block) => key(block.type, block.start)));
+  const masks = new Set(
+    verbatim.flatMap((block) => block.segments.map((s) => s.start)),
+  );
+  return lineBlocks(ast)
+    .filter((node) => !masks.has(node.position.start.offset))
+    .filter(
+      (node) =>
+        !read.has(key(LINE_BLOCKS[node.type], node.position.start.offset)),
+    )
+    .map(({ position }) => ({
+      start: position.start.offset,
+      end: position.start.offset,
+    }));
+}
+
 /**
  * The first block the two parsers read differently, or undefined: indented
  * code or a table prettier finds, or a fence the two do not open and close on

@@ -55,6 +55,7 @@ const CASES = {
   'a line break inside the braces': 'a \\footnote{one\ntwo} b',
   'a starred command': 'a \\vspace*{1em} b',
   'a command in a heading': '# Heading \\label{h}',
+  'a command in a setext heading': 'Heading \\label{h}\n===',
   'a command in link text': '[link \\emph{x}](u)',
   'an escaped percent sign': 'a \\footnote{50\\% off} b',
   'a URL with an underscore': 'a \\url{http://x.y/a_b} b',
