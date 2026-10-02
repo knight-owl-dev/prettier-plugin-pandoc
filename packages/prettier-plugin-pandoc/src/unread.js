@@ -9,8 +9,10 @@
 // tab stop, a fence deeper than a list item's content, a table straight after
 // a paragraph line. A fence Pandoc opens where CommonMark closes one parts
 // them too. So does a block Pandoc starts mid-line, as an environment in
-// paragraph text: CommonMark folds it into the paragraph. Where the two part,
-// the block prints as written — found by comparing the trees, never predicted.
+// paragraph text: CommonMark folds it into the paragraph. And CommonMark lets
+// a heading or thematic break interrupt a paragraph, and underlines one of any
+// length, where Pandoc reads paragraph text. Where the two part, the block
+// prints as written — found by comparing the trees, never predicted.
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
@@ -46,6 +48,46 @@ function headingStarts(node, out = new Set()) {
 export function folded(ast, verbatim) {
   const starts = headingStarts(ast);
   return verbatim.filter((block) => !starts.has(block.start));
+}
+
+// Prettier's headings and thematic breaks, by the recognizer's names.
+const LINE_BLOCKS = { heading: 'heading', thematicBreak: 'thematic-break' };
+
+function lineBlocks(node, out = []) {
+  for (const child of node.children ?? []) {
+    if (LINE_BLOCKS[child.type] !== undefined) out.push(child);
+    lineBlocks(child, out);
+  }
+  return out;
+}
+
+/**
+ * Each heading or thematic break prettier finds where Pandoc reads none, as
+ * the point it starts. A verbatim block's mask is a heading of the plugin's
+ * own.
+ *
+ * @param {object} ast
+ * @param {Block[]} found The recognizer's blocks.
+ * @param {Block[]} verbatim
+ * @param {string} text
+ * @returns {{start: number, end: number}[]}
+ */
+export function unreadLines(ast, found, verbatim, text) {
+  const key = (type, offset) => `${type}:${text.lastIndexOf('\n', offset - 1)}`;
+  const read = new Set(found.map((block) => key(block.type, block.start)));
+  const masks = new Set(
+    verbatim.flatMap((block) => block.segments.map((s) => s.start)),
+  );
+  return lineBlocks(ast)
+    .filter((node) => !masks.has(node.position.start.offset))
+    .filter(
+      (node) =>
+        !read.has(key(LINE_BLOCKS[node.type], node.position.start.offset)),
+    )
+    .map(({ position }) => ({
+      start: position.start.offset,
+      end: position.start.offset,
+    }));
 }
 
 /**

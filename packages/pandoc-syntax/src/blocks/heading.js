@@ -1,6 +1,5 @@
-// Headings and thematic breaks: blocks that end on the line they start, which
-// prettier prints as Pandoc reads them. They are recognized for the block
-// start they leave behind, and nothing is reported.
+// Headings and thematic breaks: blocks that end on the line they start, a
+// setext heading on its underline.
 
 import { perSyntax } from '../syntax.js';
 import { holdsRaw } from './raw-tex.js';
@@ -15,8 +14,10 @@ const patterns = perSyntax((syntax) => ({
   thematicBreak: syntax.atBlockIndent('([-*_])([ \\t]*\\1){2,}[ \\t]*$'),
 }));
 
-const endsHere = (pattern, lines, at) =>
-  pattern.test(lines[at].text) ? { last: at } : null;
+const endsHere = (pattern, type, lines, at) =>
+  pattern.test(lines[at].text)
+    ? { last: at, spans: [{ type, from: at, to: at }] }
+    : null;
 
 /**
  * Whether a line underlines the one-line paragraph above it as a heading.
@@ -45,7 +46,8 @@ export const isThematicBreak = (text, syntax) =>
 export const atxHeading = {
   name: 'atx-heading',
   interruptsParagraph: false,
-  match: (lines, at) => (holdsRaw(lines, at) ? null : endsHere(ATX, lines, at)),
+  match: (lines, at) =>
+    holdsRaw(lines, at) ? null : endsHere(ATX, 'heading', lines, at),
 };
 
 /**
@@ -58,8 +60,17 @@ export const setextUnderline = {
   name: 'setext-underline',
   interruptsParagraph: true,
   match(lines, at, context) {
-    if (context.paragraph?.lines !== 1) return null;
-    return endsHere(patterns(context.syntax).setextUnderline, lines, at);
+    const { paragraph, syntax } = context;
+    if (paragraph?.lines !== 1) return null;
+    if (!patterns(syntax).setextUnderline.test(lines[at].text)) return null;
+    /** @type {import('../types.js').SpanSpec} */
+    const span = {
+      type: 'heading',
+      from: at - 1,
+      to: at,
+      start: paragraph.start,
+    };
+    return { last: at, spans: [span] };
   },
 };
 
@@ -68,5 +79,5 @@ export const thematicBreak = {
   name: 'thematic-break',
   interruptsParagraph: false,
   match: (lines, at, { syntax }) =>
-    endsHere(patterns(syntax).thematicBreak, lines, at),
+    endsHere(patterns(syntax).thematicBreak, 'thematic-break', lines, at),
 };

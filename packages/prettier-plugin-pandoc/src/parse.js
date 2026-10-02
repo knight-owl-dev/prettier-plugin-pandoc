@@ -13,7 +13,7 @@ import { CONTAINERS } from './nodes.js';
 import { settle } from './settle.js';
 import { stretchAround } from './stretch.js';
 import { lineEnd, stopOf } from './text.js';
-import { firstUnread, folded } from './unread.js';
+import { firstUnread, folded, unreadLines } from './unread.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
@@ -128,7 +128,11 @@ export async function parse(text, options) {
       ...at(firstMisread(constructs.containers, ast, text, masked)),
       ...[firstUnread(ast, unmasked(fences), text)].filter(Boolean),
     ].sort(byStart);
-    const local = [...folded(ast, constructs.verbatim), ...unmasked(resumed)]
+    const local = [
+      ...folded(ast, constructs.verbatim),
+      ...unmasked(resumed),
+      ...unreadLines(ast, found, constructs.verbatim, text),
+    ]
       .filter((m) => shifting === undefined || m.start < shifting.start)
       .sort(byStart);
     const stretches = [];

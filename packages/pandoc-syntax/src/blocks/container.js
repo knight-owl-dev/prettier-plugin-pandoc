@@ -113,8 +113,8 @@ function collectBody(lines, at, first, column, endsLazily, tabStop) {
 }
 
 /**
- * A list item. A list marker left of its content column opens the next item,
- * and a thematic break ends it, where either would otherwise be lazy.
+ * A list item. A list marker left of its content column opens the next item
+ * where it would otherwise be lazy; a thematic break is none, and lazy.
  *
  * @type {Recognizer}
  */
@@ -128,8 +128,7 @@ export const listItem = {
     if (marker === null) return null;
     const { column, first } = contentColumn(lines[at], marker, syntax);
     const endsLazily = (text) =>
-      isListMarker(text, syntax) ||
-      isThematicBreak(text, syntax) ||
+      (isListMarker(text, syntax) && !isThematicBreak(text, syntax)) ||
       (inDiv && DIV_CLOSE.test(text));
     const { last, content } = collectBody(
       lines,
