@@ -11,7 +11,7 @@ import { BLANK, dedent, indentOf, strip } from '../lines.js';
 import { perSyntax } from '../syntax.js';
 import { DIV_CLOSE } from './div.js';
 import { isThematicBreak } from './heading.js';
-import { isOrderedItem } from './list.js';
+import { isDefinitionMarker, isOrderedItem } from './list.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
@@ -113,8 +113,8 @@ function collectBody(lines, at, first, column, endsLazily, tabStop) {
 }
 
 /**
- * A list item. A list marker left of its content column opens the next item
- * where it would otherwise be lazy; a thematic break is none, and lazy.
+ * A list item. A line that would be lazy ends the item where it opens with a
+ * list marker, a definition's among them; a thematic break is none.
  *
  * @type {Recognizer}
  */
@@ -129,6 +129,7 @@ export const listItem = {
     const { column, first } = contentColumn(lines[at], marker, syntax);
     const endsLazily = (text) =>
       (isListMarker(text, syntax) && !isThematicBreak(text, syntax)) ||
+      isDefinitionMarker(text, syntax) ||
       (inDiv && DIV_CLOSE.test(text));
     const { last, content } = collectBody(
       lines,
