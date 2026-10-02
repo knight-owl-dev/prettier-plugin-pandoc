@@ -46,6 +46,13 @@ const CASES = {
   'a thematic break after a paragraph line': 'text\n***\n',
   'underscores after a paragraph line': 'text\n___\n',
   'spaced dashes after a paragraph line': 'text\n- - -\n',
+  'asterisks after a list item line': '- a\n***\n',
+  'spaced asterisks after a list item line': '- a\n* * *\n',
+  'spaced dashes after a list item line': '- a\n- - -\n',
+  'underscores after an ordered item line': '1. a\n___\n',
+  'an underline below a list item line': '- a\n---\n',
+  'an underline below two list item lines': '- a\n  b\n---\n',
+  'a thematic break after a list item and a blank line': '- a\n\n***\n',
   'a heading after an environment on its line': '\\begin{x}y\\end{x} # H\n',
   'a setext heading after an environment on its line':
     '\\begin{x}y\\end{x} text\n===\n',

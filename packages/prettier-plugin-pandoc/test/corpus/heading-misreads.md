@@ -29,6 +29,15 @@ of a paragraph long enough that the formatter would join and wrap it
 > A quote's line, long enough that the formatter would join it and wrap it
 > # continued in the quote
 
+- A list item's line, long enough that the formatter would join it and wrap it
+***
+
+- Another item's line, long enough that the formatter would join it and wrap
+* * *
+
+- An underlined item
+---
+
 A setext heading
 ---
 

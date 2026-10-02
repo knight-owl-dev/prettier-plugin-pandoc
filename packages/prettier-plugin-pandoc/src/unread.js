@@ -9,8 +9,10 @@
 // tab stop, a fence deeper than a list item's content, a table straight after
 // a paragraph line. A fence Pandoc opens where CommonMark closes one parts
 // them too. So does a block Pandoc starts mid-line, as an environment in
-// paragraph text: CommonMark folds it into the paragraph. Where the two part,
-// the block prints as written — found by comparing the trees, never predicted.
+// paragraph text: CommonMark folds it into the paragraph. And CommonMark lets
+// a heading or thematic break interrupt a paragraph, and underlines one of any
+// length, where Pandoc reads paragraph text. Where the two part, the block
+// prints as written — found by comparing the trees, never predicted.
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 
@@ -61,9 +63,8 @@ function lineBlocks(node, out = []) {
 
 /**
  * Each heading or thematic break prettier finds where Pandoc reads none, as
- * the point it starts: CommonMark lets either interrupt a paragraph, and
- * underlines a paragraph of any length. A verbatim block's mask is a heading
- * of the plugin's own.
+ * the point it starts. A verbatim block's mask is a heading of the plugin's
+ * own.
  *
  * @param {object} ast
  * @param {Block[]} found The recognizer's blocks.
