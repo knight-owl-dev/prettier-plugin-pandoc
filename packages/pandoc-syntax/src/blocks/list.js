@@ -65,6 +65,16 @@ function opensItem(pattern, text, syntax) {
 const isExampleItem = (text, syntax) => opensItem(EXAMPLE_MARKER, text, syntax);
 
 /**
+ * Whether a line opens a definition: a marker, and its text or nothing.
+ *
+ * @param {string} text
+ * @param {Syntax} syntax
+ * @returns {boolean}
+ */
+export const isDefinitionMarker = (text, syntax) =>
+  patterns(syntax).definitionMarker.test(text);
+
+/**
  * Whether a line opens an ordered list item, in any of Pandoc's styles.
  *
  * @param {string} text

@@ -22,3 +22,14 @@ text of a div continued lazily
 
 > A paragraph continued
 lazily, which CommonMark agrees with.
+
+- An item whose next line opens with a definition marker, which ends the item
+Term
+:   so this is a paragraph to Pandoc, long enough that the formatter wraps it.
+
+- Another item
+:   with a definition marker straight after it, a paragraph's first line here
+1) and no fancy list, long enough that the formatter would join and wrap it.
+
+> - An item in a quote
+> ~   ended the same way by a tilde marker, long enough that the formatter wraps.

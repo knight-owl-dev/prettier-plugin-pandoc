@@ -122,10 +122,10 @@ export async function parse(text, options) {
     );
   // The stretches this parse settles, in order.
   const misread = (ast, masked) => {
-    const at = (offset) =>
-      offset === undefined ? [] : [{ start: offset, end: offset }];
     const [shifting] = [
-      ...at(firstMisread(constructs.containers, ast, text, masked)),
+      ...[firstMisread(constructs.containers, ast, text, masked)].filter(
+        Boolean,
+      ),
       ...[firstUnread(ast, unmasked(fences), text)].filter(Boolean),
     ].sort(byStart);
     const local = [

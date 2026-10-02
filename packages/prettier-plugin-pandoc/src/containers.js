@@ -41,14 +41,15 @@ export function containerNodes(node, out = []) {
  * Where the first container the two parsers bound differently sits, or
  * undefined: one of the recognizer's that prettier's parser bounds elsewhere,
  * or one of prettier's the recognizer never found. Each is found by where its
- * marker sits. Their ends agree when all between them is what the masks
- * blanked, a quote's bare `>` included.
+ * marker sits, and runs as far as either parser takes it. Their ends agree
+ * when all between them is what the masks blanked, a quote's bare `>`
+ * included.
  *
  * @param {Block[]} containers
  * @param {object} ast
  * @param {string} text
  * @param {string} masked
- * @returns {number | undefined} The offset of the container's marker.
+ * @returns {{start: number, end: number} | undefined}
  */
 export function firstMisread(containers, ast, text, masked) {
   const markerOf = (container) =>
@@ -57,13 +58,13 @@ export function firstMisread(containers, ast, text, masked) {
   const byMarker = new Map(
     nodes.map((n) => [`${n.type}@${n.position.start.offset}`, n]),
   );
+  const nodeOf = (container) =>
+    byMarker.get(`${NODE_TYPE[container.type]}@${markerOf(container)}`);
   const bounded = new Set(
     containers.map((c) => `${NODE_TYPE[c.type]}@${markerOf(c)}`),
   );
   const parted = containers.find((container) => {
-    const node = byMarker.get(
-      `${NODE_TYPE[container.type]}@${markerOf(container)}`,
-    );
+    const node = nodeOf(container);
     if (node === undefined) return true;
     const end = node.position.end.offset;
     return (
@@ -73,9 +74,16 @@ export function firstMisread(containers, ast, text, masked) {
   const extra = nodes.find(
     (n) => !bounded.has(`${n.type}@${n.position.start.offset}`),
   );
-  const offsets = [
-    parted === undefined ? undefined : markerOf(parted),
-    extra?.position.start.offset,
-  ].filter((offset) => offset !== undefined);
-  return offsets.length === 0 ? undefined : Math.min(...offsets);
+  const misreads = [
+    parted && {
+      start: markerOf(parted),
+      end: Math.max(parted.end, nodeOf(parted)?.position.end.offset ?? 0),
+    },
+    extra && {
+      start: extra.position.start.offset,
+      end: extra.position.end.offset,
+    },
+  ].filter(Boolean);
+  if (misreads.length === 0) return undefined;
+  return misreads.reduce((a, b) => (b.start < a.start ? b : a));
 }
