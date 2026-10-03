@@ -13,10 +13,11 @@ import plugin from '../src/index.js';
 const base = markdown.parsers.markdown;
 const { parse } = base;
 let parses = 0;
-base.parse = (...args) => {
+const counted = (...args) => {
   parses++;
   return parse.apply(base, args);
 };
+base.parse = counted;
 afterEach(() => {
   parses = 0;
 });
@@ -43,3 +44,17 @@ for (const [name, text] of Object.entries({
     assert.equal(parses, 2);
   });
 }
+
+// A parse that ignores the mask reads the same misread on every pass.
+test('a misread that never settles fails instead of hanging', async () => {
+  const text = 'Para \\begin{x}a\\end{x} b\n';
+  base.parse = (_, options) => parse.call(base, text, options);
+  try {
+    await assert.rejects(
+      prettier.format(text, { parser: 'markdown', plugins: [plugin] }),
+      /never settles/,
+    );
+  } finally {
+    base.parse = counted;
+  }
+});

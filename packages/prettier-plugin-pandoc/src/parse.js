@@ -85,6 +85,22 @@ function afterRaw(found, text) {
 }
 
 /**
+ * Throw where a pass would not print more as written: a stretch already held
+ * as written changes nothing in the mask, so a pass of only those never ends.
+ *
+ * @param {{start: number, end: number}[]} stretches
+ * @param {{start: number, end: number}[]} verbatim
+ */
+function settles(stretches, verbatim) {
+  const held = (s) =>
+    verbatim.some((v) => v.start <= s.start && s.end <= v.end);
+  if (stretches.every(held)) {
+    const [{ start, end }] = stretches;
+    throw new Error(`a misread at offsets ${start}–${end} never settles`);
+  }
+}
+
+/**
  * The constructs to mask with `stretch` printed as written instead: whatever
  * it holds is its to print, and a mask inside it would overlap its own.
  */
@@ -121,7 +137,8 @@ export async function parse(text, options) {
   // A misread in a container or a fence can shift everything after it, so
   // none after it is judged before the document is parsed again. One printed
   // as written up to a blank line shifts nothing, so the next is settled on
-  // the same parse. Every pass prints more as written, so the loop ends.
+  // the same parse. Every pass prints more as written, so the loop ends:
+  // `settles` enforces it.
   const fences = found.filter((block) => block.type === 'fenced-code');
   const resumed = afterRaw(found, text);
   // A block counts until a stretch printed as written holds all of it.
@@ -165,6 +182,7 @@ export async function parse(text, options) {
     stretches.length > 0;
     stretches = misread(ast, masked)
   ) {
+    settles(stretches, constructs.verbatim);
     for (const stretch of stretches) {
       constructs = withStretch(constructs, stretch);
     }
