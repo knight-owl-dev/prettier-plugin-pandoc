@@ -2,9 +2,8 @@
 
 // cspell:disable
 // Pandoc 3.11's block commands: its LaTeX reader's `blockCommands` and
-// `treatAsBlock`. Pandoc reads some of their arguments by a rule of the
-// command's own; here each takes options, then groups, but as the sets below
-// say.
+// `treatAsBlock`. Each reads its arguments by its own rule:
+// `tex-arguments.js`.
 export const BLOCK_COMMANDS = new Set([
   'addbibresource',
   'addcontentsline',
@@ -99,30 +98,6 @@ export const BLOCK_COMMANDS = new Set([
   'write',
 ]);
 
-// Those whose own parser takes options among their groups.
-export const INTERLEAVED = new Set([
-  'foreignblockcquote',
-  'foreignblockquote',
-  'hyphenblockcquote',
-  'hyphenblockquote',
-  'newtheorem',
-  'titleformat',
-]);
-
-// Block commands Pandoc reads as headings, each taking a label after it.
-export const SECTIONING = new Set([
-  'chapter',
-  'framesubtitle',
-  'frametitle',
-  'minisec',
-  'paragraph',
-  'part',
-  'section',
-  'subparagraph',
-  'subsection',
-  'subsubsection',
-]);
-
 // Block commands Pandoc reads inline in paragraph text: its `treatAsInline`,
 // and those in its inline map.
 export const ALSO_INLINE = new Set([
@@ -137,55 +112,6 @@ export const ALSO_INLINE = new Set([
   'togglefalse',
   'toggletrue',
   'vspace',
-]);
-
-// The groups a block command needs before Pandoc reads it as a block in
-// paragraph text; none for the rest.
-export const REQUIRED_GROUPS = new Map([
-  ...[
-    'addbibresource',
-    'author',
-    'bibliography',
-    'blockquote',
-    'chapter',
-    'documentclass',
-    'fancybreak',
-    'framesubtitle',
-    'frametitle',
-    'graphicspath',
-    'lstinputlisting',
-    'minisec',
-    'newtheorem',
-    'paragraph',
-    'part',
-    'plainbreak',
-    'rule',
-    'section',
-    'setdefaultlanguage',
-    'setmainlanguage',
-    'signature',
-    'subparagraph',
-    'subsection',
-    'subsubsection',
-    'theoremstyle',
-    'title',
-    'write',
-  ].map((name) => [name, 1]),
-  ...[
-    'blockcquote',
-    'epigraph',
-    'foreignblockquote',
-    'hyphenblockquote',
-    'inputminted',
-    'parbox',
-  ].map((name) => [name, 2]),
-  ...[
-    'foreignblockcquote',
-    'hyphenblockcquote',
-    'PackageError',
-    'plainfancybreak',
-  ].map((name) => [name, 3]),
-  ['titleformat', 5],
 ]);
 
 // Definitions, which name what they define before their arguments.

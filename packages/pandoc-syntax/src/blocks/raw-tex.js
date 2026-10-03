@@ -9,7 +9,7 @@ import { commandEnd, startsCommand } from '../command.js';
 import { BLANK, breaksParagraph } from '../lines.js';
 import { COMMENT_CLOSE, COMMENT_OPEN, opaqueEnd } from '../opaque.js';
 import { BEGIN } from '../tex.js';
-import { endsParagraph, gapEnd, paragraphRunEnd, runEnd } from './tex-run.js';
+import { endsParagraph, gapEnd, runEnd } from './tex-run.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
@@ -114,7 +114,7 @@ function inParagraph(lines, from, start, at) {
     }
     if (i >= lineStart) {
       const column = head + (i - lineStart);
-      const end = paragraphRunEnd(lines, { k: at, i: column });
+      const end = runEnd(lines, { k: at, i: column });
       if (end !== null) return raw(lines, at, line.start + column, end);
     }
     i = past(view.text, i);
