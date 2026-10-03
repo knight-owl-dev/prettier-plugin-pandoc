@@ -28,7 +28,7 @@ function uncovered(text, tabStop) {
   const found = blocks(text, { tabStop });
   const spans = [
     ...found.filter((block) => block.type === 'raw-tex'),
-    ...inlines(text, found),
+    ...inlines(text, found).filter((span) => span.type === 'raw-tex'),
   ]
     .sort((a, b) => a.start - b.start)
     .map((s) => text.slice(s.start, s.end));
@@ -104,7 +104,10 @@ for (const [name, text] of Object.entries({
   'an HTML comment': 'a <!-- \\emph{x} --> b',
   'an autolink': 'a <http://x.y/\\emph{x}> b',
 })) {
-  test(`${name}: no span claims it`, () => {
-    assert.deepEqual(inlines(`${text}\n`), []);
+  test(`${name}: no raw TeX span claims it`, () => {
+    assert.deepEqual(
+      inlines(`${text}\n`).filter((span) => span.type === 'raw-tex'),
+      [],
+    );
   });
 }

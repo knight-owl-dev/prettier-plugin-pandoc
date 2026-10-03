@@ -18,11 +18,12 @@ const blank = (length) => ' '.repeat(length);
 const HEADING = '#';
 const heading = (length) => HEADING + blank(length - HEADING.length);
 
-// Inline raw TeX becomes a code span, which prettier neither wraps nor reads
-// markdown inside.
+// Inline raw TeX and math become code spans, which prettier neither wraps nor
+// reads markdown inside. A formula's keeps a `$` in its line, where a `$$`
+// opening the line would otherwise open a math block to prettier's parser.
 const CODE_SPAN = '`';
-const codeSpan = (length) =>
-  CODE_SPAN + 'x'.repeat(length - 2 * CODE_SPAN.length) + CODE_SPAN;
+const codeSpan = (fill) => (length) =>
+  CODE_SPAN + fill.repeat(length - 2 * CODE_SPAN.length) + CODE_SPAN;
 
 // A code span needs a delimiter at each end and something between. Anything
 // shorter holds no space to wrap at and no markdown to rewrite.
@@ -39,8 +40,13 @@ export function joinTouching(spans) {
   const joined = [];
   for (const span of spans) {
     const last = joined.at(-1);
-    if (last !== undefined && last.end === span.start) last.end = span.end;
-    else joined.push({ start: span.start, end: span.end });
+    if (last !== undefined && last.end === span.start) {
+      last.end = span.end;
+      // A run holding a formula masks as one.
+      if (span.type === 'math') last.type = 'math';
+    } else {
+      joined.push({ type: span.type, start: span.start, end: span.end });
+    }
   }
   return joined;
 }
@@ -78,7 +84,10 @@ export function mask(text, { divs, verbatim, inlineRaw }) {
         .filter((segment) => segment.end > segment.start)
         .map((segment) => ({ ...segment, fill: heading })),
     ),
-    ...inlineRaw.map((span) => ({ ...span, fill: codeSpan })),
+    ...inlineRaw.map((span) => ({
+      ...span,
+      fill: codeSpan(span.type === 'math' ? '$' : 'x'),
+    })),
   ].sort((a, b) => a.start - b.start);
 
   let masked = '';

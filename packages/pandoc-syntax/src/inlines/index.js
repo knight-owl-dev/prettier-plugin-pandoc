@@ -1,9 +1,11 @@
-// Where Pandoc's inline raw TeX is, in the text Pandoc reads as markdown.
+// Where Pandoc's inline raw TeX and math are, in the text Pandoc reads as
+// markdown.
 //
 // Pandoc keeps a TeX command and its arguments raw: `\footnote{see *this*}` is
-// one raw span, the emphasis inside it included. Every raw inline Pandoc finds
+// one raw span, the emphasis inside it included. A formula keeps its text,
+// line breaks and spaces with it. Every raw inline and formula Pandoc finds
 // lies inside one span here, so a caller that leaves the spans as written
-// leaves Pandoc's raw text alone.
+// leaves Pandoc's text alone.
 
 import { blocks } from '../blocks/index.js';
 import { commandEnd, startsCommand } from '../command.js';
@@ -12,6 +14,8 @@ import { opaqueEnd } from '../opaque.js';
 /** @typedef {import('../types.js').Block} Block */
 /** @typedef {import('../types.js').InlineSpan} InlineSpan */
 /** @typedef {import('../types.js').Span} Span */
+
+const MATH = '$';
 
 // Blocks whose text Pandoc reads as markdown.
 const READ = new Set([
@@ -41,7 +45,7 @@ function unread(found) {
 }
 
 /**
- * Find every inline raw TeX span, in source order.
+ * Find every inline raw TeX and math span, in source order.
  *
  * @param {string} text Pandoc markdown.
  * @param {Block[]} [found] What `blocks` found in `text`, for a caller that
@@ -62,6 +66,7 @@ export function inlines(text, found = blocks(text)) {
     }
     const past = opaqueEnd(text, i);
     if (past > i) {
+      if (text[i] === MATH) spans.push({ type: 'math', start: i, end: past });
       i = past;
       continue;
     }
