@@ -19,7 +19,7 @@ import { DEFAULT_TAB_STOP } from '@knight-owl-dev/pandoc-syntax';
 import * as markdown from 'prettier/plugins/markdown';
 import { VISITOR_KEYS } from './nodes.js';
 import { parse } from './parse.js';
-import { print } from './print.js';
+import { print, printPrettierIgnored } from './print.js';
 
 const AST_FORMAT = 'mdast-pandoc';
 const mdast = markdown.printers.mdast;
@@ -47,7 +47,7 @@ export const parsers = {
 };
 
 export const printers = {
-  [AST_FORMAT]: { ...mdast, print, getVisitorKeys },
+  [AST_FORMAT]: { ...mdast, print, printPrettierIgnored, getVisitorKeys },
 };
 
 export default { options, parsers, printers };

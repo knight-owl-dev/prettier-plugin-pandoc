@@ -7,7 +7,14 @@ import * as markdown from 'prettier/plugins/markdown';
 import { DIV, isInlineRaw, JOINED, VERBATIM } from './nodes.js';
 import { breaksParagraph, keepsBreak } from './wrap.js';
 
-const { align, hardline, literalline, markAsRoot } = doc.builders;
+const {
+  align,
+  hardline,
+  label,
+  literalline,
+  literallineWithoutBreakParent,
+  markAsRoot,
+} = doc.builders;
 const { replaceEndOfLine } = doc.utils;
 const mdast = markdown.printers.mdast;
 
@@ -29,6 +36,10 @@ const longestRun = (text, char) =>
 // block sits at — a quote's `>`, a list item's indentation.
 const asWritten = (value) => markAsRoot(replaceEndOfLine(value, literalline));
 
+// A line break as `asWritten` writes one, keeping the spaces before it, which
+// in code are content.
+const keptLine = markAsRoot(literalline);
+
 /**
  * Code prints as written: a sample's two trailing spaces are a hard break it
  * shows. An unclosed fence at the end of the file keeps the file's last
@@ -47,7 +58,7 @@ function printCode(node, options) {
     Math.max(SHORTEST_FENCE, longestRun(value, '`') + 1),
   );
   const info = [node.lang ?? '', node.meta ? ` ${node.meta}` : ''];
-  return [fence, ...info, hardline, asWritten(value), hardline, fence];
+  return [fence, ...info, hardline, asWritten(value), keptLine, fence];
 }
 
 // `***x***` is strong around emphasis to Pandoc and emphasis around strong to
@@ -110,6 +121,45 @@ function printList(path, options, printChild) {
   );
 }
 
+// A block whose last line ends in spaces or tabs. The line after it is its
+// parent's.
+const TRAILING_SPACE = 'pandocTrailingSpace';
+const ENDS_IN_SPACE = /[ \t]$/;
+
+/**
+ * `root` with the hard line after each block so labelled kept.
+ *
+ * @param {unknown} root
+ */
+function keepTrailingSpace(root) {
+  let after = false;
+  const walk = (part) => {
+    if (typeof part === 'string') {
+      if (part !== '') after = false;
+      return part;
+    }
+    if (Array.isArray(part)) return part.map(walk);
+    if (part.type === 'line' && part.hard) {
+      const keep = after && !part.literal;
+      after = false;
+      return keep ? markAsRoot(literallineWithoutBreakParent) : part;
+    }
+    if (part.type === 'if-break') {
+      return {
+        ...part,
+        breakContents: walk(part.breakContents),
+        flatContents: walk(part.flatContents),
+      };
+    }
+    if (part.type === 'fill') return { ...part, parts: walk(part.parts) };
+    if (part.contents === undefined) return part;
+    const walked = { ...part, contents: walk(part.contents) };
+    if (part.type === 'label' && part.label === TRAILING_SPACE) after = true;
+    return walked;
+  };
+  return walk(root);
+}
+
 // A div: its fences as written, its body formatted. An unclosed div prints no
 // close, since adding one would repair it.
 function printDiv(path, printChild) {
@@ -120,6 +170,20 @@ function printDiv(path, printChild) {
   }, 'children');
   const close = node.close === null ? [] : [hardline, node.close];
   return [node.open, ...body, ...close];
+}
+
+/**
+ * A node prettier-ignore holds, as its source: labelled as a printed verbatim
+ * block is.
+ *
+ * @param {object} path
+ * @param {object} options
+ */
+export function printPrettierIgnored(path, options) {
+  const source = mdast.printPrettierIgnored(path, options);
+  return typeof source === 'string' && ENDS_IN_SPACE.test(source)
+    ? label(TRAILING_SPACE, source)
+    : source;
 }
 
 /**
@@ -134,7 +198,9 @@ export function print(path, options, printChild) {
     case DIV:
       return printDiv(path, printChild);
     case VERBATIM:
-      return asWritten(node.value);
+      return ENDS_IN_SPACE.test(node.value)
+        ? label(TRAILING_SPACE, asWritten(node.value))
+        : asWritten(node.value);
     case JOINED: {
       const [paragraph, verbatim] = path.map(printChild, 'children');
       return [paragraph, asWritten(node.hardBreak ? '  \n' : '\n'), verbatim];
@@ -155,6 +221,8 @@ export function print(path, options, printChild) {
         printTripleRun(path, options, printChild) ??
         mdast.print(path, options, printChild)
       );
+    case 'root':
+      return keepTrailingSpace(mdast.print(path, options, printChild));
     default:
       return mdast.print(path, options, printChild);
   }
