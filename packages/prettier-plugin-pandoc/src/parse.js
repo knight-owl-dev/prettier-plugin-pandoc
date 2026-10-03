@@ -43,6 +43,47 @@ const startOf = (block) =>
 
 const byStart = (a, b) => a.start - b.start;
 
+// The parses the choice of spans to mask may take to settle.
+const SETTLING = 8;
+
+// Where prettier prints the text it parsed, mask and all: raw HTML, a math
+// block, a liquid tag or wiki link, a reference definition and an image
+// whole, and a link past its text — its destination and title.
+const LITERAL = new Set([
+  'html',
+  'math',
+  'liquidNode',
+  'wikiLink',
+  'definition',
+  'image',
+  'imageReference',
+]);
+const PAST_TEXT = new Set(['link', 'linkReference']);
+
+function literalSpans(node, out = []) {
+  const { position } = node;
+  if (LITERAL.has(node.type) && position !== undefined) {
+    out.push({ start: position.start.offset, end: position.end.offset });
+  } else if (PAST_TEXT.has(node.type) && position !== undefined) {
+    const text = node.children?.at(-1)?.position;
+    const start = text?.end.offset ?? position.start.offset;
+    out.push({ start, end: position.end.offset });
+  }
+  for (const child of node.children ?? []) literalSpans(child, out);
+  return out;
+}
+
+const sameSpans = (a, b) =>
+  a.length === b.length && a.every((span, n) => span === b[n]);
+
+// The spans starting inside any of `within`.
+const spansIn = (within, spans) =>
+  new Set(
+    spans.filter((s) =>
+      within.some((w) => w.start <= s.start && s.start < w.end),
+    ),
+  );
+
 // The blocks outside every block printed as written, which prints what it
 // holds: a definition list's definitions, say.
 function outsideVerbatim(found) {
@@ -150,7 +191,7 @@ export async function parse(text, options) {
         ),
     );
   // The stretches this parse settles, in order.
-  const misread = (ast, masked) => {
+  const misread = (ast, masked, moving) => {
     const [shifting] = [
       ...[firstMisread(constructs.containers, ast, text, masked)].filter(
         Boolean,
@@ -158,6 +199,7 @@ export async function parse(text, options) {
       ...[firstUnread(ast, unmasked(fences), text)].filter(Boolean),
     ].sort(byStart);
     const local = [
+      ...moving,
       ...folded(ast, constructs.verbatim),
       ...unmasked(resumed),
       ...unreadLines(ast, found, constructs.verbatim, text),
@@ -175,22 +217,51 @@ export async function parse(text, options) {
     }
     return stretches;
   };
-  let masked = mask(text, constructs);
-  let ast = await base.parse(masked, options);
+  // Prettier prints some text as it parsed it, `literalSpans`, so a span there
+  // stays unmasked — there in the parse it prints from, since a mask can hide
+  // the tag that opens or ends that text. Each parse unmasks the spans it puts
+  // there and masks again those it no longer does, until none moves. A span
+  // that moves back, or still moves after `SETTLING` rounds, is one the two
+  // parsers cannot agree on: a misread, printed as written. Each pass starts
+  // from where the last one settled.
+  let leftOut = new Set();
+  const parseMasked = async () => {
+    const all = constructs.inlineRaw;
+    let masks = all.filter((span) => !leftOut.has(span));
+    let before = null;
+    for (let round = 1; ; round++) {
+      const masked = mask(text, { ...constructs, inlineRaw: masks });
+      const ast = await base.parse(masked, options);
+      const inLiteral = spansIn(literalSpans(ast), all);
+      const next = all.filter((span) => !inLiteral.has(span));
+      const masking = new Set(masks);
+      const moving = all.filter(
+        (span) => masking.has(span) === inLiteral.has(span),
+      );
+      // Back where it was two parses ago: it moves for good.
+      const cycles = before !== null && sameSpans(next, before);
+      if (moving.length === 0 || cycles || round === SETTLING) {
+        leftOut = new Set(all.filter((span) => inLiteral.has(span)));
+        return { masked, ast, inlineRaw: masks, moving };
+      }
+      before = masks;
+      masks = next;
+    }
+  };
+  let { masked, ast, inlineRaw, moving } = await parseMasked();
   for (
-    let stretches = misread(ast, masked);
+    let stretches = misread(ast, masked, moving);
     stretches.length > 0;
-    stretches = misread(ast, masked)
+    stretches = misread(ast, masked, moving)
   ) {
     settles(stretches, constructs.verbatim);
     for (const stretch of stretches) {
       constructs = withStretch(constructs, stretch);
     }
-    masked = mask(text, constructs);
-    ast = await base.parse(masked, options);
+    ({ masked, ast, inlineRaw, moving } = await parseMasked());
   }
 
-  settle(ast, constructs, text, tabStop);
+  settle(ast, { ...constructs, inlineRaw }, text, tabStop);
   ast[CONTAINERS] = found.filter(isContainer);
   return ast;
 }

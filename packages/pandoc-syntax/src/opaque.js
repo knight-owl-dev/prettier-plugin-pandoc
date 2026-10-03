@@ -32,22 +32,47 @@ function codeSpanEnd(text, at) {
     : match.index + run.length;
 }
 
-// Inline math opens on a `$` before a non-space and closes on one after a
-// non-space, not followed by a digit — so a price stays a price. A paragraph
-// break ends the search.
+// The offset past the balanced group opening at `at`, or null when none closes
+// before a paragraph break.
+function bracedEnd(text, at) {
+  let depth = 0;
+  for (let i = at; i < text.length; i++) {
+    const char = text[i];
+    if (char === '\\') i++;
+    else if (char === '\n' && breaksParagraph(text, i)) return null;
+    else if (char === '{') depth++;
+    else if (char === '}' && --depth === 0) return i + 1;
+  }
+  return null;
+}
+
+// What may not come before a formula's closing `$`.
+const SPACING = /[ \t\n]/;
+
+// What follows `\text` in a formula: a group Pandoc reads whole, a `$` in it
+// included.
+const TEXT_GROUP = '\\text{';
+
+// Inline math opens on a `$` before a non-space and closes on one after
+// anything but a space, a tab or a newline, an escaped character included,
+// not followed by a digit — so a price stays a price. A paragraph break ends
+// the search, and so does a `$` that cannot close: a formula holds none
+// outside a `\text` group.
 function inlineMathEnd(text, at) {
   const first = text[at + 1] ?? '';
   if (!/\S/.test(first) || first === INLINE_MATH) return at;
+  let escaped = -1;
   for (let i = at + 1; i < text.length; i++) {
     const char = text[i];
-    if (char === '\\') i++;
+    if (text.startsWith(TEXT_GROUP, i)) {
+      const end = bracedEnd(text, i + TEXT_GROUP.length - 1);
+      if (end !== null) i = end - 1;
+    } else if (char === '\\') escaped = ++i;
     else if (char === '\n' && breaksParagraph(text, i)) break;
-    else if (
-      char === INLINE_MATH &&
-      /\S/.test(text[i - 1]) &&
-      !/\d/.test(text[i + 1] ?? '')
-    ) {
-      return i + 1;
+    else if (char === INLINE_MATH) {
+      const after = escaped === i - 1 || !SPACING.test(text[i - 1]);
+      const closes = after && !/\d/.test(text[i + 1] ?? '');
+      return closes ? i + 1 : at;
     }
   }
   return at;

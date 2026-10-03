@@ -126,7 +126,7 @@
 
 /**
  * @typedef {object} InlineSpan
- * @property {'raw-tex'} type
+ * @property {'raw-tex' | 'math'} type
  * @property {number} start
  * @property {number} end
  */
