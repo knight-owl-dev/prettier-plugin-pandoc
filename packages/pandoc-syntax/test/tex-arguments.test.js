@@ -6,10 +6,10 @@
 // cspell:disable
 
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { test } from 'node:test';
 import { blocks } from '../src/index.js';
 import { BLOCK_COMMANDS } from '../src/tex-names.js';
+import { rawBlocksOf, readPandocEach } from './helpers/pandoc.js';
 
 const SHAPES = {
   'groups on its line': (c) => `\\${c}{a}{b}{c}{d}{e}{f} z`,
@@ -29,28 +29,6 @@ const SHAPES = {
   'punctuation after its group': (c) => `\\${c}{a}. z`,
   'a label on the next line': (c) => `\\${c}{a}\n\\label{b} z`,
   'three groups, the last two on the next line': (c) => `\\${c}{a}\n{b}{c} z`,
-};
-
-function pandoc(text) {
-  return new Promise((resolve, reject) => {
-    const run = spawn('pandoc', ['-f', 'markdown', '-t', 'json']);
-    let out = '';
-    run.stdout.on('data', (chunk) => {
-      out += chunk;
-    });
-    run.on('error', reject);
-    run.on('close', () => resolve(out));
-    run.stdin.end(text);
-  });
-}
-
-const rawOf = (json) => {
-  const found = [];
-  JSON.parse(json, (_, value) => {
-    if (value?.t === 'RawBlock') found.push(value.c[1]);
-    return value;
-  });
-  return found;
 };
 
 // Arguments whose own content decides: what each parser rejects inside, what
@@ -87,23 +65,13 @@ const cases = [
   ...EDGES.map((text) => ({ title: JSON.stringify(text), text: `${text}\n` })),
 ];
 
-// One Pandoc per case, a few at a time: a raw block can swallow any separator
-// between cases.
-const PARALLEL = 16;
-const read = [];
-for (let i = 0; i < cases.length; i += PARALLEL) {
-  read.push(
-    ...(await Promise.all(
-      cases.slice(i, i + PARALLEL).map((c) => pandoc(c.text)),
-    )),
-  );
-}
+const read = await readPandocEach(cases.map((c) => c.text));
 
 cases.forEach(({ title, text }, i) => {
   test(title, () => {
     const recognized = blocks(text)
       .filter((block) => block.type === 'raw-tex')
       .map((block) => text.slice(block.start, block.end));
-    assert.deepEqual(recognized, rawOf(read[i]));
+    assert.deepEqual(recognized, rawBlocksOf(read[i]));
   });
 });

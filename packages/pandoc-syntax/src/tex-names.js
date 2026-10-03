@@ -114,6 +114,124 @@ export const ALSO_INLINE = new Set([
   'vspace',
 ]);
 
+// Pandoc 3.11's inline environments, its math ones: never a raw block, inline
+// text wherever they sit.
+export const INLINE_ENVIRONMENTS = new Set(
+  [
+    'align',
+    'alignat',
+    'darray',
+    'dgroup',
+    'displaymath',
+    'dmath',
+    'eqnarray',
+    'equation',
+    'flalign',
+    'gather',
+    'math',
+    'multline',
+    'subequations',
+  ].flatMap((name) =>
+    name === 'displaymath' || name === 'math' || name === 'subequations'
+      ? [name]
+      : [name, `${name}*`],
+  ),
+);
+
+// Inline commands with an argument Pandoc reads raw, by the kind of each of
+// their first arguments: `r` raw, `i` inlines, `e` inlines that hold an
+// environment. Every other inline command reads its arguments as inlines; a
+// block in one fails the command.
+export const INLINE_ARGUMENTS = new Map([
+  ...[
+    'Ac',
+    'Acf',
+    'Acfp',
+    'Acl',
+    'Aclp',
+    'Acp',
+    'Acrfull',
+    'Acrlong',
+    'Acrshort',
+    'Acs',
+    'Acsp',
+    'GLSdesc',
+    'GLSdescplural',
+    'Gls',
+    'Glsdesc',
+    'Glsdescplural',
+    'Glspl',
+    'Verb',
+    'ac',
+    'acf',
+    'acfp',
+    'acl',
+    'aclp',
+    'acp',
+    'acrfull',
+    'acrlong',
+    'acrshort',
+    'acs',
+    'acsp',
+    'ang',
+    'bibstring',
+    'ensuremath',
+    'footnote',
+    'footnotetext',
+    'gls',
+    'glsdesc',
+    'glsdescplural',
+    'glspl',
+    'includegraphics',
+    'includesvg',
+    'lstinline',
+    'nolinkurl',
+    'num',
+    'numlist',
+    'thanks',
+    'url',
+    'verb',
+  ].map((name) => [name, 'r']),
+  ...[
+    'SI',
+    'SIlist',
+    'colorbox',
+    'foreignlanguage',
+    'foreignquote',
+    'href',
+    'hyperlink',
+    'hyphenquote',
+    'qty',
+    'qtylist',
+    'textcolor',
+  ].map((name) => [name, 'ri']),
+  ...['mintinline', 'numrange'].map((name) => [name, 'er']),
+  ...['SIrange', 'qtyrange'].map((name) => [name, 'eri']),
+  ['hyperref', 'iir'],
+]);
+
+// Inline commands Pandoc reads as a block where their last group is no inline
+// text.
+export const COLORED = new Set(['colorbox', 'textcolor']);
+
+// Inline commands Pandoc reads as one it does not know: every group after it
+// raw.
+export const RAW_INLINE = new Set([
+  'Cref',
+  'autoref',
+  'cref',
+  'eqref',
+  'hbox',
+  'index',
+  'label',
+  'lettrine',
+  'mbox',
+  'noindent',
+  'ref',
+  'vbox',
+  'vref',
+]);
+
 // Definitions, which name what they define before their arguments.
 export const DEFINITIONS = new Set([
   'DeclareMathOperator',

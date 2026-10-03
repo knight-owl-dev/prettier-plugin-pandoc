@@ -10,9 +10,11 @@ import { blockArgumentsEnd, groupEnd, pastSpaces } from '../tex-arguments.js';
 import {
   ALSO_INLINE,
   BLOCK_COMMANDS,
+  COLORED,
   DEFINITIONS,
   DEFS,
   INLINE_COMMANDS,
+  INLINE_ENVIRONMENTS,
 } from '../tex-names.js';
 
 /** @typedef {import('../types.js').Line} Line */
@@ -21,7 +23,7 @@ import {
 const OPENS_ENVIRONMENT = new RegExp(BEGIN, 'y');
 const COMMAND = /\\([A-Za-z]+)\*?/y;
 const ENDS_PARAGRAPH = new RegExp(
-  `\\\\(?:${[...BLOCK_COMMANDS].filter((name) => !ALSO_INLINE.has(name)).join('|')})(?![A-Za-z])`,
+  `\\\\(?:${[...BLOCK_COMMANDS, ...COLORED].filter((name) => !ALSO_INLINE.has(name)).join('|')})(?![A-Za-z])`,
 );
 const ENDS_PARAGRAPH_AT = new RegExp(ENDS_PARAGRAPH.source, 'y');
 
@@ -147,6 +149,7 @@ function trimmed(lines, from, end) {
 function pieceEnd(lines, p) {
   OPENS_ENVIRONMENT.lastIndex = p.i;
   const name = OPENS_ENVIRONMENT.exec(textAt(lines, p))?.[1];
+  if (INLINE_ENVIRONMENTS.has(name)) return null;
   if (name !== undefined) {
     const close = environmentEnd(name, textFrom(lines, p));
     if (close === null) return null;
@@ -157,6 +160,10 @@ function pieceEnd(lines, p) {
     return { k, i: close.end - lines[k].start };
   }
   const command = commandAt(lines, p);
+  if (command !== null && COLORED.has(command.name)) {
+    const named = { k: p.k, i: p.i + 1 + command.name.length };
+    return blockArgumentsEnd(lines, command.name, named);
+  }
   if (command === null || !opensPiece(command)) return null;
   if (DEFINITIONS.has(command.name)) return definitionEnd(lines, command);
   if (BLOCK_COMMANDS.has(command.name)) {
