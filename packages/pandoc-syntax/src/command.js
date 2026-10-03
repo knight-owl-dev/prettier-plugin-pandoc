@@ -8,8 +8,9 @@
 // and all. In paragraph text it is a raw block, `blocks/raw-tex.js`; one read
 // here sits where it is none, as in brackets.
 
-import { closeOf } from './lines.js';
+import { closeOf, paragraphEnd, splitLines } from './lines.js';
 import { BEGIN, environmentEnd } from './tex.js';
+import { verbatimEnd } from './tex-arguments.js';
 
 const LETTER = /[A-Za-z]/;
 const SPACE = /[ \t]/;
@@ -56,6 +57,29 @@ function environmentAt(text, at) {
   return environmentEnd(name, [{ text: rest, start: at }])?.end ?? null;
 }
 
+// Commands whose body Pandoc reads verbatim, between a delimiter and the
+// same delimiter again.
+const DELIMITED = new Set(['verb', 'Verb', 'lstinline', 'mintinline']);
+
+/**
+ * Past the verbatim command at `at` and its body, or null where none is: the
+ * paragraph from the command's line on, read as Pandoc reads it.
+ *
+ * @param {string} text
+ * @param {number} at
+ * @returns {number | null}
+ */
+export function verbatimCommandEnd(text, at) {
+  let i = at + 1;
+  while (i < text.length && LETTER.test(text[i])) i++;
+  const name = text.slice(at + 1, i);
+  if (!DELIMITED.has(name)) return null;
+  const start = text.lastIndexOf('\n', at) + 1;
+  const lines = splitLines(text.slice(start, paragraphEnd(text, at)));
+  const end = verbatimEnd(lines, name, { k: 0, i: i - start });
+  return end === null ? null : start + lines[end.k].start + end.i;
+}
+
 /**
  * Where the command starting at `at` ends, or null when Pandoc keeps none of
  * it raw: an environment never ended, an `\end` without its `\begin`, or a
@@ -74,6 +98,9 @@ export function commandEnd(text, at) {
   const name = text.slice(at + 1, i);
   if (name === 'begin') return environmentAt(text, at);
   if (name === 'end') return null;
+  // One without a body is read as any other command.
+  const verbatim = verbatimCommandEnd(text, at);
+  if (verbatim !== null) return verbatim;
   if (text[i] === '*') i++;
 
   let args = 0;

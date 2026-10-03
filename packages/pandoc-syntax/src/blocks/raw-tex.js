@@ -8,7 +8,12 @@
 
 // cspell:ignore vadjust
 
-import { commandEnd, groupsAfter, startsCommand } from '../command.js';
+import {
+  commandEnd,
+  groupsAfter,
+  startsCommand,
+  verbatimCommandEnd,
+} from '../command.js';
 import { BLANK, closeOf, viewFrom } from '../lines.js';
 import { COMMENT_CLOSE, COMMENT_OPEN, opaqueEnd } from '../opaque.js';
 import { BEGIN } from '../tex.js';
@@ -46,6 +51,8 @@ function past(text, at) {
   if (opaque > at) return opaque;
   if (text.startsWith(BEGIN_PREFIX, at)) return at + BEGIN_PREFIX.length;
   if (startsCommand(text, at)) {
+    const verbatim = verbatimCommandEnd(text, at);
+    if (verbatim !== null) return verbatim;
     NAME.lastIndex = at;
     const name = NAME.exec(text)[1];
     return INLINE_COMMANDS.has(name) && !RAW_INLINE.has(name)
@@ -153,6 +160,8 @@ function bracketsEnd(text, at, to = text.length) {
  * @returns {number}
  */
 export function pastCommand(text, at) {
+  const verbatim = verbatimCommandEnd(text, at);
+  if (verbatim !== null) return verbatim;
   NAME.lastIndex = at;
   const name = NAME.exec(text)[1];
   if (!INLINE_COMMANDS.has(name) || RAW_INLINE.has(name)) {

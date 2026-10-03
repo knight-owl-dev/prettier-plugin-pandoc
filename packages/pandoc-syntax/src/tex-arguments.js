@@ -1,5 +1,6 @@
-// How far a block command reads: Pandoc's LaTeX reader parses each by a rule
-// of its own, and its raw block holds what that parse consumed. The parsers
+// How far a block command, or a verbatim command's body, reads: Pandoc's
+// LaTeX reader parses each by a rule of its own, and its raw text holds what
+// that parse consumed. The parsers
 // below are Pandoc 3.11's, composed of its primitives as its source composes
 // them, over places in lines.
 //
@@ -256,6 +257,50 @@ const times = (n, parser) => seq(...Array.from({ length: n }, () => parser));
 
 // Pandoc's `skipopts`.
 const skipopts = many(either(overlay, option));
+
+// What may open a verbatim body: one symbol to TeX's tokenizer — no letter,
+// digit, space, tab, `%` or backslash, and no `#` a digit makes an argument.
+const SYMBOL = /[^\p{L}\p{N} \t%\\]/u;
+
+// Pandoc's `doverb` and `doinlinecode`: a symbol right at `p`, then the body to
+// it again — to `}` after `{`, but in a `\verb` — a `\verb`'s on its line.
+function verbatimBody(lines, p, verb) {
+  const text = textAt(lines, p);
+  const point = text.codePointAt(p.i);
+  if (point === undefined) return null;
+  const open = String.fromCodePoint(point);
+  const argument = open === '#' && /\d/.test(text[p.i + 1] ?? '');
+  if (!SYMBOL.test(open) || argument) return null;
+  const close = open === '{' && !verb ? '}' : open;
+  for (let k = p.k, i = p.i + open.length; k < lines.length; k++, i = 0) {
+    const at = lines[k].text.indexOf(close, i);
+    if (at !== -1) return { k, i: at + close.length };
+    if (verb) return null;
+  }
+  return null;
+}
+
+/**
+ * Past a verbatim command's body, from the end of its name, as Pandoc's
+ * `inlineCommand'` reads it: a star with `sp` after it and an overlay, any
+ * command's, then `\lstinline`'s keyvals or `\mintinline`'s options and
+ * language, then the body. Null where Pandoc keeps none raw.
+ *
+ * @param {Line[]} lines
+ * @param {'verb' | 'Verb' | 'lstinline' | 'mintinline'} name
+ * @param {Place} p
+ * @returns {Place | null}
+ */
+export function verbatimEnd(lines, name, p) {
+  let at = pastSpaces(lines, p);
+  if (charAt(lines, at) === '*') at = sp(lines, { k: at.k, i: at.i + 1 });
+  at = maybe(overlay)(lines, at);
+  if (name === 'lstinline') at = maybe(keyvals)(lines, at);
+  if (name === 'mintinline') at = braced(lines, skipopts(lines, at));
+  return at === null
+    ? null
+    : verbatimBody(lines, at, name === 'verb' || name === 'Verb');
+}
 
 const COMMAND = /\\(?:[A-Za-z]+[ \t]*|[^A-Za-z])/y;
 
