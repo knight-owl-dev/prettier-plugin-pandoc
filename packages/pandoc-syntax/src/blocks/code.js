@@ -7,8 +7,20 @@ import { perSyntax } from '../syntax.js';
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
 
+// What Pandoc takes after an opening fence: a raw attribute, or a language
+// and an attribute block, either optional, then nothing.
+const NAME = '[A-Za-z][\\w:.-]*';
+const ATTRIBUTE = `(?:[#.]${NAME}|${NAME}=(?:"[^"]*"|'[^']*'|[^\\s}]*)|-)`;
+const INFO = [
+  '[ \\t]*',
+  `(?:\\{[ \\t]*=[\\w-]+[ \\t]*\\}`,
+  `|[^\\s\`{}]*[ \\t]*(?:\\{[ \\t]*(?:${ATTRIBUTE}[ \\t]*)*\\})?)`,
+  '[ \\t]*$',
+].join('');
+
 const patterns = perSyntax((syntax) => ({
   fence: syntax.atBlockIndent('(`{3,}|~{3,})'),
+  opener: syntax.atBlockIndent(`(\`{3,}|~{3,})${INFO}`),
 }));
 
 const isIndented = (text, syntax) =>
@@ -28,17 +40,17 @@ function closes(line, opener, fencePattern) {
 
 /**
  * A backtick fence interrupts a paragraph; a tilde fence opens only at a block
- * start. One never closed is paragraph text.
+ * start. One never closed, or with info Pandoc refuses, is paragraph text.
  *
  * @type {Recognizer}
  */
 export const fencedCode = {
   name: 'fenced-code',
   interruptsParagraph: true,
-  opensAhead: (text, syntax) => patterns(syntax).fence.test(text),
+  opensAhead: (text, syntax) => patterns(syntax).opener.test(text),
   match(lines, at, { syntax, paragraph }) {
-    const { fence } = patterns(syntax);
-    const opener = fence.exec(lines[at].text)?.[1];
+    const { fence, opener: opens } = patterns(syntax);
+    const opener = opens.exec(lines[at].text)?.[1];
     if (opener === undefined) return null;
     if (paragraph !== null && opener[0] === '~') return null;
     let last = null;

@@ -40,10 +40,16 @@ const asWritten = (value) => markAsRoot(replaceEndOfLine(value, literalline));
 // in code are content.
 const keptLine = markAsRoot(literalline);
 
+// The character a code block's fence was written in. Another could close an
+// unclosed fence above it that Pandoc reads as text.
+const fenceCharOf = (node, text) =>
+  /^[ \t]*(~)/.exec(text.slice(node.position.start.offset))?.[1] ?? '`';
+
 /**
- * Code prints as written: a sample's two trailing spaces are a hard break it
- * shows. An unclosed fence at the end of the file keeps the file's last
- * newline in its value; stock prettier drops it, and so does this.
+ * Code prints as written, in the fence character it was written in: a
+ * sample's two trailing spaces are a hard break it shows. An unclosed fence
+ * at the end of the file keeps the file's last newline in its value; stock
+ * prettier drops it, and so does this.
  *
  * @param {object} node
  * @param {object} options
@@ -54,8 +60,9 @@ function printCode(node, options) {
   if (atEnd && value.endsWith('\n') && options.originalText.endsWith('\n')) {
     value = value.slice(0, -1);
   }
-  const fence = '`'.repeat(
-    Math.max(SHORTEST_FENCE, longestRun(value, '`') + 1),
+  const char = fenceCharOf(node, options.originalText);
+  const fence = char.repeat(
+    Math.max(SHORTEST_FENCE, longestRun(value, char) + 1),
   );
   const info = [node.lang ?? '', node.meta ? ` ${node.meta}` : ''];
   return [fence, ...info, hardline, asWritten(value), keptLine, fence];
@@ -202,8 +209,8 @@ export function print(path, options, printChild) {
         ? label(TRAILING_SPACE, asWritten(node.value))
         : asWritten(node.value);
     case JOINED: {
-      const [paragraph, verbatim] = path.map(printChild, 'children');
-      return [paragraph, asWritten(node.hardBreak ? '  \n' : '\n'), verbatim];
+      const [above, below] = path.map(printChild, 'children');
+      return [above, asWritten(node.hardBreak ? '  \n' : '\n'), below];
     }
     case 'code':
       return printCode(node, options);

@@ -1,9 +1,9 @@
 // Constructs inside containers.
 //
-// Each construct is wrapped in a block quote, a list item and both, and the
-// recognizer must find in it what Pandoc does: the same constructs, in the same
-// order, and each span's lines must hold the construct's own text — no
-// container prefix in them.
+// Each construct is wrapped in each container and a list item in a block
+// quote, and the recognizer must find in it what Pandoc does: the same
+// constructs, in the same order, and each span's lines must hold the
+// construct's own text — no container prefix in them.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -34,7 +34,12 @@ function pandocKinds(text, tabStop) {
 
 const TABLES = new Set(['grid-table', 'simple-table', 'multiline-table']);
 // A container's own segments are its whole lines, prefix and all.
-const CONTAINERS = new Set(['block-quote', 'list-item', 'footnote-definition']);
+const CONTAINERS = new Set([
+  'block-quote',
+  'list-item',
+  'footnote-definition',
+  'definition',
+]);
 const KINDS = new Set([
   'div',
   'line-block',
@@ -68,6 +73,13 @@ const WRAPPERS = {
     '',
     ...lines.map((l) => `    ${l}`),
   ],
+  // Tight: past a blank line, a table would take the marker for its caption.
+  'a definition': (lines) => [
+    'Term',
+    ':   first',
+    '',
+    ...lines.map((l) => `    ${l}`),
+  ],
   'a list item in a block quote': (lines) =>
     ['- item', '', ...lines.map((l) => `  ${l}`)].map((l) =>
       `> ${l}`.trimEnd(),
@@ -90,15 +102,20 @@ for (const [what, construct] of Object.entries(CONSTRUCTS)) {
 
       test(`${label}: no span holds a container prefix`, () => {
         const found = blocks(text, { tabStop });
-        const contentStarts = found
-          .filter((block) => CONTAINERS.has(block.type))
-          .flatMap((container) => container.lines.map((line) => line.start));
         for (const block of found) {
           if (CONTAINERS.has(block.type)) continue;
           const spans =
             block.type === 'div'
               ? [block.open, block.close].filter((s) => s !== null)
               : block.segments;
+          // The containers around the block: a definition list holds its
+          // definitions' prefixes.
+          const [start, end] = [spans[0].start, spans.at(-1).end];
+          const contentStarts = found
+            .filter(
+              (b) => CONTAINERS.has(b.type) && b.start <= start && end <= b.end,
+            )
+            .flatMap((container) => container.lines.map((line) => line.start));
           for (const span of spans) {
             // The innermost container's content on this span's line starts at
             // the latest content start there.

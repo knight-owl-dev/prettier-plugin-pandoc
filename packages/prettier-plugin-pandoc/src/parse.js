@@ -43,6 +43,19 @@ const startOf = (block) =>
 
 const byStart = (a, b) => a.start - b.start;
 
+// The blocks outside every block printed as written, which prints what it
+// holds: a definition list's definitions, say.
+function outsideVerbatim(found) {
+  const verbatim = found.filter((block) => VERBATIM.has(block.type));
+  return found.filter(
+    (block) =>
+      !verbatim.some(
+        (v) =>
+          v !== block && v.start <= startOf(block) && startOf(block) < v.end,
+      ),
+  );
+}
+
 const BLANK_AFTER = /[ \t]*(\n[ \t]*(\n|$)|$)/y;
 
 // Whether only a blank line, or the end, follows the line `at` ends.
@@ -95,7 +108,7 @@ function withStretch(constructs, stretch) {
  */
 export async function parse(text, options) {
   const tabStop = options.pandocTabStop ?? DEFAULT_TAB_STOP;
-  const found = blocks(text, { tabStop });
+  const found = outsideVerbatim(blocks(text, { tabStop }));
   let constructs = {
     divs: found.filter((block) => block.type === 'div'),
     verbatim: found.filter((block) => VERBATIM.has(block.type)),

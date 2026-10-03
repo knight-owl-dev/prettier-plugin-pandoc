@@ -7,8 +7,8 @@
 // stack, and reads each container's content as a document of its own.
 
 import { BLANK, segmentsOf, strip } from '../lines.js';
+import { definitionList } from './container.js';
 import { DIV_CLOSE } from './div.js';
-import { definitionList } from './list.js';
 import { texInParagraph } from './raw-tex.js';
 import { INTERRUPTERS, ITEM_INTERRUPTERS, REGISTRY } from './registry.js';
 
@@ -25,6 +25,10 @@ import { INTERRUPTERS, ITEM_INTERRUPTERS, REGISTRY } from './registry.js';
 const NOT_TERMS = REGISTRY.filter(
   (r) => r !== definitionList && r !== texInParagraph,
 );
+
+// The containers Pandoc reads as list items, where a list may open straight
+// after a paragraph line.
+const ITEMS = new Set(['list-item', 'definition']);
 
 /**
  * @param {Recognizer[]} recognizers
@@ -156,20 +160,18 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
   };
 
   /**
-   * Report what a match at line `at` found, and return the line read last: at
-   * a resume point, the line before the one read again from it.
+   * Report what a match found, and return the line read last: at a resume
+   * point, the line before the one read again from it.
    *
    * @param {Match} match
-   * @param {number} at
    */
-  const take = (match, at) => {
+  const take = (match) => {
     for (const spec of match.spans ?? []) out.push(toBlock(lines, spec));
     if (match.divOpen !== undefined) open.push(match.divOpen);
-    if (match.container !== undefined) {
-      const { type, content } = match.container;
-      out.push(toContainer(lines, at, match.last, type, content));
+    for (const { type, from, to, content } of match.containers ?? []) {
+      out.push(toContainer(lines, from, to, type, content));
       const depth = divDepth + open.length;
-      scan(content, text, out, depth, syntax, type === 'list-item');
+      scan(content, text, out, depth, syntax, ITEMS.has(type));
     }
     paragraph = null;
     if (match.resume === undefined) return match.last;
@@ -207,7 +209,7 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
       n,
       context,
     );
-    if (match !== null) n = take(match, n);
+    if (match !== null) n = take(match);
     else if (paragraph === null) paragraph = { lines: 1, start: line.start };
     else paragraph.lines++;
   }

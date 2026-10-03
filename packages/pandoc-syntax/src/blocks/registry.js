@@ -5,12 +5,17 @@
 // only those that interrupt a paragraph are asked, in the same order.
 
 import { fencedCode, indentedCode } from './code.js';
-import { blockQuote, footnoteDefinition, listItem } from './container.js';
+import {
+  blockQuote,
+  definitionList,
+  footnoteDefinition,
+  listItem,
+} from './container.js';
 import { divOpen } from './div.js';
 import { atxHeading, setextUnderline, thematicBreak } from './heading.js';
 import { htmlBlockTag, htmlComment } from './html.js';
 import { lineBlock } from './line-block.js';
-import { definitionList, exampleList, fancyList } from './list.js';
+import { exampleList, fancyList } from './list.js';
 import { texBlock, texInParagraph } from './raw-tex.js';
 import { linkReference } from './reference.js';
 import { pandocTable, pipeTable } from './table.js';

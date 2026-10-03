@@ -90,6 +90,7 @@ function restoreVerbatim(children, verbatim, text) {
     const lines = block.segments.map((s) => text.slice(s.start, s.end));
     out.push({
       type: VERBATIM,
+      definitions: block.type === 'definition-list',
       value: lines.join('\n') + text.slice(block.end, end),
       position: { start: { offset: block.start }, end: { offset: end } },
     });
@@ -129,8 +130,9 @@ function endsHard(paragraph, text, tabStop) {
 }
 
 /**
- * Join each paragraph to the verbatim block on the line after it, with the
- * hard break its line may end in.
+ * Join each paragraph to a verbatim block on the next line, with the hard
+ * break its line may end in, and each definition list to any block on the
+ * next line.
  *
  * @param {object[]} children
  * @param {string} text
@@ -143,14 +145,13 @@ function joinParagraphs(children, text, tabStop) {
     ONE_BREAK.test(text.slice(above.position.end.offset, offsetOf(below)));
   for (const node of children) {
     const last = out.at(-1);
-    if (
-      last?.type === 'paragraph' &&
-      node.type === VERBATIM &&
-      nextLine(last, node)
-    ) {
+    const joins =
+      (last?.type === 'paragraph' && node.type === VERBATIM) ||
+      (last?.type === VERBATIM && last.definitions);
+    if (joins && nextLine(last, node)) {
       out[out.length - 1] = {
         type: JOINED,
-        hardBreak: endsHard(last, text, tabStop),
+        hardBreak: last.type === 'paragraph' && endsHard(last, text, tabStop),
         children: [last, node],
         position: { start: last.position.start, end: node.position.end },
       };
