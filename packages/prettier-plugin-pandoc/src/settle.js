@@ -130,9 +130,10 @@ function endsHard(paragraph, text, tabStop) {
 }
 
 /**
- * Join each paragraph to a verbatim block on the next line, with the hard
- * break its line may end in, and each definition list to any block on the
- * next line.
+ * Join each paragraph to a verbatim block or a list on the next line, with
+ * the hard break its line may end in, and each definition list to any block
+ * on the next line. A list there is one Pandoc opens in a list item, at any
+ * depth: anywhere else the parsers part and it prints as written.
  *
  * @param {object[]} children
  * @param {string} text
@@ -146,7 +147,8 @@ function joinParagraphs(children, text, tabStop) {
   for (const node of children) {
     const last = out.at(-1);
     const joins =
-      (last?.type === 'paragraph' && node.type === VERBATIM) ||
+      (last?.type === 'paragraph' &&
+        (node.type === VERBATIM || node.type === 'list')) ||
       (last?.type === VERBATIM && last.definitions);
     if (joins && nextLine(last, node)) {
       out[out.length - 1] = {

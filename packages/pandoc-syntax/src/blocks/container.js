@@ -39,26 +39,45 @@ const isListMarker = (text, syntax) =>
 const isDefinitionMarker = (text, syntax) =>
   patterns(syntax).definitionMarker.test(text);
 
+// Whether a line opens a list, a definition among them; a thematic break is
+// none.
+const opensList = (text, syntax) =>
+  (isListMarker(text, syntax) && !isThematicBreak(text, syntax)) ||
+  isDefinitionMarker(text, syntax);
+
 /**
  * A block quote runs to its first blank line, a `>` stripped from each line
- * that has one.
+ * that has one. A line without one, its indentation dropped, ends it where it
+ * ends a paragraph: at a backtick fence its first column opens, or in a list
+ * item, at a list. So does a `>` past the block indent.
  *
  * @type {Recognizer}
  */
 export const blockQuote = {
   name: 'block-quote',
   interruptsParagraph: false,
-  match(lines, at, { inDiv, syntax }) {
+  match(lines, at, context) {
+    const { inDiv, inItem, syntax } = context;
+    const { tabStop } = syntax;
     const { quoteMarker } = patterns(syntax);
     if (!quoteMarker.test(lines[at].text)) return null;
+    const endsLazily = (n) =>
+      /^[ \t]*>/.test(lines[n].text) ||
+      (inDiv && DIV_CLOSE.test(lines[n].text)) ||
+      (inItem && opensList(lines[n].text, syntax)) ||
+      (lines[n].text.startsWith('`') &&
+        fencedCode.match(lines, n, { ...context, paragraph: null }) !== null);
     const content = [];
     let n = at;
     for (; n < lines.length && !BLANK.test(lines[n].text); n++) {
       const marker = quoteMarker.exec(lines[n].text);
-      if (marker === null && inDiv && DIV_CLOSE.test(lines[n].text)) break;
+      if (marker === null && endsLazily(n)) break;
       content.push(
         marker === null
-          ? { ...lines[n], lazy: true }
+          ? {
+              ...dedent(lines[n], indentOf(lines[n].text, tabStop), tabStop),
+              lazy: true,
+            }
           : strip(lines[n], marker[0].length),
       );
     }
@@ -138,22 +157,19 @@ function collectBody(lines, at, first, column, endsLazily, tabStop) {
 function itemBody(lines, at, marker, context) {
   const { inDiv, syntax } = context;
   const { column, first } = contentColumn(lines[at], marker, syntax);
-  const opensList = (text) =>
-    (isListMarker(text, syntax) && !isThematicBreak(text, syntax)) ||
-    isDefinitionMarker(text, syntax);
   const opensFence = (n) =>
     fencedCode.match(lines, n, { ...context, paragraph: null }) !== null;
   const ends = (k) =>
     BLANK.test(lines[k].text) ||
     (indentOf(lines[k].text, syntax.tabStop) >= column &&
-      opensList(lines[k].text.trimStart())) ||
+      opensList(lines[k].text.trimStart(), syntax)) ||
     opensFence(k);
   const firstTake = (n) => {
     for (let k = at + 1; k < n; k++) if (ends(k)) return false;
     return true;
   };
   const endsLazily = (n) =>
-    opensList(lines[n].text) ||
+    opensList(lines[n].text, syntax) ||
     (opensFence(n) && firstTake(n)) ||
     (inDiv && DIV_CLOSE.test(lines[n].text));
   return collectBody(lines, at, first, column, endsLazily, syntax.tabStop);

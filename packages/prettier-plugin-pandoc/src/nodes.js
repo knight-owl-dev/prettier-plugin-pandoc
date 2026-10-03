@@ -6,9 +6,9 @@
 export const DIV = 'pandocDiv';
 // A block printed exactly as written, container prefixes aside.
 export const VERBATIM = 'pandocVerbatim';
-// Two blocks kept a line apart: a paragraph and a verbatim block, or a
-// definition list and any block. A blank line between would turn Pandoc's
-// plain text into a paragraph.
+// Two blocks kept a line apart: a paragraph and a verbatim block or a list,
+// or a definition list and any block. A blank line between would turn
+// Pandoc's plain text into a paragraph.
 export const JOINED = 'pandocJoined';
 
 export const VISITOR_KEYS = {

@@ -100,6 +100,8 @@
  * @property {string} text The whole source.
  * @property {boolean} inDiv Whether a div is open around this line, at any
  *   level of nesting.
+ * @property {boolean} inItem Whether this line is in a list item's or a
+ *   definition's content, at any level of nesting.
  * @property {{lines: number, start: number} | null} paragraph The paragraph
  *   this line would continue, or null at a block start: its lines so far, and
  *   where its text starts on the first.

@@ -1,9 +1,11 @@
-// What each list item and definition holds.
+// What each list item, definition and block quote holds.
 //
-// Pandoc reads a list item's text, and a definition's, as a document of its
-// own. Each body the recognizer reports, read as the one item of a list, must
-// hold what Pandoc's parse holds there, in order. A tab left in the content
-// would move with the item's indentation: no case keeps one.
+// Pandoc reads a container's text as a document of its own. Each body the
+// recognizer reports, read again as the one item of a list or as a quote,
+// must hold what Pandoc's parse holds there, in order. A quote inside an item
+// is read inside one too, where a list may open after a paragraph line. A tab
+// left in the content would move with the item's indentation: no case keeps
+// one.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -28,6 +30,11 @@ function pandocBodies(text, tabStop) {
       }
       return;
     }
+    if (node.t === 'BlockQuote') {
+      found.push(plain(node.c));
+      walk(node.c);
+      return;
+    }
     if (node.t === 'DefinitionList') {
       for (const [, definitions] of node.c) {
         for (const body of definitions) {
@@ -43,21 +50,32 @@ function pandocBodies(text, tabStop) {
   return found;
 }
 
-const BODIES = new Set(['list-item', 'definition']);
+const ITEMS = new Set(['list-item', 'definition']);
 
-const recognizerBodies = (text, tabStop) =>
-  blocks(text, { tabStop })
-    .filter((block) => BODIES.has(block.type))
+// `lines` as the one item of a list, and what Pandoc reads in it.
+const asItem = (lines) =>
+  lines.map((line, n) => `${n === 0 ? '- ' : '  '}${line}`);
+const itemOf = (blocks) => blocks[0].c[0];
+
+function recognizerBodies(text, tabStop) {
+  const found = blocks(text, { tabStop });
+  const inItem = (body) =>
+    found.some(
+      (b) => ITEMS.has(b.type) && b.start < body.start && body.end <= b.end,
+    );
+  return found
+    .filter((b) => ITEMS.has(b.type) || b.type === 'block-quote')
     .map((body) => {
-      const item = body.lines
-        .map(
-          (line, n) =>
-            `${n === 0 ? '- ' : '  '}${text.slice(line.start, line.end)}`,
-        )
-        .join('\n');
-      const [list] = JSON.parse(readPandoc(`${item}\n`, tabStop)).blocks;
-      return plain(list.c[0]);
+      const lines = body.lines.map((l) => text.slice(l.start, l.end));
+      const quote = body.type === 'block-quote';
+      const nested = quote && inItem(body);
+      let wrapped = quote ? lines.map((l) => `> ${l}`) : asItem(lines);
+      if (nested) wrapped = asItem(wrapped);
+      const read = JSON.parse(readPandoc(`${wrapped.join('\n')}\n`, tabStop));
+      const held = nested ? itemOf(read.blocks) : read.blocks;
+      return plain(quote ? held[0].c : itemOf(held));
     });
+}
 
 const CASES = {
   'a tight definition': 'Term\n:   Def',
@@ -97,6 +115,23 @@ const CASES = {
   'a fence after an item past a blank line': '- a\n\n  b\n```\ncode\n```',
   'a fence after a nested item': '- a\n  - b\n```\ncode\n```',
   'a fence after an indented line': '- a\n  b\n```\ncode\n```',
+  'a fence after a quote': '> x\n```\ncode\n```',
+  'a fence after a quote, indented': '> x\n  ```\ncode\n```',
+  'an unclosed fence after a quote': '> x\n```\nno close',
+  'a fence Pandoc refuses after a quote': '> x\n```js two words\ncode\n```',
+  'a tilde fence after a quote': '> x\n~~~\ncode\n~~~',
+  'a fence after a quote, closed past a blank line': '> q\n```\n\na\n```\n```',
+  'a list marker after a quote': '> q\n- b',
+  'a list marker after a quote in an item': '- a\n\n  > q\n  - b',
+  'a list marker after a quote in a definition': 'Term\n: > q\n  - b',
+  'a list in a quote in an item': '- a\n\n  > q\n  > - b',
+  'a list in a quote in a quote in an item': '- a\n\n  > > q\n  > - b',
+  'a list in a quote in a definition': 'Term\n: > q\n  > - b',
+  'a list in a quote': '> q\n> - b',
+  'an indented lazy line after a quote line left blank': '> x\n>\n    lazy',
+  'a quote marker past the block indent': '> x\n    > y',
+  'a quote marker a code indent deeper': '> x\n        > y',
+  'a quote marker after a tab': '> x\n\t> y',
   'a fence Pandoc refuses after an item': '- a\n```js two words\nc\n```',
   'a fence Pandoc refuses after a definition': 'T\n: a\n```{.x} y\nc\n```',
   'a raw attribute fence after an item': '- a\n```{=html}\n<b>\n```',
