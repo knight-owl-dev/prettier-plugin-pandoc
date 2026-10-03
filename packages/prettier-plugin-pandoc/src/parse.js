@@ -138,7 +138,7 @@ export async function parse(text, options) {
     for (const m of [...local, shifting].filter(Boolean)) {
       const last = stretches.at(-1);
       if (last !== undefined && m.start <= last.end) continue;
-      const stretch = stretchAround(m, ast, constructs, text);
+      const stretch = stretchAround(m, ast, constructs, text, masked);
       if (last !== undefined && stretch.start <= last.end) break;
       stretches.push(stretch);
       if (m === shifting || !beforeBlank(text, stretch.end)) break;
