@@ -5,6 +5,7 @@
   "ignorePaths": ["package-lock.json", "packages/*/test/corpus/**"],
   "words": [
     "autolinks",
+    "combinators",
     "COMMONMARK",
     "dedent",
     "dedented",

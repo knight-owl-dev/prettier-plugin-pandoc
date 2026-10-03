@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "workspaces": [
+    "packages/pandoc-parser",
     "packages/pandoc-syntax",
     "packages/prettier-plugin-pandoc"
   ],
