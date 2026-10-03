@@ -45,6 +45,10 @@ const CASES = {
   'a dash line with nothing after': 'x\n\n-------  ----',
   'a dash line never closed': 'x\n\n-------\ntext',
   'YAML metadata': '---\ntitle: x\n---',
+  'a grid table never closed': '+---+\n| a |',
+  'a grid table with a row past its last rule': '+---+\n| a |\n+---+\n| b |',
+  'a grid table of rules alone': '+---+\n+---+',
+  'a simple table without rows': '  a   b\n --- ---',
   'two tables': `${GRID}\n\n${SIMPLE}`,
   'a table inside a div': `::: wide\n${GRID}\n:::`,
 };

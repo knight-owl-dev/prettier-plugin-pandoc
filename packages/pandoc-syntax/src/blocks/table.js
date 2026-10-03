@@ -2,6 +2,7 @@
 // table is CommonMark's too, and prettier prints one as Pandoc reads it, so it
 // is only passed over.
 
+import { ATTRIBUTES } from '../attributes.js';
 import { BLANK, indentOf } from '../lines.js';
 import { perSyntax } from '../syntax.js';
 
@@ -63,20 +64,23 @@ function dashTable(lines, at) {
 }
 
 // Which of Pandoc's tables opens on line `at`, and its last line. A grid table
-// ends on its last framed line; a simple table at the next blank line, so a
-// text line straight after it is another row.
+// needs a rule after its first and ends on its last framed line; a simple
+// table needs a row and ends at the next blank line, so a text line straight
+// after it is another row.
 function pandocTableAt(lines, at, syntax) {
   const { gridRule, dashColumns, dashLine } = opening(syntax);
   const line = lines[at].text;
   const next = lines[at + 1]?.text;
   if (gridRule.test(line)) {
-    return {
-      type: 'grid-table',
-      last: lastWhile(lines, at, (l) => GRID_ROW.test(l)),
-    };
+    const last = lastWhile(lines, at, (l) => GRID_ROW.test(l));
+    const closed = lines
+      .slice(at + 1, last + 1)
+      .some((l) => gridRule.test(l.text));
+    return closed ? { type: 'grid-table', last } : null;
   }
   if (next === undefined) return null;
   if (!BLANK.test(line) && dashColumns.test(next)) {
+    if (BLANK.test(lines[at + 2]?.text ?? '')) return null;
     return {
       type: 'simple-table',
       last: lastWhile(lines, at, (l) => !BLANK.test(l)),
@@ -84,6 +88,46 @@ function pandocTableAt(lines, at, syntax) {
   }
   if (dashLine.test(line) && !BLANK.test(next)) return dashTable(lines, at);
   return null;
+}
+
+// A caption Pandoc reads before a table: `:` or `Table:`, its text running to
+// a blank line, or through a line ending in attributes between its inlines.
+const caption = perSyntax((syntax) =>
+  syntax.atBlockIndent('(:(?!\\p{P})|[Tt]able:)', 'u'),
+);
+const CAPTION_END = new RegExp(`(^|[:\\s])${ATTRIBUTES}[ \\t]*$`);
+// What may open an inline construct spanning lines, or a block-level tag.
+const NOT_PLAIN = /[<`$\\]/;
+
+/**
+ * Whether Pandoc surely reads a table from line `at`, a caption before it or
+ * not. A caption counts only where plain: one with a construct that may span
+ * lines or end it, or with a line that may end paragraph text, is taken for
+ * none, as is one no table follows.
+ *
+ * @param {Line[]} lines
+ * @param {number} at
+ * @param {import('../syntax.js').Syntax} syntax
+ * @param {(n: number) => boolean} ends Whether paragraph text may end before
+ *   line `n`.
+ */
+export function tableAt(lines, at, syntax, ends) {
+  let n = at;
+  if (caption(syntax).test(lines[n].text)) {
+    for (;;) {
+      if (NOT_PLAIN.test(lines[n].text)) return false;
+      if (CAPTION_END.test(lines[n].text)) break;
+      if (BLANK.test(lines[n + 1]?.text ?? '')) break;
+      if (ends(++n)) return false;
+    }
+    n++;
+    while (n < lines.length && BLANK.test(lines[n].text)) n++;
+    if (n === lines.length) return false;
+  }
+  return (
+    pandocTableAt(lines, n, syntax) !== null ||
+    pipeTable.match(lines, n, { syntax }) !== null
+  );
 }
 
 /** @type {Recognizer} */
