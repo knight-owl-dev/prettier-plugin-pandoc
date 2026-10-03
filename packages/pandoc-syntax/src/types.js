@@ -47,11 +47,12 @@
  */
 
 /**
- * A block quote, list item or footnote definition, with the lines of its
- * content.
+ * A block quote, list item, footnote definition or a definition list's
+ * definition, with the lines of its content.
  *
  * @typedef {object} ContainerBlock
- * @property {'block-quote' | 'list-item' | 'footnote-definition'} type
+ * @property {'block-quote' | 'list-item' | 'footnote-definition' | 'definition'}
+ *   type
  * @property {number} start
  * @property {number} end
  * @property {Span[]} segments
@@ -75,8 +76,8 @@
 
 /**
  * What a recognizer found at a line: the block's last line, and what to report.
- * A container carries its content, which the scan reads as a document of its
- * own; a div's opening fence is noted for the scan's stack.
+ * Each container carries its lines and content, which the scan reads as a
+ * document of its own; a div's opening fence is noted for the scan's stack.
  *
  * @typedef {object} Match
  * @property {number} last
@@ -84,7 +85,12 @@
  *   start of the line after `last`: on `last` after a mid-line end, or past
  *   the next line's indentation.
  * @property {SpanSpec[]} [spans]
- * @property {{type: ContainerBlock['type'], content: Line[]}} [container]
+ * @property {{
+ *   type: ContainerBlock['type'],
+ *   from: number,
+ *   to: number,
+ *   content: Line[],
+ * }[]} [containers]
  * @property {Span} [divOpen]
  */
 

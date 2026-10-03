@@ -1,9 +1,10 @@
 // Which lines a list item takes lazily.
 //
 // Pandoc ends a list item's lazy lines at a list start: a bullet or ordered
-// marker, or a definition marker. Any other line straight after the item's
-// text is the item's. The recognizer must find the blocks Pandoc's parse
-// holds, of each kind both name, in order.
+// marker, or a definition marker. A fence ends them too: `bodies.test.js`.
+// Any other line straight after the item's text is the item's. The
+// recognizer must find the blocks Pandoc's parse holds, of each kind both
+// name, in order.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

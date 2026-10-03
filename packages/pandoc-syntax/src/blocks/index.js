@@ -19,9 +19,9 @@ const startOf = (block) =>
  * order.
  *
  * A div never closed runs to the end of the document, so its `close` is null.
- * Block quotes, list items and footnote definitions hold their content's
- * blocks, reported beside them; every span inside a container stops short of
- * its prefix.
+ * Block quotes, list items, footnote definitions and a definition list's
+ * definitions hold their content's blocks, reported beside them; every span
+ * inside a container stops short of its prefix.
  *
  * @param {string} text Pandoc markdown.
  * @param {{tabStop?: number}} [options] `tabStop` is Pandoc's `--tab-stop`,

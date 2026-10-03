@@ -1,8 +1,8 @@
-// Lists inside list items.
+// Lists inside list items and definitions.
 //
-// In a list item's content a list may open straight after a paragraph line,
-// where elsewhere Pandoc wants a blank line first. Pandoc's parse gives its
-// list items and code blocks; the recognizer must find as many of each.
+// In their content a list may open straight after a paragraph line, where
+// elsewhere Pandoc wants a blank line first. Pandoc's parse gives its list
+// items and code blocks; the recognizer must find as many of each.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -51,6 +51,8 @@ const CASES = {
   'a nested list after a later paragraph': '- a\n\n  para\n  - b',
   'an ordered nested list': '- a\n  1. b',
   'a list in a block quote after a line': '> a\n> - b',
+  'a list in a definition after a line': 'Term\n:   a\n    - b',
+  'an ordered list in a definition after a line': 'Term\n:   a\n    1. b',
   'three levels, then a fence':
     '1. one\n    - two\n        - three\n\n            ```\n            code\n            ```',
   'three levels, then indented code':
