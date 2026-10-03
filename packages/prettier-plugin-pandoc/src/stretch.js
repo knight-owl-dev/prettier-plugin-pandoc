@@ -48,13 +48,23 @@ function stretchOf(container, containers, text) {
 
 const lineStart = (text, offset) => text.lastIndexOf('\n', offset - 1) + 1;
 
-// Whether two siblings sit on adjacent lines, no blank line between.
-const joined = (a, b) => a.position.end.line + 1 === b.position.start.line;
+const BLANK_LINE = /\n[ \t]*\n/;
+
+// Whether no blank line separates two siblings in the text prettier parsed, a
+// div's fences blank there. Positions can't tell: indented code runs over the
+// blank lines after it.
+const joined = (a, b, masked) =>
+  !BLANK_LINE.test(
+    masked.slice(
+      stopOf(masked, a.position.start.offset, a.position.end.offset),
+      b.position.start.offset,
+    ),
+  );
 
 // The top-level blocks from the one holding `start` to the one holding `end`,
 // and those joined to them with no blank line between: one paragraph to
 // Pandoc, whatever CommonMark made of them.
-function joinedAround(ast, { start, end }, text) {
+function joinedAround(ast, { start, end }, text, masked) {
   const blocks = ast.children;
   // The last block starting at or before `offset`: the one holding it, or
   // the one before the blank lines it falls in.
@@ -64,14 +74,21 @@ function joinedAround(ast, { start, end }, text) {
       blocks.findLastIndex((b) => b.position.start.offset <= offset),
     );
   let [first, last] = [holding(start), holding(Math.max(start, end - 1))];
-  while (first > 0 && joined(blocks[first - 1], blocks[first])) first--;
-  while (last + 1 < blocks.length && joined(blocks[last], blocks[last + 1]))
+  while (first > 0 && joined(blocks[first - 1], blocks[first], masked)) first--;
+  while (
+    last + 1 < blocks.length &&
+    joined(blocks[last], blocks[last + 1], masked)
+  )
     last++;
   const from = lineStart(text, blocks[first].position.start.offset);
-  // A fence never closed runs through the file's last newline, which the
-  // printer writes again. A misread's end may lie on a line the mask blanked,
-  // past every block.
-  const until = Math.max(blocks[last].position.end.offset, end);
+  // A block ends on the line its content stops on, short of indented code's
+  // blank lines and a fence never closed. A misread's end may lie on a line
+  // the mask blanked, past every block.
+  const { position } = blocks[last];
+  const until = Math.max(
+    lineStop(text, stopOf(masked, position.start.offset, position.end.offset)),
+    end,
+  );
   const to = from + text.slice(from, until).trimEnd().length;
   return {
     type: 'verbatim',
@@ -89,19 +106,27 @@ function joinedAround(ast, { start, end }, text) {
  *
  * @param {{start: number, end: number}} misread
  * @param {object} ast
- * @param {{containers: Block[], verbatim: Block[]}} constructs
+ * @param {{containers: Block[], verbatim: Block[], divs: Block[]}} constructs
  * @param {string} text
+ * @param {string} masked The text prettier parsed to `ast`.
  * @returns {Block}
  */
-export function stretchAround(misread, ast, { containers, verbatim }, text) {
+export function stretchAround(
+  misread,
+  ast,
+  { containers, verbatim, divs },
+  text,
+  masked,
+) {
+  const whole = { blocks: [...verbatim, ...containers], divs };
   const holder = containers.find(
     (c) => c.start <= misread.start && misread.start < c.end,
   );
   if (holder !== undefined) {
     const stretch = stretchOf(holder, containers, text);
-    if (misread.end <= stretch.end) return widen(stretch, verbatim, text);
+    if (misread.end <= stretch.end) return widen(stretch, whole, text);
   }
-  return widen(joinedAround(ast, misread, text), verbatim, text);
+  return widen(joinedAround(ast, misread, text, masked), whole, text);
 }
 
 // The end of the line `at` is on, short of its trailing spaces.
@@ -110,17 +135,28 @@ function lineStop(text, at) {
   return from + text.slice(from, lineEnd(text, at)).trimEnd().length;
 }
 
-// `stretch` grown to hold each verbatim block it cuts into, whole lines and
-// all: two masks over one line print it twice.
-function widen(stretch, verbatim, text) {
+// `stretch` grown to hold each block it cuts into, whole lines and all, and
+// both fences of each div it holds one of: withStretch drops a construct
+// starting inside it, and two masks over one line print it twice. A div whose
+// fences lie outside needs none: the mask blanks them.
+function widen(stretch, { blocks, divs }, text) {
   let { start, end } = stretch;
-  const cut = (v) =>
-    v.start < end &&
-    start < v.end &&
-    (v.start < start || stopOf(text, v.start, v.end) > end);
-  for (let v = verbatim.find(cut); v !== undefined; v = verbatim.find(cut)) {
-    start = Math.min(start, lineStart(text, v.start));
-    end = Math.max(end, lineStop(text, v.end));
+  const cut = (b) =>
+    b.start < end &&
+    start < b.end &&
+    (b.start < start || stopOf(text, b.start, b.end) > end);
+  const holds = (fence) => start <= fence.start && fence.start < end;
+  const cutDiv = (d) => d.close !== null && holds(d.open) !== holds(d.close);
+  for (;;) {
+    const block = blocks.find(cut);
+    const div = divs.find(cutDiv);
+    if (block === undefined && div === undefined) break;
+    const { start: from, end: to } = block ?? {
+      start: div.open.start,
+      end: div.close.end,
+    };
+    start = Math.min(start, lineStart(text, from));
+    end = Math.max(end, lineStop(text, to));
   }
   if (start === stretch.start && end === stretch.end) return stretch;
   return {
