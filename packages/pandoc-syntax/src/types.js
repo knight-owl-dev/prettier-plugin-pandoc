@@ -31,7 +31,7 @@
  * @typedef {'raw-tex' | 'line-block' | 'pipe-table' | 'grid-table' | 'simple-table'
  *   | 'multiline-table' | 'definition-list' | 'example-list' | 'fancy-list'
  *   | 'fenced-code' | 'indented-code' | 'html-comment' | 'yaml-metadata'
- *   | 'heading' | 'thematic-break'
+ *   | 'heading' | 'thematic-break' | 'paragraph'
  * } SpanType
  */
 

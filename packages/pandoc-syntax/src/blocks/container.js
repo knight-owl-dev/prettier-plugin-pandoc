@@ -13,7 +13,7 @@ import { perSyntax } from '../syntax.js';
 import { fencedCode } from './code.js';
 import { DIV_CLOSE } from './div.js';
 import { isThematicBreak } from './heading.js';
-import { isOrderedItem } from './list.js';
+import { isExampleItem, isOrderedItem } from './list.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
@@ -34,14 +34,21 @@ const patterns = perSyntax(({ blockIndent }) => ({
 const isListMarker = (text, syntax) =>
   patterns(syntax).bulletItem.test(text) ||
   patterns(syntax).plainItem.test(text) ||
-  isOrderedItem(text, syntax);
+  isOrderedItem(text, syntax) ||
+  isExampleItem(text, syntax);
 
 const isDefinitionMarker = (text, syntax) =>
   patterns(syntax).definitionMarker.test(text);
 
-// Whether a line opens a list, a definition among them; a thematic break is
-// none.
-const opensList = (text, syntax) =>
+/**
+ * Whether a line opens a list, a definition among them; a thematic break is
+ * none.
+ *
+ * @param {string} text
+ * @param {import('../syntax.js').Syntax} syntax
+ * @returns {boolean}
+ */
+export const opensList = (text, syntax) =>
   (isListMarker(text, syntax) && !isThematicBreak(text, syntax)) ||
   isDefinitionMarker(text, syntax);
 

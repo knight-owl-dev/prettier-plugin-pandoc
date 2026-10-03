@@ -2,7 +2,7 @@
 // math, autolinks.
 // A paragraph break ends each but a comment or a tag.
 
-import { breaksParagraph, paragraphEnd } from './lines.js';
+import { breaksParagraph } from './lines.js';
 
 export const COMMENT_OPEN = '<!--';
 export const COMMENT_CLOSE = '-->';
@@ -18,6 +18,27 @@ const AUTOLINK =
 const TAG =
   /<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][-\w:.]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/y;
 
+// Searches that found no close in `text`: an opener later in the same
+// stretch finds none either, since what closes one depends not on where it
+// opened. Inline math found none from `math[0]` to the paragraph break at
+// `math[1]`; a comment none after `comment`.
+let misses = { text: '', math: [0, 0], comment: Infinity };
+const missesIn = (text) => {
+  if (misses.text !== text) {
+    misses = { text, math: [0, 0], comment: Infinity };
+  }
+  return misses;
+};
+
+// Whether a paragraph break falls between `from` and `to`.
+function breaksBetween(text, from, to) {
+  for (let i = text.indexOf('\n', from); i !== -1 && i < to; ) {
+    if (breaksParagraph(text, i)) return true;
+    i = text.indexOf('\n', i + 1);
+  }
+  return false;
+}
+
 // A code span closes on a backtick run of the same length as its opener, and
 // no longer; one never closed leaves its backticks as text.
 function codeSpanEnd(text, at) {
@@ -27,7 +48,7 @@ function codeSpanEnd(text, at) {
   const close = new RegExp(`(?<!\`)${run}(?!\`)`, 'g');
   close.lastIndex = n;
   const match = close.exec(text);
-  return match === null || match.index > paragraphEnd(text, n)
+  return match === null || breaksBetween(text, n, match.index)
     ? n
     : match.index + run.length;
 }
@@ -61,12 +82,17 @@ const TEXT_GROUP = '\\text{';
 function inlineMathEnd(text, at) {
   const first = text[at + 1] ?? '';
   if (!/\S/.test(first) || first === INLINE_MATH) return at;
+  const { math } = missesIn(text);
+  if (math[0] <= at && at < math[1]) return at;
   let escaped = -1;
-  for (let i = at + 1; i < text.length; i++) {
+  // An opener inside a group the search passes over reads it differently.
+  let group = Infinity;
+  let i = at + 1;
+  for (; i < text.length; i++) {
     const char = text[i];
     if (text.startsWith(TEXT_GROUP, i)) {
       const end = bracedEnd(text, i + TEXT_GROUP.length - 1);
-      if (end !== null) i = end - 1;
+      if (end !== null) [group, i] = [Math.min(group, i), end - 1];
     } else if (char === '\\') escaped = ++i;
     else if (char === '\n' && breaksParagraph(text, i)) break;
     else if (char === INLINE_MATH) {
@@ -75,6 +101,7 @@ function inlineMathEnd(text, at) {
       return closes ? i + 1 : at;
     }
   }
+  misses.math = [at, Math.min(i, group)];
   return at;
 }
 
@@ -96,7 +123,10 @@ function pairEnd(text, at, open, close, limit = text.length) {
 export function opaqueEnd(text, at) {
   if (text[at] === '`') return codeSpanEnd(text, at);
   if (text.startsWith(COMMENT_OPEN, at)) {
-    return pairEnd(text, at, COMMENT_OPEN, COMMENT_CLOSE);
+    if (at >= missesIn(text).comment) return at;
+    const end = pairEnd(text, at, COMMENT_OPEN, COMMENT_CLOSE);
+    if (end === at) misses.comment = at;
+    return end;
   }
   if (text[at] === '<') {
     AUTOLINK.lastIndex = at;
@@ -107,8 +137,8 @@ export function opaqueEnd(text, at) {
     if (tag !== null) return at + tag[0].length;
   }
   if (text.startsWith(DISPLAY_MATH, at)) {
-    const limit = paragraphEnd(text, at);
-    return pairEnd(text, at, DISPLAY_MATH, DISPLAY_MATH, limit);
+    const end = pairEnd(text, at, DISPLAY_MATH, DISPLAY_MATH);
+    return breaksBetween(text, at, end) ? at : end;
   }
   if (text[at] === INLINE_MATH) return inlineMathEnd(text, at);
   return at;

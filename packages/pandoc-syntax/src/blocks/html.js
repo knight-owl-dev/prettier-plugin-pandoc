@@ -67,6 +67,19 @@ const BLOCK_TAGS = [
 const OPENING_BLOCK_TAGS = ['script'];
 
 const TAG = `(</?(${BLOCK_TAGS.join('|')})|<(${OPENING_BLOCK_TAGS.join('|')}))(\\s|/?>|$)`;
+const BLOCK_TAG = new RegExp(TAG, 'iy');
+
+/**
+ * Whether a block-level tag opens at `at`: one Pandoc reads as no inline tag.
+ *
+ * @param {string} text
+ * @param {number} at
+ */
+export function opensBlockTag(text, at) {
+  BLOCK_TAG.lastIndex = at;
+  return BLOCK_TAG.test(text);
+}
+
 // A tag at any depth, for where indented code cannot open.
 const TAG_AT_ANY_INDENT = new RegExp(`^[ \\t]*${TAG}`, 'i');
 const patterns = perSyntax((syntax) => ({

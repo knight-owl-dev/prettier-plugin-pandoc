@@ -68,6 +68,8 @@ const CASES = {
   'a letter before the @': '(a@)  one',
   'a space inside the marker': '(1 @)  one',
   'a definition list inside a div': '::: note\nTerm\n:   Def\n:::',
+  'an example list cutting a code span short in an item':
+    '- see `a\n  (@) c\n  d` e',
 };
 
 for (const [name, text] of Object.entries(CASES)) {

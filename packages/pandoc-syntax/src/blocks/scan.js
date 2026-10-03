@@ -9,6 +9,7 @@
 import { BLANK, segmentsOf, strip } from '../lines.js';
 import { definitionList } from './container.js';
 import { DIV_CLOSE } from './div.js';
+import { holding } from './held.js';
 import { texInParagraph } from './raw-tex.js';
 import { INTERRUPTERS, ITEM_INTERRUPTERS, REGISTRY } from './registry.js';
 
@@ -152,6 +153,7 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
   let paragraph = null;
 
   const context = contextFor(text, syntax, inItem);
+  const held = holding(lines, syntax, inItem);
 
   /**
    * Report what a match found, and return the line read last: at a resume
@@ -178,19 +180,52 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
     return k - 1;
   };
 
+  // A paragraph Pandoc reads past a blank line, which CommonMark ends there:
+  // where it starts, and its last line so far.
+  /** @type {{from: number, start: number} | null} */
+  let pastBlank = null;
+  let last = -1;
+
+  // End the paragraph open, reporting it if it ran past a blank line: on its
+  // last line, or before a match opening mid-line on line `n`.
+  const endParagraph = (/** @type {Match | null} */ match, n) => {
+    const [spec] = match?.spans ?? [];
+    const before =
+      spec?.from === n && spec.start !== undefined
+        ? lines[n].text.slice(0, spec.start - lines[n].start).trimEnd()
+        : '';
+    if (pastBlank !== null) {
+      const [to, end] =
+        before === ''
+          ? [last, lines[last].end]
+          : [n, lines[n].start + before.length];
+      out.push(
+        toBlock(lines, {
+          type: 'paragraph',
+          from: pastBlank.from,
+          to,
+          start: pastBlank.start,
+          end,
+        }),
+      );
+    }
+    pastBlank = null;
+    paragraph = null;
+  };
+
   for (let n = 0; n < lines.length; n++) {
     const line = lines[n];
     if (BLANK.test(line.text)) {
-      paragraph = null;
+      endParagraph(null, n);
       continue;
     }
     if (open.length > 0 && DIV_CLOSE.test(line.text)) {
+      endParagraph(null, n);
       out.push({
         type: 'div',
         open: open.pop(),
         close: { start: line.start, end: line.end },
       });
-      paragraph = null;
       continue;
     }
 
@@ -203,10 +238,43 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
       n,
       context,
     );
-    if (match !== null) n = take(match);
-    else if (paragraph === null) paragraph = { lines: 1, start: line.start };
+    if (match !== null) {
+      endParagraph(match, n);
+      n = take(match);
+      continue;
+    }
+    if (paragraph === null) paragraph = { lines: 1, start: line.start };
     else paragraph.lines++;
+    last = n;
+
+    // Pandoc reads a paragraph's inlines before asking any line whether it
+    // opens a block: the lines a construct spans are the paragraph's, and on
+    // the line it ends on, only raw TeX after it may end the paragraph.
+    const first = n - paragraph.lines + 1;
+    let k = n;
+    let raw = null;
+    for (let next = held.through(k); next !== k; next = held.through(k)) {
+      if (
+        pastBlank === null &&
+        lines.slice(k + 1, next).some((l) => BLANK.test(l.text))
+      ) {
+        pastBlank = { from: first, start: paragraph.start };
+      }
+      k = next;
+      paragraph.lines = k - first;
+      context.paragraph = paragraph;
+      raw = texInParagraph.match(lines, k, context);
+      if (raw !== null) break;
+      paragraph.lines++;
+    }
+    if (raw !== null) {
+      endParagraph(raw, k);
+      n = take(raw);
+    } else {
+      n = last = k;
+    }
   }
+  endParagraph(null, lines.length);
 
   // A div never closed runs to the end of the document.
   for (const span of open) out.push({ type: 'div', open: span, close: null });

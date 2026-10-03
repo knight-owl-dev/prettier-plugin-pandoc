@@ -9,7 +9,7 @@
 // cspell:ignore vadjust
 
 import { commandEnd, groupsAfter, startsCommand } from '../command.js';
-import { BLANK, breaksParagraph } from '../lines.js';
+import { BLANK, closeOf, viewFrom } from '../lines.js';
 import { COMMENT_CLOSE, COMMENT_OPEN, opaqueEnd } from '../opaque.js';
 import { BEGIN } from '../tex.js';
 import {
@@ -121,51 +121,65 @@ function takesMissing(text, at, kinds) {
   return !endsParagraph(text, at + next) && !opensEnvironment(text, at + next);
 }
 
-// Whether a paragraph break comes at `at`, ending the brackets and
-// parentheses open there.
-const breaksAt = (text, at) => text[at] === '\n' && breaksParagraph(text, at);
-
 // The offset past the parentheses opening at `at`, or null.
-function parensEnd(text, at) {
-  let depth = 0;
-  for (let i = at; i < text.length; i++) {
-    if (breaksAt(text, i)) return null;
-    if (text[i] === '\\') i++;
-    else if (text[i] === '(') depth++;
-    else if (text[i] === ')' && --depth === 0) return i + 1;
-  }
-  return null;
+const parensEnd = (text, at) => closeOf(text, at, '(', ')', escaped);
+
+// Past the character at `at`, and the one after a backslash.
+const escaped = (text, at) => at + (text[at] === '\\' ? 2 : 1);
+
+// The offset past the brackets opening at `at`, or null when they never close
+// before `limit`.
+function bracketsClose(text, at, limit = text.length) {
+  const close = closeOf(text, at, '[', ']', past);
+  return close !== null && close <= limit ? close : null;
 }
 
 // The offset past the brackets opening at `at`, a link destination after them
-// included, or null when they never close.
-function bracketsEnd(text, at) {
-  let depth = 0;
-  for (let i = at; i < text.length; ) {
-    if (breaksAt(text, i)) return null;
-    if (text[i] === '[') depth++;
-    else if (text[i] === ']' && --depth === 0) {
-      return (text[i + 1] === '(' && parensEnd(text, i + 1)) || i + 1;
-    }
-    i = text[i] === '[' || text[i] === ']' ? i + 1 : past(text, i);
-  }
-  return null;
+// included, or null when they never close. Brackets past `to`, in a link's
+// text, hold nothing: a line there may open a block.
+function bracketsEnd(text, at, to = text.length) {
+  const close = bracketsClose(text, at, to);
+  if (close === null) return null;
+  return (text[close] === '(' && parensEnd(text, close)) || close;
 }
 
-// The text from `start` on line `from` up to a blank line, or with `whole` to
-// the end of `lines`, and where each line's text sits in it.
-function viewFrom(lines, from, start, whole = false) {
-  const parts = [];
-  let text = '';
-  for (let k = from; k < lines.length; k++) {
-    if (!whole && k > from && BLANK.test(lines[k].text)) break;
-    const head = k === from ? start - lines[k].start : 0;
-    if (k > from) text += '\n';
-    parts.push({ at: text.length, head });
-    text += lines[k].text.slice(head);
+/**
+ * The offset past the command at `at` as Pandoc reads it in paragraph text:
+ * one raw inline, its arguments with it, unless an argument it reads as
+ * inlines holds a block, which fails it and leaves its name.
+ *
+ * @param {string} text
+ * @param {number} at
+ * @returns {number}
+ */
+export function pastCommand(text, at) {
+  NAME.lastIndex = at;
+  const name = NAME.exec(text)[1];
+  if (!INLINE_COMMANDS.has(name) || RAW_INLINE.has(name)) {
+    return commandEnd(text, at) ?? at + 2;
   }
-  return { text, parts };
+  const named = at + 1 + name.length;
+  const end = pastInline(text, at, name);
+  if (end > named || INLINE_ARGUMENTS.has(name) || name === 'vadjust') {
+    return end;
+  }
+  const whole = commandEnd(text, at) ?? named;
+  return holdsBlock(text, named, whole, false) ? named : whole;
 }
+
+/**
+ * The offset past what opens at `at` in inline text: brackets and a link
+ * destination after them, a command and its arguments, an opaque construct,
+ * an escape, or a character. Brackets whose text runs past `to` are only a
+ * character.
+ *
+ * @param {string} text
+ * @param {number} at
+ * @param {number} [to]
+ * @returns {number}
+ */
+export const pastInlines = (text, at, to) =>
+  (text[at] === '[' && bracketsEnd(text, at, to)) || past(text, at);
 
 // Whether raw TeX may end a paragraph somewhere in `text`.
 const opensAhead = (text) => text.includes(BEGIN_PREFIX) || endsParagraph(text);
@@ -184,7 +198,9 @@ const opensAhead = (text) => text.includes(BEGIN_PREFIX) || endsParagraph(text);
 function inParagraph(lines, from, start, at) {
   const line = lines[at];
   if (!opensAhead(line.text)) return null;
-  let view = viewFrom(lines, from, start);
+  // A comment holding a blank line keeps the paragraph open past it.
+  const spansBlank = lines.slice(from, at).some((l) => BLANK.test(l.text));
+  let view = viewFrom(lines, from, start, spansBlank);
   const { at: lineStart, head } = view.parts[at - from];
   const lineEnd = lineStart + line.text.length - head;
   for (let i = 0; i < lineEnd; ) {
@@ -196,9 +212,7 @@ function inParagraph(lines, from, start, at) {
       view = viewFrom(lines, from, start, true);
     }
     if (!opensEnvironment(view.text, i) && !endsParagraph(view.text, i)) {
-      i =
-        (view.text[i] === '[' && bracketsEnd(view.text, i)) ||
-        past(view.text, i);
+      i = pastInlines(view.text, i);
       continue;
     }
     if (i >= lineStart) {

@@ -90,7 +90,7 @@ function restoreVerbatim(children, verbatim, text) {
     const lines = block.segments.map((s) => text.slice(s.start, s.end));
     out.push({
       type: VERBATIM,
-      definitions: block.type === 'definition-list',
+      kind: block.type,
       value: lines.join('\n') + text.slice(block.end, end),
       position: { start: { offset: block.start }, end: { offset: end } },
     });
@@ -130,8 +130,8 @@ function endsHard(paragraph, text, tabStop) {
 }
 
 /**
- * Join each paragraph to a verbatim block or a list on the next line, with
- * the hard break its line may end in, and each definition list to any block
+ * Join each paragraph, one printed as written too, to a verbatim block or a
+ * list on the next line, with the hard break its line may end in, and each definition list to any block
  * on the next line. A list there is one Pandoc opens in a list item, at any
  * depth: anywhere else the parsers part and it prints as written.
  *
@@ -146,10 +146,16 @@ function joinParagraphs(children, text, tabStop) {
     ONE_BREAK.test(text.slice(above.position.end.offset, offsetOf(below)));
   for (const node of children) {
     const last = out.at(-1);
+    const paragraph =
+      last?.type === 'paragraph' ||
+      (last?.type === VERBATIM && last.kind === 'paragraph');
+    // Prettier keeps its own paragraph a line from raw HTML after it; one
+    // printed as written, it does not.
+    const held = last?.type === VERBATIM && last.kind === 'paragraph';
     const joins =
-      (last?.type === 'paragraph' &&
-        (node.type === VERBATIM || node.type === 'list')) ||
-      (last?.type === VERBATIM && last.definitions);
+      (paragraph && (node.type === VERBATIM || node.type === 'list')) ||
+      (held && node.type === 'html') ||
+      (last?.type === VERBATIM && last.kind === 'definition-list');
     if (joins && nextLine(last, node)) {
       out[out.length - 1] = {
         type: JOINED,
