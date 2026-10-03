@@ -96,3 +96,27 @@ export function commandEnd(text, at) {
   if (args === 0) while (SPACE.test(text[i] ?? '')) i++;
   return i;
 }
+
+/**
+ * The groups after a command name ending at `at`, up to `count`: options
+ * before each passed over, the first after spaces or one line down, the rest
+ * straight after. Fewer where the groups stop.
+ *
+ * @param {string} text
+ * @param {number} at
+ * @param {number} count
+ * @returns {{start: number, end: number}[]}
+ */
+export function groupsAfter(text, at, count) {
+  const groups = [];
+  let i = at;
+  while (groups.length < count) {
+    const open = groups.length === 0 ? pastGap(text, i) : i;
+    if (CLOSES[text[open]] === undefined) break;
+    const end = groupEnd(text, open);
+    if (end === null) break;
+    if (text[open] === '{') groups.push({ start: open, end });
+    i = end;
+  }
+  return groups;
+}

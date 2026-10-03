@@ -3,12 +3,22 @@
 // past the whitespace after a run, mid-line or on the next line.
 //
 // In paragraph text, an environment or a block command Pandoc does not read
-// inline ends the paragraph where it opens, unless balanced brackets hold it.
+// inline ends the paragraph where it opens, unless balanced brackets or an
+// argument Pandoc reads raw hold it.
 
-import { commandEnd, startsCommand } from '../command.js';
+// cspell:ignore vadjust
+
+import { commandEnd, groupsAfter, startsCommand } from '../command.js';
 import { BLANK, breaksParagraph } from '../lines.js';
 import { COMMENT_CLOSE, COMMENT_OPEN, opaqueEnd } from '../opaque.js';
 import { BEGIN } from '../tex.js';
+import {
+  COLORED,
+  INLINE_ARGUMENTS,
+  INLINE_COMMANDS,
+  INLINE_ENVIRONMENTS,
+  RAW_INLINE,
+} from '../tex-names.js';
 import { endsParagraph, gapEnd, runEnd } from './tex-run.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
@@ -20,6 +30,14 @@ const OPENS_ENVIRONMENT = new RegExp(BEGIN, 'y');
 
 const BEGIN_PREFIX = '\\begin{';
 
+// Whether an environment Pandoc reads as a block opens at `at`: any but its
+// inline ones.
+function opensEnvironment(text, at) {
+  OPENS_ENVIRONMENT.lastIndex = at;
+  const name = OPENS_ENVIRONMENT.exec(text)?.[1];
+  return name !== undefined && !INLINE_ENVIRONMENTS.has(name);
+}
+
 // Past what opens at `at` in inline text: an opaque construct, a command and
 // its arguments, an escape, or a character. A `\begin` is only its own text:
 // brackets balance through an environment.
@@ -27,8 +45,80 @@ function past(text, at) {
   const opaque = opaqueEnd(text, at);
   if (opaque > at) return opaque;
   if (text.startsWith(BEGIN_PREFIX, at)) return at + BEGIN_PREFIX.length;
-  if (startsCommand(text, at)) return commandEnd(text, at) ?? at + 2;
+  if (startsCommand(text, at)) {
+    NAME.lastIndex = at;
+    const name = NAME.exec(text)[1];
+    return INLINE_COMMANDS.has(name) && !RAW_INLINE.has(name)
+      ? pastInline(text, at, name)
+      : (commandEnd(text, at) ?? at + 2);
+  }
   return at + (text[at] === '\\' ? 2 : 1);
+}
+
+const NAME = /\\([A-Za-z]+)/y;
+
+// Whether a block opens between `from` and `to`, failing an inline argument;
+// an environment does unless `environments` holds. A colored command fails
+// one by its own argument, which the scan reaches.
+function holdsBlock(text, from, to, environments) {
+  for (let i = from; i < to; i = past(text, i)) {
+    if (endsParagraph(text, i)) {
+      NAME.lastIndex = i;
+      if (!COLORED.has(NAME.exec(text)[1])) return true;
+    }
+    if (!environments && opensEnvironment(text, i)) return true;
+  }
+  return false;
+}
+
+// Past an inline command Pandoc knows: with its arguments where its parse
+// takes them, only its name where a block in an argument it reads as inlines
+// fails it, and the arguments are then paragraph text. One reading every
+// argument as inlines is its name either way.
+function pastInline(text, at, name) {
+  if (memo.text !== text) memo = { text, ends: new Map() };
+  let end = memo.ends.get(at);
+  if (end === undefined) {
+    end = commandArgumentsEnd(text, at, name);
+    memo.ends.set(at, end);
+  }
+  return end;
+}
+
+// The ends `pastInline` found in the text it last read: a failed command is
+// read again from every argument around it, nested ones exponentially often.
+let memo = { text: '', ends: new Map() };
+
+function commandArgumentsEnd(text, at, name) {
+  const named = at + 1 + name.length;
+  if (name === 'vadjust') {
+    // Raw up to and through its first group.
+    const open = text.indexOf('{', named);
+    const [group] = open === -1 ? [] : groupsAfter(text, open, 1);
+    return group?.end ?? named;
+  }
+  const kinds = INLINE_ARGUMENTS.get(name);
+  if (kinds === undefined) return named;
+  const groups = groupsAfter(text, named, kinds.length);
+  const end = groups.at(-1)?.end ?? named;
+  const fails =
+    groups.some(
+      (group, n) =>
+        kinds[n] !== 'r' &&
+        holdsBlock(text, group.start + 1, group.end - 1, kinds[n] === 'e'),
+    ) || !takesMissing(text, end, kinds.slice(groups.length));
+  return fails ? named : end;
+}
+
+// Whether the arguments of `kinds` a command lacks groups for are taken from
+// `at` on: a raw one never is, one of inlines takes the next token, which a
+// block cannot be.
+function takesMissing(text, at, kinds) {
+  if (kinds.length === 0) return true;
+  if (kinds.includes('r')) return false;
+  const next = text.slice(at).search(/\S/);
+  if (next === -1) return false;
+  return !endsParagraph(text, at + next) && !opensEnvironment(text, at + next);
 }
 
 // Whether a paragraph break comes at `at`, ending the brackets and
@@ -105,8 +195,7 @@ function inParagraph(lines, from, start, at) {
     ) {
       view = viewFrom(lines, from, start, true);
     }
-    OPENS_ENVIRONMENT.lastIndex = i;
-    if (!OPENS_ENVIRONMENT.test(view.text) && !endsParagraph(view.text, i)) {
+    if (!opensEnvironment(view.text, i) && !endsParagraph(view.text, i)) {
       i =
         (view.text[i] === '[' && bracketsEnd(view.text, i)) ||
         past(view.text, i);

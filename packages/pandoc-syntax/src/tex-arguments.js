@@ -10,7 +10,12 @@
 // cspell:disable
 
 import { BLANK } from './lines.js';
-import { ALSO_INLINE, BLOCK_COMMANDS } from './tex-names.js';
+import {
+  ALSO_INLINE,
+  BLOCK_COMMANDS,
+  COLORED,
+  INLINE_ENVIRONMENTS,
+} from './tex-names.js';
 
 /** @typedef {import('./types.js').Line} Line */
 /** @typedef {{k: number, i: number}} Place */
@@ -98,7 +103,12 @@ const braced = (lines, p) =>
 /** @type {Parser} */
 const grouped = (lines, p) => braced(lines, sp(lines, p));
 
-const END = /\\end(?![A-Za-z])/;
+const INLINE_NAMES = [...INLINE_ENVIRONMENTS]
+  .map((name) => name.replace('*', '\\*'))
+  .join('|');
+const END = new RegExp(
+  `\\\\end(?![A-Za-z])(?![ \\t]*\\{(?:${INLINE_NAMES})\\})`,
+);
 
 // A group right at `p` Pandoc reads as inline text: no blank line in it, and no
 // `\end`.
@@ -522,6 +532,7 @@ const PARSERS = new Map([
   ['endinput', (lines) => toEnd(lines)],
   ['write', seq(digits, braced)],
   ['titleformat', seq(braced, skipopts, times(4, braced))],
+  ...[...COLORED].map((name) => [name, coloredBlock]),
 ]);
 
 const DIGITS = /\d*/y;
@@ -531,6 +542,29 @@ function digits(lines, p) {
   DIGITS.lastIndex = p.i;
   DIGITS.exec(textAt(lines, p));
   return { k: p.k, i: DIGITS.lastIndex };
+}
+
+const BLOCK = new RegExp(
+  `\\\\(?:begin[ \\t]*\\{(?!(?:${INLINE_NAMES})\\})|(?:${[...BLOCK_COMMANDS].filter((name) => !ALSO_INLINE.has(name)).join('|')})(?![A-Za-z]))`,
+);
+
+// Pandoc's `coloredBlock`: options, a color, and a group after `sp` that is no
+// inline text: one holding a blank line, `\end`, a block command or an
+// environment.
+/** @type {Parser} */
+function coloredBlock(lines, p) {
+  const color = braced(lines, skipopts(lines, p));
+  if (color === null) return null;
+  const open = sp(lines, color);
+  const past = braced(lines, open);
+  if (past === null || inlineGroup(lines, open) === null) return past;
+  for (let k = open.k; k <= past.k; k++) {
+    const from = k === open.k ? open.i : 0;
+    const to = k === past.k ? past.i : lines[k].text.length;
+    const text = lines[k].text.slice(from, to).replace(/(?<!\\)%.*/, '');
+    if (BLOCK.test(text)) return past;
+  }
+  return null;
 }
 
 // `\graphicspath`: a group of nothing but groups and whitespace.
