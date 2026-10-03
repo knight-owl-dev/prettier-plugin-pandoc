@@ -6,15 +6,13 @@
 
 import { BLANK } from '../lines.js';
 import { BEGIN, environmentEnd } from '../tex.js';
+import { blockArgumentsEnd, groupEnd, pastSpaces } from '../tex-arguments.js';
 import {
   ALSO_INLINE,
   BLOCK_COMMANDS,
   DEFINITIONS,
   DEFS,
   INLINE_COMMANDS,
-  INTERLEAVED,
-  REQUIRED_GROUPS,
-  SECTIONING,
 } from '../tex-names.js';
 
 /** @typedef {import('../types.js').Line} Line */
@@ -40,16 +38,7 @@ export function endsParagraph(text, at) {
   return ENDS_PARAGRAPH_AT.test(text);
 }
 
-const SPACES = /[ \t]*/y;
-
 const textAt = (lines, p) => lines[p.k].text;
-
-/** @returns {Place} */
-function pastSpaces(lines, p) {
-  SPACES.lastIndex = p.i;
-  SPACES.exec(textAt(lines, p));
-  return { k: p.k, i: SPACES.lastIndex };
-}
 
 // The command at `p`: its name, and the place after it.
 function commandAt(lines, p) {
@@ -58,22 +47,6 @@ function commandAt(lines, p) {
   return name === undefined
     ? null
     : { name, end: { k: p.k, i: COMMAND.lastIndex } };
-}
-
-// Past the group `open` opens at `p`, across lines, blank ones included, or
-// null when it never closes. A backslash escapes the character after it, and
-// a `%` comment hides the rest of its line.
-function groupEnd(lines, p, open, close) {
-  let depth = 0;
-  for (let k = p.k, i = p.i; k < lines.length; k++, i = 0) {
-    const { text } = lines[k];
-    for (; i < text.length && text[i] !== '%'; i++) {
-      if (text[i] === '\\') i++;
-      else if (text[i] === open) depth++;
-      else if (text[i] === close && --depth === 0) return { k, i: i + 1 };
-    }
-  }
-  return null;
 }
 
 const OPTION = ['[', ']'];
@@ -148,36 +121,26 @@ function unknownEnd(lines, command) {
 const opensPiece = ({ name }) =>
   name !== 'begin' && name !== 'end' && !INLINE_COMMANDS.has(name);
 
-// Past the whitespace from `p` on, as TeX reads it: spaces, comments and line
-// breaks, blank lines among them.
-/** @returns {Place} */
-function pastWhitespace(lines, p) {
-  for (let { k, i } = p; k < lines.length; k++, i = 0) {
-    const at = pastSpaces(lines, { k, i });
-    if (at.i < lines[k].text.length && lines[k].text[at.i] !== '%') return at;
-  }
-  return { k: lines.length - 1, i: lines.at(-1).text.length };
-}
-
-const LABEL = /\\label(?![A-Za-z])/y;
-
-// Past the label a sectioning command takes from `p`, or null when none
-// follows.
-function labelEnd(lines, p) {
-  const at = pastWhitespace(lines, p);
-  LABEL.lastIndex = at.i;
-  if (!LABEL.test(textAt(lines, at))) return null;
-  const group = pastWhitespace(lines, { k: at.k, i: LABEL.lastIndex });
-  return textAt(lines, group)[group.i] === '{'
-    ? groupEnd(lines, group, ...GROUP)
-    : null;
-}
-
 // The text from `p` on, a line at a time.
 function* textFrom(lines, p) {
   const line = lines[p.k];
   yield { text: line.text.slice(p.i), start: line.start + p.i };
   for (let k = p.k + 1; k < lines.length; k++) yield lines[k];
+}
+
+// `end` moved back over the whitespace before it, to no earlier than `from`.
+// A piece's parse can read whitespace past its last line, blank lines too, and
+// the run goes on from there; the raw text stops short of it.
+function trimmed(lines, from, end) {
+  let { k, i } = end;
+  while (k > from.k || i > from.i) {
+    if (i === 0) {
+      k--;
+      i = lines[k].text.length;
+    } else if (/[ \t]/.test(lines[k].text[i - 1])) i--;
+    else break;
+  }
+  return { k, i };
 }
 
 // Past the piece of raw TeX at `p`, or null when none opens there.
@@ -187,6 +150,9 @@ function pieceEnd(lines, p) {
   if (name !== undefined) {
     const close = environmentEnd(name, textFrom(lines, p));
     if (close === null) return null;
+    // Pandoc skips everything after the document.
+    if (name === 'document')
+      return { k: lines.length - 1, i: lines.at(-1).text.length };
     const k = p.k + close.chunk;
     return { k, i: close.end - lines[k].start };
   }
@@ -194,8 +160,8 @@ function pieceEnd(lines, p) {
   if (command === null || !opensPiece(command)) return null;
   if (DEFINITIONS.has(command.name)) return definitionEnd(lines, command);
   if (BLOCK_COMMANDS.has(command.name)) {
-    const end = argumentsEnd(lines, command.end, INTERLEAVED.has(command.name));
-    return SECTIONING.has(command.name) ? (labelEnd(lines, end) ?? end) : end;
+    const named = { k: p.k, i: p.i + 1 + command.name.length };
+    return blockArgumentsEnd(lines, command.name, named);
   }
   return unknownEnd(lines, command);
 }
@@ -216,27 +182,6 @@ export function gapEnd(lines, p) {
 }
 
 /**
- * Where the run of raw TeX ending a paragraph at `p` ends, or null when none
- * does: a block command there needs its groups.
- *
- * @param {Line[]} lines
- * @param {Place} p
- * @returns {Place | null}
- */
-export function paragraphRunEnd(lines, p) {
-  const command = commandAt(lines, p);
-  if (command !== null && command.name !== 'begin') {
-    const { groups } = argumentsOf(
-      lines,
-      command.end,
-      INTERLEAVED.has(command.name),
-    );
-    if (groups < (REQUIRED_GROUPS.get(command.name) ?? 0)) return null;
-  }
-  return runEnd(lines, p);
-}
-
-/**
  * Where the run of raw TeX opening at `p` ends, or null when none opens there.
  *
  * @param {Line[]} lines
@@ -248,7 +193,7 @@ export function runEnd(lines, p) {
   if (end === null) return null;
   for (;;) {
     const next = pieceEnd(lines, gapEnd(lines, end));
-    if (next === null) return end;
+    if (next === null) return trimmed(lines, p, end);
     end = next;
   }
 }
