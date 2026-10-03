@@ -26,8 +26,8 @@ const NOT_TERMS = REGISTRY.filter(
   (r) => r !== definitionList && r !== texInParagraph,
 );
 
-// The containers Pandoc reads as list items, where a list may open straight
-// after a paragraph line.
+// The containers Pandoc reads as list items. In one, at any depth, a list may
+// open straight after a paragraph line.
 const ITEMS = new Set(['list-item', 'definition']);
 
 /**
@@ -90,14 +90,16 @@ function toContainer(lines, from, to, type, content) {
  *
  * @param {string} text
  * @param {import('../syntax.js').Syntax} syntax
+ * @param {boolean} inItem
  * @returns {Context}
  */
-function contextFor(text, syntax) {
+function contextFor(text, syntax, inItem) {
   /** @type {Context} */
   const context = {
     syntax,
     text,
     inDiv: false,
+    inItem,
     paragraph: null,
     // Asked at a block start, which is where a term would open.
     opensBlock: (lines, at) =>
@@ -115,10 +117,11 @@ function contextFor(text, syntax) {
  * @param {Line[]} lines
  * @param {string} text
  * @param {import('../syntax.js').Syntax} syntax
- * @param {boolean} inItem Whether the paragraph is in a list item's content.
+ * @param {boolean} inItem Whether the paragraph is in a list item's content,
+ *   at any depth.
  */
 export function endsParagraph(lines, text, syntax, inItem) {
-  const context = contextFor(text, syntax);
+  const context = contextFor(text, syntax, inItem);
   const opened = firstMatch(REGISTRY, lines, 0, context);
   if (opened !== null && opened.last >= 1) return true;
   const paragraph = {
@@ -139,7 +142,8 @@ export function endsParagraph(lines, text, syntax, inItem) {
  * @param {number} divDepth Divs open around this document, whose closing fence
  *   ends a container inside them.
  * @param {import('../syntax.js').Syntax} syntax
- * @param {boolean} [inItem] Whether `lines` are a list item's content.
+ * @param {boolean} [inItem] Whether `lines` are in a list item's content, at
+ *   any depth.
  */
 export function scan(lines, text, out, divDepth, syntax, inItem = false) {
   /** @type {Span[]} */
@@ -147,17 +151,7 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
   /** @type {Context['paragraph']} */
   let paragraph = null;
 
-  /** @type {Context} */
-  const context = {
-    syntax,
-    text,
-    inDiv: false,
-    paragraph: null,
-    // Asked at a block start, which is where a term would open.
-    opensBlock: (lines, at) =>
-      firstMatch(NOT_TERMS, lines, at, { ...context, paragraph: null }) !==
-      null,
-  };
+  const context = contextFor(text, syntax, inItem);
 
   /**
    * Report what a match found, and return the line read last: at a resume
@@ -171,7 +165,7 @@ export function scan(lines, text, out, divDepth, syntax, inItem = false) {
     for (const { type, from, to, content } of match.containers ?? []) {
       out.push(toContainer(lines, from, to, type, content));
       const depth = divDepth + open.length;
-      scan(content, text, out, depth, syntax, ITEMS.has(type));
+      scan(content, text, out, depth, syntax, inItem || ITEMS.has(type));
     }
     paragraph = null;
     if (match.resume === undefined) return match.last;
