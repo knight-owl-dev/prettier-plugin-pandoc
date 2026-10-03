@@ -1,6 +1,7 @@
 // Code blocks, fenced and indented. Pandoc reads no markdown inside either, so
 // each is reported for a caller scanning for inline syntax to pass over.
 
+import { ATTRIBUTES } from '../attributes.js';
 import { BLANK, indentOf } from '../lines.js';
 import { perSyntax } from '../syntax.js';
 
@@ -9,12 +10,10 @@ import { perSyntax } from '../syntax.js';
 
 // What Pandoc takes after an opening fence: a raw attribute, or a language
 // and an attribute block, either optional, then nothing.
-const NAME = '[A-Za-z][\\w:.-]*';
-const ATTRIBUTE = `(?:[#.]${NAME}|${NAME}=(?:"[^"]*"|'[^']*'|[^\\s}]*)|-)`;
 const INFO = [
   '[ \\t]*',
   `(?:\\{[ \\t]*=[\\w-]+[ \\t]*\\}`,
-  `|[^\\s\`{}]*[ \\t]*(?:\\{[ \\t]*(?:${ATTRIBUTE}[ \\t]*)*\\})?)`,
+  `|[^\\s\`{}]*[ \\t]*(?:${ATTRIBUTES})?)`,
   '[ \\t]*$',
 ].join('');
 

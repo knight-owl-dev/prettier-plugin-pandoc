@@ -14,6 +14,7 @@ import { fencedCode } from './code.js';
 import { DIV_CLOSE } from './div.js';
 import { isThematicBreak } from './heading.js';
 import { isExampleItem, isOrderedItem } from './list.js';
+import { tableAt } from './table.js';
 
 /** @typedef {import('../types.js').Recognizer} Recognizer */
 /** @typedef {import('../types.js').Line} Line */
@@ -212,7 +213,8 @@ function markerAfter(lines, at, syntax, blanks = Infinity) {
 /**
  * A definition list: terms, each a line, and their definitions, each read as
  * a list item. The first term is a line opening no block of its own, one
- * blank line at most before its marker; a later one is any line.
+ * blank line at most before its marker, and none where a table opens there:
+ * the marker is its caption. A later term is any line.
  *
  * @type {Recognizer}
  */
@@ -227,7 +229,12 @@ export const definitionList = {
     /** @type {NonNullable<Match['containers']>} */
     const containers = [];
     let last = at;
-    for (let n = markerAfter(lines, at, syntax, 1); n !== -1; ) {
+    const first = markerAfter(lines, at, syntax, 1);
+    const ends = (n) =>
+      context.opensBlock(lines, n) ||
+      (context.inDiv && DIV_CLOSE.test(lines[n].text));
+    if (first === at + 2 && tableAt(lines, first, syntax, ends)) return null;
+    for (let n = first; n !== -1; ) {
       const marker = patterns(syntax).definitionMarker.exec(lines[n].text);
       const { last: end, content } = itemBody(lines, n, marker, context);
       containers.push({ type: 'definition', from: n, to: end, content });
