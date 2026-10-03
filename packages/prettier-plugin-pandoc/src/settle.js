@@ -2,8 +2,8 @@
 // this plugin's own, in the node of prettier's tree that holds it.
 
 import { containerNodes } from './containers.js';
-import { DIV, INLINE_RAW, VERBATIM } from './nodes.js';
-import { lineEnd } from './text.js';
+import { DIV, INLINE_RAW, JOINED, VERBATIM } from './nodes.js';
+import { lineEnd, stopOf } from './text.js';
 
 /** @typedef {import('@knight-owl-dev/pandoc-syntax').Block} Block */
 /** @typedef {{start: number, end: number}} Span */
@@ -98,6 +98,69 @@ function restoreVerbatim(children, verbatim, text) {
   return out;
 }
 
+const ONE_BREAK = /^[^\n]*\n[^\n]*$/;
+
+// The column `at` is at on its line, tabs expanded as Pandoc expands them.
+function columnOf(text, at, tabStop) {
+  let column = 0;
+  for (let i = text.lastIndexOf('\n', at - 1) + 1; i < at; i++) {
+    column += text[i] === '\t' ? tabStop - (column % tabStop) : 1;
+  }
+  return column;
+}
+
+const lastLeaf = (node) =>
+  node.children?.length > 0 ? lastLeaf(node.children.at(-1)) : node;
+
+/**
+ * Whether a paragraph's line ends in a hard break to Pandoc: two columns of
+ * whitespace or more, none of it inline raw TeX's.
+ *
+ * @param {object} paragraph
+ * @param {string} text
+ * @param {number} tabStop
+ */
+function endsHard(paragraph, text, tabStop) {
+  const { start, end } = paragraph.position;
+  const stop = stopOf(text, start.offset, end.offset);
+  if (lastLeaf(paragraph).position.end.offset > stop) return false;
+  const line = lineEnd(text, end.offset);
+  return columnOf(text, line, tabStop) - columnOf(text, stop, tabStop) >= 2;
+}
+
+/**
+ * Join each paragraph to the verbatim block on the line after it, with the
+ * hard break its line may end in.
+ *
+ * @param {object[]} children
+ * @param {string} text
+ * @param {number} tabStop
+ * @returns {object[]}
+ */
+function joinParagraphs(children, text, tabStop) {
+  const out = [];
+  const nextLine = (above, below) =>
+    ONE_BREAK.test(text.slice(above.position.end.offset, offsetOf(below)));
+  for (const node of children) {
+    const last = out.at(-1);
+    if (
+      last?.type === 'paragraph' &&
+      node.type === VERBATIM &&
+      nextLine(last, node)
+    ) {
+      out[out.length - 1] = {
+        type: JOINED,
+        hardBreak: endsHard(last, text, tabStop),
+        children: [last, node],
+        position: { start: last.position.start, end: node.position.end },
+      };
+    } else {
+      out.push(node);
+    }
+  }
+  return out;
+}
+
 /**
  * Turn each code span an inline raw TeX mask produced back into its source.
  *
@@ -151,15 +214,20 @@ function holders(ast, found) {
  * @param {object} ast
  * @param {{divs: Block[], verbatim: Block[], inlineRaw: Span[]}} constructs
  * @param {string} text
+ * @param {number} tabStop
  */
-export function settle(ast, { divs, verbatim, inlineRaw }, text) {
+export function settle(ast, { divs, verbatim, inlineRaw }, text, tabStop) {
   restoreInline(ast, new Map(inlineRaw.map((s) => [s.start, s])), text);
   for (const [node, held] of holders(ast, [...divs, ...verbatim])) {
     node.children = fold(
-      restoreVerbatim(
-        node.children,
-        held.filter((b) => b.type !== 'div'),
+      joinParagraphs(
+        restoreVerbatim(
+          node.children,
+          held.filter((b) => b.type !== 'div'),
+          text,
+        ),
         text,
+        tabStop,
       ),
       held.filter((b) => b.type === 'div'),
       text,
