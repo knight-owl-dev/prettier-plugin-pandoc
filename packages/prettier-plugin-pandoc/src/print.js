@@ -4,7 +4,7 @@
 import { DEFAULT_TAB_STOP } from '@knight-owl-dev/pandoc-syntax';
 import { doc } from 'prettier';
 import * as markdown from 'prettier/plugins/markdown';
-import { DIV, isInlineRaw, VERBATIM } from './nodes.js';
+import { DIV, isInlineRaw, JOINED, VERBATIM } from './nodes.js';
 import { breaksParagraph, keepsBreak } from './wrap.js';
 
 const { align, hardline, literalline, markAsRoot } = doc.builders;
@@ -135,6 +135,10 @@ export function print(path, options, printChild) {
       return printDiv(path, printChild);
     case VERBATIM:
       return asWritten(node.value);
+    case JOINED: {
+      const [paragraph, verbatim] = path.map(printChild, 'children');
+      return [paragraph, asWritten(node.hardBreak ? '  \n' : '\n'), verbatim];
+    }
     case 'code':
       return printCode(node, options);
     case 'whitespace':

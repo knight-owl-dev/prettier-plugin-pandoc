@@ -94,9 +94,8 @@ function withStretch(constructs, stretch) {
  *   among them.
  */
 export async function parse(text, options) {
-  const found = blocks(text, {
-    tabStop: options.pandocTabStop ?? DEFAULT_TAB_STOP,
-  });
+  const tabStop = options.pandocTabStop ?? DEFAULT_TAB_STOP;
+  const found = blocks(text, { tabStop });
   let constructs = {
     divs: found.filter((block) => block.type === 'div'),
     verbatim: found.filter((block) => VERBATIM.has(block.type)),
@@ -160,7 +159,7 @@ export async function parse(text, options) {
     ast = await base.parse(masked, options);
   }
 
-  settle(ast, constructs, text);
+  settle(ast, constructs, text, tabStop);
   ast[CONTAINERS] = found.filter(isContainer);
   return ast;
 }

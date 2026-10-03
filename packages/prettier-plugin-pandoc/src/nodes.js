@@ -6,10 +6,14 @@
 export const DIV = 'pandocDiv';
 // A block printed exactly as written, container prefixes aside.
 export const VERBATIM = 'pandocVerbatim';
+// A paragraph and the verbatim block on the line after it, kept a line apart:
+// a blank line between would turn Pandoc's plain text into a paragraph.
+export const JOINED = 'pandocJoined';
 
 export const VISITOR_KEYS = {
   [DIV]: ['children'],
   [VERBATIM]: [],
+  [JOINED]: ['children'],
 };
 
 // On the root: the recognizer's containers, whose content lines the printer
