@@ -1,0 +1,16 @@
+{
+  "name": "@knight-owl-dev/pandoc-parser",
+  "version": "0.0.0",
+  "description": "Pandoc's markdown reader, ported: Pandoc's AST with source positions",
+  "license": "MIT",
+  "type": "module",
+  "exports": "./src/index.js",
+  "files": [
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/knight-owl-dev/prettier-plugin-pandoc.git",
+    "directory": "packages/pandoc-parser"
+  }
+}
