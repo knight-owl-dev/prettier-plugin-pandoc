@@ -6,8 +6,6 @@
 // inline ends the paragraph where it opens, unless balanced brackets or an
 // argument Pandoc reads raw hold it.
 
-// cspell:ignore vadjust
-
 import {
   commandEnd,
   groupsAfter,
@@ -101,12 +99,12 @@ function commandArgumentsEnd(text, at, name) {
   if (name === 'vadjust') {
     // Raw up to and through its first group.
     const open = text.indexOf('{', named);
-    const [group] = open === -1 ? [] : groupsAfter(text, open, 1);
+    const [group] = open === -1 ? [] : groupsAfter(text, open, name, 1);
     return group?.end ?? named;
   }
   const kinds = INLINE_ARGUMENTS.get(name);
   if (kinds === undefined) return named;
-  const groups = groupsAfter(text, named, kinds.length);
+  const groups = groupsAfter(text, named, name, kinds.length);
   const end = groups.at(-1)?.end ?? named;
   const fails =
     groups.some(

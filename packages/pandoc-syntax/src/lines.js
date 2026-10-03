@@ -170,8 +170,9 @@ const KEPT = 8;
 
 /**
  * The offset past the `close` pairing the `open` at `at`, or null when none
- * does before a paragraph break. `step` moves past any other character, as the
- * caller reads it. Unless `nests`, an opener inside closes with the first.
+ * does before a paragraph break, or with `pastBlank` before the end. `step`
+ * moves past any other character, as the caller reads it. Unless `nests`, an
+ * opener inside closes with the first.
  *
  * @param {string} text
  * @param {number} at
@@ -179,9 +180,18 @@ const KEPT = 8;
  * @param {string} close
  * @param {(text: string, at: number) => number} step
  * @param {boolean} [nests]
+ * @param {boolean} [pastBlank]
  * @returns {number | null}
  */
-export function closeOf(text, at, open, close, step, nests = true) {
+export function closeOf(
+  text,
+  at,
+  open,
+  close,
+  step,
+  nests = true,
+  pastBlank = false,
+) {
   let bySteps = pairings.get(text);
   if (bySteps === undefined) {
     if (pairings.size === KEPT) pairings.clear();
@@ -193,14 +203,14 @@ export function closeOf(text, at, open, close, step, nests = true) {
     byOpen = new Map();
     bySteps.set(step, byOpen);
   }
-  const key = nests ? open : `${open}!`;
+  const key = `${open}${nests ? '' : '!'}${pastBlank ? '+' : ''}`;
   const known = byOpen.get(key);
   if (known?.has(at)) return known.get(at);
   // Most close soon: look for this one alone first.
   let depth = 0;
   for (let i = at; i < text.length; ) {
     const char = text[i];
-    if (char === '\n' && breaksParagraph(text, i)) break;
+    if (char === '\n' && !pastBlank && breaksParagraph(text, i)) break;
     if (char === open && (nests || depth === 0)) depth++;
     else if (char === close && --depth === 0) return i + 1;
     i = char === open || char === close ? i + 1 : step(text, i);
@@ -210,7 +220,7 @@ export function closeOf(text, at, open, close, step, nests = true) {
   const stack = [];
   for (let i = at; i < text.length; ) {
     const char = text[i];
-    if (char === '\n' && breaksParagraph(text, i)) break;
+    if (char === '\n' && !pastBlank && breaksParagraph(text, i)) break;
     if (char === open) {
       stack.push(i);
       ends.set(i, null);

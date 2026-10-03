@@ -45,6 +45,46 @@ function unread(found) {
     .sort((a, b) => a.start - b.start);
 }
 
+const CONTAINERS = new Set([
+  'block-quote',
+  'list-item',
+  'footnote-definition',
+  'definition',
+]);
+
+const BREAK = /\n[ \t]*(?=\n|$)/g;
+
+/**
+ * How far a command's groups may run from each offset asked, asked in order:
+ * past a blank line only in a paragraph `blocks` holds past one, and never
+ * past the container Pandoc reads its text in, as a document of its own.
+ *
+ * @param {Block[]} found
+ * @param {string} text
+ */
+function boundsOf(found, text) {
+  const byStart = (type) =>
+    found.filter((block) => type(block.type)).sort((a, b) => a.start - b.start);
+  const containers = byStart((type) => CONTAINERS.has(type));
+  const held = byStart((type) => type === 'paragraph');
+  const breaks = [...text.matchAll(BREAK)].map((m) => m.index);
+  const open = [];
+  let [c, h, b] = [0, 0, 0];
+  return (/** @type {number} */ at) => {
+    while (c < containers.length && containers[c].start <= at) {
+      open.push(containers[c++]);
+    }
+    while (open.length > 0 && open.at(-1).end <= at) open.pop();
+    while (h < held.length && held[h].end <= at) h++;
+    while (b < breaks.length && breaks[b] < at) b++;
+    const paragraph =
+      held[h] !== undefined && held[h].start <= at
+        ? held[h].end
+        : (breaks[b] ?? text.length);
+    return Math.min(open.at(-1)?.end ?? text.length, paragraph);
+  };
+}
+
 /**
  * Find every inline raw TeX and math span, in source order.
  *
@@ -57,6 +97,7 @@ export function inlines(text, found = blocks(text)) {
   /** @type {InlineSpan[]} */
   const spans = [];
   const skipped = unread(found);
+  const boundOf = boundsOf(found, text);
   let next = 0;
 
   for (let i = 0; i < text.length; ) {
@@ -76,7 +117,7 @@ export function inlines(text, found = blocks(text)) {
       i += text[i] === '\\' ? 2 : 1;
       continue;
     }
-    const end = commandEnd(text, i);
+    const end = commandEnd(text, i, boundOf(i));
     if (end === null) {
       i += 2;
       continue;

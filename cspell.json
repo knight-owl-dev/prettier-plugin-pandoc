@@ -24,6 +24,7 @@
     "Pandoc",
     "Pandoc's",
     "setext",
-    "textbf"
+    "textbf",
+    "vadjust"
   ]
 }
