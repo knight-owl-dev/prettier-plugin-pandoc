@@ -43,6 +43,8 @@ function uncovered(text, tabStop) {
 }
 
 const CASES = {
+  'a raw group past a blank line': 'r \\foo{a\n\n> b} c',
+  'the group of vadjust past a blank line': 'r \\vadjust{a\n\n> b} c',
   'a command with an argument': 'a \\footnote{one two} b',
   'a command with an empty group': 'a \\LaTeX{} b',
   'a command with no argument': 'a \\LaTeX b',
@@ -107,6 +109,33 @@ for (const [name, text] of Object.entries({
   test(`${name}: no raw TeX span claims it`, () => {
     assert.deepEqual(
       inlines(`${text}\n`).filter((span) => span.type === 'raw-tex'),
+      [],
+    );
+  });
+}
+
+// A group closes nowhere past its container, whose text Pandoc reads alone,
+// or past a blank line `blocks` holds no paragraph across.
+for (const [name, text] of Object.entries({
+  'a list item': '- set \\foo{x\n\npara\n\n```\n}\n```',
+  'a block quote': '> q \\foo{x\n\nv} w',
+  'a heading, ended on its line': '# h \\foo{a\n\n>\n\n  y} w',
+})) {
+  test(`a raw group never closed in ${name}: no span`, () => {
+    assert.deepEqual(
+      inlines(`${text}\n`).filter((span) => span.type === 'raw-tex'),
+      [],
+    );
+  });
+}
+
+// A block command's group is no raw inline: past a blank line, it is text.
+for (const text of ['x \\section{a *b*\n\nc *d*} e', '\\caption{a\n\nb} c']) {
+  test(`${JSON.stringify(text)}: no span past the blank line`, () => {
+    const source = `${text}\n`;
+    const blank = source.indexOf('\n\n');
+    assert.deepEqual(
+      inlines(source).filter((s) => s.start < blank && s.end > blank),
       [],
     );
   });

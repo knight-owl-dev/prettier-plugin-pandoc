@@ -42,3 +42,26 @@ text
     lazy
 - item
   \begin{x}a\end{x} b
+
+A raw command's group runs past a blank line, long enough to wrap, \foo{a
+
+> b} and more words after it that run on long enough to wrap again.
+
+A second group of vadjust is no raw one, r \vadjust{a}{b
+
+# c} and a heading that runs on long enough to wrap at forty columns
+
+- An item a raw group in never closes, set \foo{x
+
+Para one with *emphasis* that runs on long enough to wrap at forty columns.
+
+```c
+  return 0;
+}
+```
+
+A known command Pandoc fails whole, x \href{u
+
+::: d
+
+v}

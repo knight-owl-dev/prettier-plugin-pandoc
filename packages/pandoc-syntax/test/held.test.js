@@ -59,6 +59,26 @@ const CASES = {
     'Text \\foo{x}[a]\n```\nc\n```',
   'an option after a braced argument, in an item':
     '- item \\foo{x}[a]\n  - next',
+  'a raw group past a blank line': 'r \\foo{a\n\n> b} c',
+  'a raw group past blank lines': 'r \\foo{a\n\n\n# b} c',
+  'a second raw group past a blank line': 'r \\foo{a}{b\n\n> c} d',
+  'a nested group past a blank line': 'r \\foo{a{x\n\n> y}b} c',
+  'a raw group at a line start': '\\foo{a\n\n> b} c',
+  'a raw group never closed': 'r \\foo{a\n\n> b',
+  'a raw group one line down': 'r \\foo\n{a\n\n> b} c',
+  'an inlines argument past a blank line': 'r \\href{u}{t\n\n> x} c',
+  'a group of inlines past a blank line': 'r \\emph{a\n\n> b} c',
+  "a ref's group past a blank line": 'r \\ref{a\n\n> b} c',
+  'the group of vadjust past a blank line': 'r \\vadjust{a\n\n> b} c',
+  'a raw group in an item': '- r \\foo{a\n\n  > b} c',
+  'a raw group in a quote': '> r \\foo{a\n>\n> > b} c',
+  'a second group of vadjust past a blank line': 'r \\vadjust{a}{b\n\n# c} d',
+  'a block command past a blank line': 'x \\section{a *b*\n\nc *d*} e',
+  'a block command opening past a blank line': '\\section{a *b*\n\nc *d*} e',
+  'a block command read inline, past a blank line': 'x \\vspace{a\n\n> b} c',
+  'a definition past a blank line': 'x \\newcommand{a *b*\n\nc} d',
+  'a failed command with a raw argument past a blank line':
+    'x \\href{u\n\n::: d\n\n> }',
   'raw TeX after a comment ends': 'a <!-- b\n\nc --> \\begin{x}y\\end{x} > q',
 };
 
@@ -95,6 +115,7 @@ const PARAGRAPHS = {
   'a comment ended by raw TeX after it':
     'a <!-- b\n\nc --> \\begin{x}y\\end{x}',
   'a comment in a quote': '> a <!-- b\n>\n> c --> d',
+  'a raw group past a blank line': 'r \\foo{a\n\n> b} c\nd',
   'raw TeX on the next line, indented':
     'a <!-- x\n\ny --> b\n  \\begin{center}\nz\n\\end{center}',
 };

@@ -11,6 +11,13 @@
 import { closeOf, paragraphEnd, splitLines } from './lines.js';
 import { BEGIN, environmentEnd } from './tex.js';
 import { verbatimEnd } from './tex-arguments.js';
+import {
+  ALSO_INLINE,
+  BLOCK_COMMANDS,
+  DEFINITIONS,
+  INLINE_COMMANDS,
+  RAW_INLINE,
+} from './tex-names.js';
 
 const LETTER = /[A-Za-z]/;
 const SPACE = /[ \t]/;
@@ -27,11 +34,28 @@ const CLOSES = { '{': '}', '[': ']' };
 export const startsCommand = (text, at) =>
   text[at] === '\\' && LETTER.test(text[at + 1] ?? '');
 
+// Commands Pandoc reads by a rule of their own, never as raw inline TeX.
+const NOT_RAW = new Set(
+  [...BLOCK_COMMANDS, ...DEFINITIONS].filter((name) => !ALSO_INLINE.has(name)),
+);
+
+// Whether Pandoc reads the braced group opening at `at` raw, past blank
+// lines: any of a command it treats as unknown, and `\vadjust`'s first. Never
+// one a line down from `from`, which such a command does not take. A known
+// command's raw argument stops at the blank line: Pandoc may fail the command
+// whole.
+function readsRaw(text, from, at, name, n) {
+  if (text[at] !== '{' || text.lastIndexOf('\n', at) >= from) return false;
+  if (NOT_RAW.has(name)) return false;
+  if (!INLINE_COMMANDS.has(name) || RAW_INLINE.has(name)) return true;
+  return name === 'vadjust' && n === 0;
+}
+
 // The offset just past the group opening at `at`, or null when it never
-// closes: a paragraph break ends the group with the paragraph. A backslash
+// closes: a paragraph break ends one Pandoc reads as inlines. A backslash
 // escapes the character after it.
-function groupEnd(text, at) {
-  return closeOf(text, at, text[at], CLOSES[text[at]], escaped);
+function groupEnd(text, at, raw) {
+  return closeOf(text, at, text[at], CLOSES[text[at]], escaped, true, raw);
 }
 
 // Past the character at `at`, and the one after a backslash.
@@ -86,13 +110,15 @@ export function verbatimCommandEnd(text, at) {
  * brace never closed.
  *
  * The first argument may sit after spaces, or one line down; the rest follow
- * it directly. With no argument, the command takes the spaces after it.
+ * it directly. With no argument, the command takes the spaces after it. A
+ * group closing past `to` never closes.
  *
  * @param {string} text
  * @param {number} at
+ * @param {number} [to]
  * @returns {number | null}
  */
-export function commandEnd(text, at) {
+export function commandEnd(text, at, to = text.length) {
   let i = at + 1;
   while (i < text.length && LETTER.test(text[i])) i++;
   const name = text.slice(at + 1, i);
@@ -103,16 +129,18 @@ export function commandEnd(text, at) {
   if (verbatim !== null) return verbatim;
   if (text[i] === '*') i++;
 
-  let args = 0;
+  let [args, groups] = [0, 0];
   for (;;) {
     const open = args === 0 ? pastGap(text, i) : i;
     if (CLOSES[text[open]] === undefined) break;
-    const end = groupEnd(text, open);
+    const close = groupEnd(text, open, readsRaw(text, i, open, name, groups));
+    const end = close !== null && close <= to ? close : null;
     // An unclosed option leaves the command without it; an unclosed brace
     // leaves the whole command as text.
     if (end === null) return text[open] === '{' ? null : i;
     i = end;
     args++;
+    if (text[open] === '{') groups++;
   }
   if (args === 0) while (SPACE.test(text[i] ?? '')) i++;
   return i;
@@ -125,16 +153,18 @@ export function commandEnd(text, at) {
  *
  * @param {string} text
  * @param {number} at
+ * @param {string} name The command's.
  * @param {number} count
  * @returns {{start: number, end: number}[]}
  */
-export function groupsAfter(text, at, count) {
+export function groupsAfter(text, at, name, count) {
   const groups = [];
   let i = at;
   while (groups.length < count) {
     const open = groups.length === 0 ? pastGap(text, i) : i;
     if (CLOSES[text[open]] === undefined) break;
-    const end = groupEnd(text, open);
+    const raw = readsRaw(text, i, open, name, groups.length);
+    const end = groupEnd(text, open, raw);
     if (end === null) break;
     if (text[open] === '{') groups.push({ start: open, end });
     i = end;
