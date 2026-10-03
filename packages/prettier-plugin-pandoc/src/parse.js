@@ -21,11 +21,12 @@ const base = markdown.parsers.markdown;
 
 // Printed as written: raw TeX is another language's source, verse is its line
 // breaks, and a table's layout is its meaning — a pipe table past the column
-// width takes its column widths from its dashes. Definition,
-// example and fancy lists are CommonMark paragraphs to prettier's parser.
-// Indented code is code at Pandoc's tab stop, which CommonMark's fixed one of
-// four need not agree with.
+// width takes its column widths from its dashes. Definition, example and
+// fancy lists are CommonMark paragraphs to prettier's parser, and a paragraph
+// Pandoc reads past a blank line is two to it. Indented code is code at
+// Pandoc's tab stop, which CommonMark's fixed one of four need not agree with.
 const VERBATIM = new Set([
+  'paragraph',
   'indented-code',
   'raw-tex',
   'line-block',
@@ -75,6 +76,20 @@ function literalSpans(node, out = []) {
 
 const sameSpans = (a, b) =>
   a.length === b.length && a.every((span, n) => span === b[n]);
+
+// The spans, in source order, starting outside every block printed as
+// written, which holds its inline spans: one pass over both.
+function outside(blocks, spans) {
+  const sorted = [...blocks].sort(byStart);
+  const kept = [];
+  let b = 0;
+  for (const span of spans) {
+    while (b < sorted.length && sorted[b].end <= span.start) b++;
+    const block = sorted[b];
+    if (block === undefined || span.start < block.start) kept.push(span);
+  }
+  return kept;
+}
 
 // The spans starting inside any of `within`.
 const spansIn = (within, spans) =>
@@ -169,8 +184,9 @@ export async function parse(text, options) {
   let constructs = {
     divs: found.filter((block) => block.type === 'div'),
     verbatim: found.filter((block) => VERBATIM.has(block.type)),
-    inlineRaw: joinTouching(inlines(text, found)).filter((span) =>
-      maskable(text, span),
+    inlineRaw: outside(
+      found.filter((block) => VERBATIM.has(block.type)),
+      joinTouching(inlines(text, found)).filter((span) => maskable(text, span)),
     ),
     containers: found.filter(isContainer),
   };

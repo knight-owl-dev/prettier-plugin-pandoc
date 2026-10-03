@@ -50,7 +50,15 @@ function opensItem(pattern, text, syntax) {
   );
 }
 
-const isExampleItem = (text, syntax) => opensItem(EXAMPLE_MARKER, text, syntax);
+/**
+ * Whether a line opens an example list item.
+ *
+ * @param {string} text
+ * @param {Syntax} syntax
+ * @returns {boolean}
+ */
+export const isExampleItem = (text, syntax) =>
+  opensItem(EXAMPLE_MARKER, text, syntax);
 
 /**
  * Whether a line opens an ordered list item, in any of Pandoc's styles.

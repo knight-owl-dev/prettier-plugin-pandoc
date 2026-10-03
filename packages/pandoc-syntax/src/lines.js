@@ -137,3 +137,93 @@ export function paragraphEnd(text, at) {
   }
   return text.length;
 }
+
+/**
+ * The text from `start` on line `from` up to a blank line, or with `whole` to
+ * the end of `lines`, and where each line's text sits in it.
+ *
+ * @param {Line[]} lines
+ * @param {number} from
+ * @param {number} start
+ * @param {boolean} [whole]
+ * @returns {{text: string, parts: {at: number, head: number}[]}}
+ */
+export function viewFrom(lines, from, start, whole = false) {
+  const parts = [];
+  let text = '';
+  for (let k = from; k < lines.length; k++) {
+    if (!whole && k > from && BLANK.test(lines[k].text)) break;
+    const head = k === from ? start - lines[k].start : 0;
+    if (k > from) text += '\n';
+    parts.push({ at: text.length, head });
+    text += lines[k].text.slice(head);
+  }
+  return { text, parts };
+}
+
+// The pairs found by text, step, opener and nesting, after an opener found no
+// close: a pass from it to the paragraph break pairs every opener it steps
+// onto, so the openers after it cost nothing. A document and the views read
+// from it take turns, so a few texts are kept.
+const pairings = new Map();
+const KEPT = 8;
+
+/**
+ * The offset past the `close` pairing the `open` at `at`, or null when none
+ * does before a paragraph break. `step` moves past any other character, as the
+ * caller reads it. Unless `nests`, an opener inside closes with the first.
+ *
+ * @param {string} text
+ * @param {number} at
+ * @param {string} open
+ * @param {string} close
+ * @param {(text: string, at: number) => number} step
+ * @param {boolean} [nests]
+ * @returns {number | null}
+ */
+export function closeOf(text, at, open, close, step, nests = true) {
+  let bySteps = pairings.get(text);
+  if (bySteps === undefined) {
+    if (pairings.size === KEPT) pairings.clear();
+    bySteps = new Map();
+    pairings.set(text, bySteps);
+  }
+  let byOpen = bySteps.get(step);
+  if (byOpen === undefined) {
+    byOpen = new Map();
+    bySteps.set(step, byOpen);
+  }
+  const key = nests ? open : `${open}!`;
+  const known = byOpen.get(key);
+  if (known?.has(at)) return known.get(at);
+  // Most close soon: look for this one alone first.
+  let depth = 0;
+  for (let i = at; i < text.length; ) {
+    const char = text[i];
+    if (char === '\n' && breaksParagraph(text, i)) break;
+    if (char === open && (nests || depth === 0)) depth++;
+    else if (char === close && --depth === 0) return i + 1;
+    i = char === open || char === close ? i + 1 : step(text, i);
+  }
+  /** @type {Map<number, number | null>} */
+  const ends = new Map();
+  const stack = [];
+  for (let i = at; i < text.length; ) {
+    const char = text[i];
+    if (char === '\n' && breaksParagraph(text, i)) break;
+    if (char === open) {
+      stack.push(i);
+      ends.set(i, null);
+      i++;
+    } else if (char === close) {
+      for (const opener of nests ? stack.splice(-1) : stack.splice(0)) {
+        ends.set(opener, i + 1);
+      }
+      i++;
+    } else {
+      i = step(text, i);
+    }
+  }
+  byOpen.set(key, ends);
+  return ends.get(at) ?? null;
+}

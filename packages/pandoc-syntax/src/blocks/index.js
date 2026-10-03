@@ -18,7 +18,9 @@ const startOf = (block) =>
  * reads no markdown inside, and the containers that hold them, in source
  * order.
  *
- * A div never closed runs to the end of the document, so its `close` is null.
+ * A paragraph is reported only where Pandoc reads it past a blank line, which
+ * an inline comment or tag running on keeps open. A div never closed runs to
+ * the end of the document, so its `close` is null.
  * Block quotes, list items, footnote definitions and a definition list's
  * definitions hold their content's blocks, reported beside them; every span
  * inside a container stops short of its prefix.

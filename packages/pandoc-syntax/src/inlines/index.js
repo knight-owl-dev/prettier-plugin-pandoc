@@ -23,6 +23,7 @@ const READ = new Set([
   'list-item',
   'footnote-definition',
   'heading',
+  'paragraph',
 ]);
 
 /**

@@ -8,7 +8,7 @@
 // and all. In paragraph text it is a raw block, `blocks/raw-tex.js`; one read
 // here sits where it is none, as in brackets.
 
-import { breaksParagraph } from './lines.js';
+import { closeOf } from './lines.js';
 import { BEGIN, environmentEnd } from './tex.js';
 
 const LETTER = /[A-Za-z]/;
@@ -30,17 +30,11 @@ export const startsCommand = (text, at) =>
 // closes: a paragraph break ends the group with the paragraph. A backslash
 // escapes the character after it.
 function groupEnd(text, at) {
-  const [open, close] = [text[at], CLOSES[text[at]]];
-  let depth = 0;
-  for (let i = at; i < text.length; i++) {
-    const char = text[i];
-    if (char === '\\') i++;
-    else if (char === open) depth++;
-    else if (char === close && --depth === 0) return i + 1;
-    else if (char === '\n' && breaksParagraph(text, i)) return null;
-  }
-  return null;
+  return closeOf(text, at, text[at], CLOSES[text[at]], escaped);
 }
+
+// Past the character at `at`, and the one after a backslash.
+const escaped = (text, at) => at + (text[at] === '\\' ? 2 : 1);
 
 // Past the spaces from `at` on, and at most one newline among them: how far
 // the first argument may sit from its command.

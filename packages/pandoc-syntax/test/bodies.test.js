@@ -115,6 +115,7 @@ const CASES = {
   'a fence after an item past a blank line': '- a\n\n  b\n```\ncode\n```',
   'a fence after a nested item': '- a\n  - b\n```\ncode\n```',
   'a fence after an indented line': '- a\n  b\n```\ncode\n```',
+  'an example marker after an item': '- a\n(@) b',
   'a fence after a quote': '> x\n```\ncode\n```',
   'a fence after a quote, indented': '> x\n  ```\ncode\n```',
   'an unclosed fence after a quote': '> x\n```\nno close',
