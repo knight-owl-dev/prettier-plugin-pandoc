@@ -26,7 +26,7 @@ import { header } from './headers.js';
 import { hrule } from './hrule.js';
 import { inlines1 } from './inlines.js';
 import { lineBlock } from './line-blocks.js';
-import { implicitFigure } from './links.js';
+import { implicitFigure, referenceKey } from './links.js';
 import { bulletList, listStartInItem, orderedList } from './lists.js';
 import { table } from './tables.js';
 
@@ -112,7 +112,9 @@ export function block(ctx) {
     hrule,
     orderedList,
     definitionList,
-    // noteBlock, referenceKey, abbrevKey,
+    // noteBlock,
+    referenceKey,
+    // abbrevKey,
     para,
     plain,
   ]);

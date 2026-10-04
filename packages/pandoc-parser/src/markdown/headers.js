@@ -29,6 +29,7 @@ import {
 import { enabled, toKey, updateState, whenEnabled } from '../parsing/state.js';
 import { attributes } from './attributes.js';
 import { inline } from './inlines.js';
+import { lookupCount, withoutTables } from './references.js';
 
 /** @typedef {import('../core.js').Context} Context */
 /** @typedef {import('../parsing/state.js').Attr} Attr */
@@ -38,24 +39,37 @@ const maybeAttributes = option(
   whenEnabled('header_attributes', attributes),
 );
 
+// The inlines of a heading's text, read with line breaks off, until
+// `ends`: trimmed.
+function readHeadingText(ctx, ends) {
+  const outer = ctx.state.allowLineBreaks;
+  updateState(ctx, { allowLineBreaks: false });
+  const xs = ends(ctx);
+  if (xs === FAIL) return FAIL;
+  updateState(ctx, { allowLineBreaks: outer });
+  return B.trimInlines(B.concat(xs));
+}
+
 /**
- * The inlines of a heading's text, read with line breaks off, until `ends`:
- * trimmed, and the text read.
+ * A heading's text: its inlines, the text read, and the inlines its
+ * identifier is made from, which Pandoc reads with no reference resolved
+ * (`runF text defaultParserState`).
  *
  * @param {Context} ctx
  * @param {import('../core.js').Parser<unknown>} ends
  */
 function headingText(ctx, ends) {
   const start = ctx.pos;
-  const outer = ctx.state.allowLineBreaks;
-  updateState(ctx, { allowLineBreaks: false });
-  const xs = ends(ctx);
-  if (xs === FAIL) return FAIL;
-  updateState(ctx, { allowLineBreaks: outer });
-  return {
-    ils: B.trimInlines(B.concat(xs)),
-    raw: ctx.text.slice(start, ctx.pos),
-  };
+  const lookups = lookupCount(ctx);
+  const ils = readHeadingText(ctx, ends);
+  if (ils === FAIL) return FAIL;
+  const raw = ctx.text.slice(start, ctx.pos);
+  if (lookupCount(ctx) === lookups) return { ils, raw, unresolved: ils };
+  const { pos, state } = ctx;
+  ctx.pos = start;
+  const unresolved = withoutTables(ctx, (c) => readHeadingText(c, ends));
+  [ctx.pos, ctx.state] = [pos, state];
+  return { ils, raw, unresolved };
 }
 
 // `inline`s while `closing` does not follow.
@@ -82,8 +96,8 @@ function registerImplicitHeader(ctx, raw, attr) {
 }
 
 // A heading of `level` and its text: attributes and identifier settled.
-function heading(ctx, attr, level, { ils, raw }, start, end) {
-  const settled = registerHeader(ctx, attr, ils);
+function heading(ctx, attr, level, { ils, raw, unresolved }, start, end) {
+  const settled = registerHeader(ctx, attr, unresolved);
   registerImplicitHeader(ctx, raw, settled);
   return B.headerWith(settled, level, ils, start, end);
 }
