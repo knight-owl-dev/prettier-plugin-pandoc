@@ -78,7 +78,8 @@ const hexChar = (hex, c) =>
   isDigit(c) || (hex && ((c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')));
 
 /**
- * The tokens of `text` from `from`: `next()` lexes until one is ready.
+ * The tokens of `text` from `from`, then of `suffix`, read as though
+ * appended without copying the text: `next()` lexes until one is ready.
  *
  * @see Text.HTML.TagSoup.Specification.parse
  */
@@ -86,9 +87,12 @@ export class Lexer {
   /**
    * @param {string} text
    * @param {number} [from]
+   * @param {string} [suffix]
    */
-  constructor(text, from = 0) {
+  constructor(text, from = 0, suffix = '') {
     this.text = text;
+    this.suffix = suffix;
+    this.length = text.length + suffix.length;
     /** @type {Out[]} */
     this.out = [];
     this.read = 0;
@@ -115,22 +119,28 @@ export class Lexer {
 
   // The character at `i`, a code point; `\0` at the end, as TagSoup's.
   hd(i) {
-    if (i >= this.text.length) return '\0';
+    if (i >= this.length) return '\0';
+    if (i >= this.text.length) return this.suffix[i - this.text.length];
     return this.text.slice(i, i + codePointLength(this.text, i));
   }
 
   // The offset after the character at `i`.
   tl(i) {
-    return i >= this.text.length ? i : i + codePointLength(this.text, i);
+    if (i >= this.length) return i;
+    return i >= this.text.length ? i + 1 : i + codePointLength(this.text, i);
   }
 
   eof(i) {
-    return i >= this.text.length;
+    return i >= this.length;
   }
 
   // Where `s` ends if the text at `i` starts with it; -1 if not.
   nextAfter(i, s) {
-    return this.text.startsWith(s, i) ? i + s.length : -1;
+    const end = i + s.length;
+    const own = this.text.slice(i, end);
+    const from = Math.max(0, i - this.text.length);
+    const tail = this.suffix.slice(from, end - this.text.length);
+    return own + tail === s ? end : -1;
   }
 
   pos(i) {

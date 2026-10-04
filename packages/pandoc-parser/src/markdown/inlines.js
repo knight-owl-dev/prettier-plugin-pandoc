@@ -65,6 +65,11 @@ import { mark, strikeout, strongOrEmph } from './emphasis.js';
 import { autoLink, bracketedSpan, image, link } from './links.js';
 import { listStart, listStartInItem } from './lists.js';
 import { inlineNote, note } from './notes.js';
+import {
+  notFollowedByHtmlCloser,
+  rawHtmlInline,
+  spanHtml,
+} from './raw-html.js';
 import { subscript, superscript } from './scripts.js';
 
 const manyInline = many((ctx) => inline(ctx));
@@ -236,14 +241,18 @@ export const doubleQuoted = quotedSpan({
 const lessThan = char('<');
 
 /**
- * A `<` that opens nothing, as a word of its own.
+ * A `<` that opens nothing, as a word of its own: with `raw_html`, not
+ * where the open HTML block's closing tag opens.
  *
- * Not ported yet: with `raw_html`, none where a block-level tag opens, or
- * the closer of an open HTML block.
+ * Not ported yet: none where a block tag opens, which an HTML block reads
+ * first; until HTML blocks are, that `<` would be read by nothing.
  *
  * @see Text.Pandoc.Readers.Markdown.ltSign
  */
 export function ltSign(ctx) {
+  if (enabled(ctx, 'raw_html') && notFollowedByHtmlCloser(ctx) === FAIL) {
+    return FAIL;
+  }
   const start = ctx.pos;
   return lessThan(ctx) === FAIL ? FAIL : B.str('<', start, ctx.pos);
 }
@@ -423,7 +432,7 @@ const BY_CHAR = new Map([
   ['@', then(alt(cite, exampleRef))],
   // ':': emoji, off by default, not ported yet.
   ['&', then(charRef)],
-  ['<', then(alt(autoLink /* , spanHtml, rawHtmlInline */, ltSign))],
+  ['<', then(alt(autoLink, spanHtml, rawHtmlInline, ltSign))],
   ['"', then(smart)],
   ["'", then(smart)],
   ['‘', then(smart)],
