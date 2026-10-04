@@ -63,16 +63,28 @@ const EXTENSIONS = [
  * @property {ReadonlySet<string>} abbreviations
  */
 
+// `pandoc --list-extensions=latex`, those on.
+const LATEX_EXTENSIONS = ['auto_identifiers', 'latex_macros', 'smart'];
+
+const FORMATS = { markdown: EXTENSIONS, latex: LATEX_EXTENSIONS };
+
 /**
- * Pandoc's reader options for its `markdown` format.
+ * Pandoc's reader options for a format, `markdown` or `latex`, its
+ * default extensions changed as `+name` and `-name` in `extensions` say.
  *
  * @see Text.Pandoc.Options.ReaderOptions
- * @param {{tabStop?: number}} [options]
+ * @param {{tabStop?: number, format?: 'markdown' | 'latex', extensions?: string[]}} [options]
  * @returns {ReaderOptions}
  */
-export const readerOptions = ({ tabStop = 4 } = {}) => ({
-  tabStop,
-  columns: 72,
-  extensions: new Set(EXTENSIONS),
-  abbreviations: ABBREVIATIONS,
-});
+export function readerOptions({
+  tabStop = 4,
+  format = 'markdown',
+  extensions = [],
+} = {}) {
+  const on = new Set(FORMATS[format]);
+  for (const change of extensions) {
+    if (change.startsWith('-')) on.delete(change.slice(1));
+    else on.add(change.replace(/^\+/, ''));
+  }
+  return { tabStop, columns: 72, extensions: on, abbreviations: ABBREVIATIONS };
+}
