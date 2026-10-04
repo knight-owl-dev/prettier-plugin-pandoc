@@ -9,6 +9,7 @@ import {
   alt,
   attempt,
   FAIL,
+  many,
   many1,
   manyTill,
   notFollowedBy,
@@ -131,6 +132,38 @@ export function enclosed(start, end, p) {
 }
 
 const ampersand = char('&');
+/**
+ * Text between `open` and `close`, pairs of them inside balanced and kept,
+ * each character read by `parser`.
+ *
+ * @see Text.Pandoc.Parsing.General.charsInBalanced
+ * @param {string} open
+ * @param {string} close
+ * @param {Parser<string>} parser
+ * @returns {Parser<string>}
+ */
+export function charsInBalanced(open, close, parser) {
+  const notDelimiter = notFollowedBy(satisfy((c) => c === open || c === close));
+  const run = many1((ctx) => (notDelimiter(ctx) === FAIL ? FAIL : parser(ctx)));
+  const nested = (ctx) => {
+    const inner = balanced(ctx);
+    return inner === FAIL ? FAIL : open + inner + close;
+  };
+  const chunks = many(
+    alt((ctx) => {
+      const xs = run(ctx);
+      return xs === FAIL ? FAIL : xs.join('');
+    }, nested),
+  );
+  const [opening, closing] = [char(open), char(close)];
+  const balanced = attempt((ctx) => {
+    if (opening(ctx) === FAIL) return FAIL;
+    const xs = chunks(ctx);
+    return xs === FAIL || closing(ctx) === FAIL ? FAIL : xs.join('');
+  });
+  return balanced;
+}
+
 const referenceBody = many1Till(nonspaceChar, char(';'));
 
 /**

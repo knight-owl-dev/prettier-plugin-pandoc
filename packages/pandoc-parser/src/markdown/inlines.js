@@ -61,6 +61,7 @@ import { codeBlockFenced } from './code.js';
 import { escapedCharacter, unescaped } from './common.js';
 import { notFollowedByDivCloser } from './divs.js';
 import { mark, strikeout, strongOrEmph } from './emphasis.js';
+import { bracketedSpan, image, link } from './links.js';
 import { listStart, listStartInItem } from './lists.js';
 import { subscript, superscript } from './scripts.js';
 
@@ -387,7 +388,9 @@ const BY_CHAR = new Map([
   ['_', then((ctx) => strongOrEmph(ctx))],
   ['*', then((ctx) => strongOrEmph(ctx))],
   ['^', then((ctx) => /* inlineNote, */ superscript(ctx))],
-  // '[': note, cite, bracketedSpan, wikilink, link; '!': image.
+  // '[': note, cite and wikilink not ported yet.
+  ['[', then(alt(bracketedSpan, link))],
+  ['!', then(image)],
   ['$', then((ctx) => math(ctx))],
   [
     '~',
