@@ -3,7 +3,8 @@
 // not after another cell's, which in a multiline table share its lines;
 // a cell spanning rows within the table, past its own row. A
 // caption is checked apart from what it captions: a table's may follow its
-// rows, and an implicit figure's is its image's description. A note's
+// rows, or precede them in a LaTeX float, so it is within the table's
+// parent; an implicit figure's is its image's description. A note's
 // contents span its definition, wherever that is; so does a block quote's
 // citation (csquotes'), read before the quote and placed after it.
 
@@ -52,7 +53,9 @@ export function assertNested(nodes, start, end, path) {
       if (moved) assertNested([last], node.start, node.end, `${at} > Citation`);
     } else if (node.t === 'Table' || node.t === 'Figure') {
       const [, caption, ...parts] = node.c;
-      assertNested(collect(caption), node.start, node.end, `${at} > Caption`);
+      const [from, to] =
+        node.t === 'Table' ? [start, end] : [node.start, node.end];
+      assertNested(collect(caption), from, to, `${at} > Caption`);
       assertNested(collect(parts), node.start, node.end, at);
     } else {
       assertNested(childrenOf(node), node.start, node.end, at);
