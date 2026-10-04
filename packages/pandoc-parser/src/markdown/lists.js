@@ -45,6 +45,7 @@ import { codeBlockFenced } from './code.js';
 import { skipNonindentSpaces } from './common.js';
 import { notFollowedByDivCloser } from './divs.js';
 import { hrule } from './hrule.js';
+import { notFollowedByHtmlCloser } from './raw-html.js';
 
 /** @typedef {import('../core.js').Context} Context */
 /** @typedef {import('../ast/nodes.js').Node} Node */
@@ -238,7 +239,7 @@ const notBlank = notFollowedBy(blankline);
 
 // A list item's line after its first, `indent` spaces of indentation
 // dropped where it has them; not one opening a list item at that indentation,
-// nor an open div's closing fence. Not ported yet: an HTML block's closer.
+// nor an open HTML block's closing tag or div's closing fence.
 // @see Text.Pandoc.Readers.Markdown.listLine
 function listLine(indent) {
   const opensItem = notAhead((ctx) => {
@@ -247,7 +248,11 @@ function listLine(indent) {
     return listStart(ctx);
   });
   return attempt((ctx) => {
-    if (opensItem(ctx) === FAIL || notFollowedByDivCloser(ctx) === FAIL) {
+    if (
+      opensItem(ctx) === FAIL ||
+      notFollowedByHtmlCloser(ctx) === FAIL ||
+      notFollowedByDivCloser(ctx) === FAIL
+    ) {
       return FAIL;
     }
     gobbleSpaces(ctx, indent);
@@ -307,7 +312,7 @@ function rawListItem(fourSpaceRule, start) {
 /**
  * A list item's continuation: lines indented by `indent`, the first after
  * a blank line, the rest also lazy where they open no item; blank lines
- * after. None is an open div's closing fence.
+ * after. None is an open HTML block's closing tag or div's closing fence.
  *
  * @see Text.Pandoc.Readers.Markdown.listContinuation
  * @param {number} indent
@@ -315,13 +320,19 @@ function rawListItem(fourSpaceRule, start) {
 function listContinuation(indent) {
   const indented = lineAfter(indent);
   const first = attempt((ctx) =>
-    notBlank(ctx) === FAIL || notFollowedByDivCloser(ctx) === FAIL
+    notBlank(ctx) === FAIL ||
+    notFollowedByHtmlCloser(ctx) === FAIL ||
+    notFollowedByDivCloser(ctx) === FAIL
       ? FAIL
       : indented(ctx),
   );
   const rest = many(
     attempt((ctx) => {
-      if (notBlank(ctx) === FAIL || notFollowedByDivCloser(ctx) === FAIL) {
+      if (
+        notBlank(ctx) === FAIL ||
+        notFollowedByHtmlCloser(ctx) === FAIL ||
+        notFollowedByDivCloser(ctx) === FAIL
+      ) {
         return FAIL;
       }
       if (gobbleSpaces(ctx, indent) === FAIL && noListStart(ctx) === FAIL) {

@@ -29,6 +29,7 @@ import {
   option,
   skipMany1,
 } from '../core.js';
+import { htmlTag, isBlockTag } from '../html.js';
 import {
   blankline,
   charRef,
@@ -108,9 +109,8 @@ const backtickFence = whenEnabled(
  * interrupt a paragraph, after it.
  *
  * A list start interrupts in a list item, or anywhere with
- * `lists_without_preceding_blankline`; so do a backtick fence and an open
- * div's closing fence. Not ported yet: an open HTML block's closer. A block
- * quote or ATX
+ * `lists_without_preceding_blankline`; so do a backtick fence, an open HTML
+ * block's closing tag and an open div's closing fence. A block quote or ATX
  * heading interrupts only with `blank_before_blockquote` or
  * `blank_before_header` off.
  *
@@ -124,6 +124,7 @@ export const endline = attempt((ctx) => {
     if (noListStart(ctx) === FAIL) return FAIL;
   }
   if (backtickFence(ctx) !== FAIL) return FAIL;
+  if (notFollowedByHtmlCloser(ctx) === FAIL) return FAIL;
   if (notFollowedByDivCloser(ctx) === FAIL) return FAIL;
   if (eof(ctx) !== FAIL) return [];
   if (enabled(ctx, 'hard_line_breaks')) return B.linebreak(start, ctx.pos);
@@ -240,18 +241,25 @@ export const doubleQuoted = quotedSpan({
 
 const lessThan = char('<');
 
+// No block tag here, read or not.
+const noBlockTag = (ctx) => {
+  const { pos, state } = ctx;
+  const found = htmlTag(ctx, isBlockTag);
+  [ctx.pos, ctx.state] = [pos, state];
+  return found === FAIL ? undefined : FAIL;
+};
+
 /**
  * A `<` that opens nothing, as a word of its own: with `raw_html`, not
- * where the open HTML block's closing tag opens.
- *
- * Not ported yet: none where a block tag opens, which an HTML block reads
- * first; until HTML blocks are, that `<` would be read by nothing.
+ * where a block tag or the open HTML block's closing tag opens.
  *
  * @see Text.Pandoc.Readers.Markdown.ltSign
  */
 export function ltSign(ctx) {
-  if (enabled(ctx, 'raw_html') && notFollowedByHtmlCloser(ctx) === FAIL) {
-    return FAIL;
+  if (enabled(ctx, 'raw_html')) {
+    if (notFollowedByHtmlCloser(ctx) === FAIL || noBlockTag(ctx) === FAIL) {
+      return FAIL;
+    }
   }
   const start = ctx.pos;
   return lessThan(ctx) === FAIL ? FAIL : B.str('<', start, ctx.pos);

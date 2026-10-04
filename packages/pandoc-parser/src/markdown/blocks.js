@@ -29,6 +29,7 @@ import { lineBlock } from './line-blocks.js';
 import { implicitFigure, referenceKey } from './links.js';
 import { bulletList, listStartInItem, orderedList } from './lists.js';
 import { noteBlock } from './notes.js';
+import { divHtml, htmlBlock, htmlDivCloserAhead } from './raw-html.js';
 import { table } from './tables.js';
 
 const divCloserAhead = lookAhead(divFenceEnd);
@@ -38,13 +39,13 @@ const blank = (ctx) => (blanklines(ctx) === FAIL ? FAIL : []);
 
 // A paragraph's end after its last line: a newline, then blank lines, a
 // fence, with `lists_without_preceding_blankline` anything but a list start
-// in a list item, or an open div's closing fence. Not ported yet, each
-// needing a construct or a non-default extension: a block quote, an ATX
-// heading, the closer of an open HTML block.
+// in a list item, or an open `<div>`'s or fenced div's closer. Not ported
+// yet, each needing a non-default extension: a block quote, an ATX heading.
 const paragraphEnd = alt(
   blanklines,
   whenEnabled('backtick_code_blocks', lookAhead(codeBlockFenced)),
   whenEnabled('lists_without_preceding_blankline', notAhead(listStartInItem)),
+  (ctx) => htmlDivCloserAhead(ctx),
   (ctx) => (inDiv(ctx) ? divCloserAhead(ctx) : FAIL),
 );
 const paragraphBreak = attempt((ctx) =>
@@ -101,10 +102,11 @@ export function block(ctx) {
     codeBlockFenced,
     // yamlMetaBlock',
     bulletList,
-    // divHtml,
+    divHtml,
     divFenced,
     header,
-    // lhsCodeBlock, htmlBlock,
+    // lhsCodeBlock,
+    htmlBlock,
     table,
     codeBlockIndented,
     // rawTeXBlock,
