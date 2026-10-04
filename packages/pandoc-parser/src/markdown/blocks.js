@@ -16,27 +16,27 @@ import {
   lookAhead,
   manyTill,
 } from '../core.js';
-import {
-  blanklines,
-  optionalBlanklines,
-  skipSpaces,
-} from '../parsing/general.js';
+import { blanklines, blockEnd, notAhead } from '../parsing/general.js';
 import { whenEnabled } from '../parsing/state.js';
 import { blockQuote } from './blockquote.js';
 import { codeBlockFenced, codeBlockIndented } from './code.js';
 import { header } from './headers.js';
+import { hrule } from './hrule.js';
 import { inlines1 } from './inlines.js';
+import { bulletList, listStartInItem, orderedList } from './lists.js';
 
 // Blank lines, which make no block.
 const blank = (ctx) => (blanklines(ctx) === FAIL ? FAIL : []);
 
-// A paragraph's end after its last line: a newline, then blank lines or a
-// fence. Not ported yet, each needing a construct or a non-default
-// extension: a block quote, an ATX heading, a list start, the closer of an
+// A paragraph's end after its last line: a newline, then blank lines, a
+// fence, or with `lists_without_preceding_blankline` anything but a list
+// start in a list item. Not ported yet, each needing a construct or a
+// non-default extension: a block quote, an ATX heading, the closer of an
 // open HTML block or div.
 const paragraphEnd = alt(
   blanklines,
   whenEnabled('backtick_code_blocks', lookAhead(codeBlockFenced)),
+  whenEnabled('lists_without_preceding_blankline', notAhead(listStartInItem)),
 );
 const paragraphBreak = attempt((ctx) =>
   newline(ctx) === FAIL ? FAIL : paragraphEnd(ctx),
@@ -51,11 +51,12 @@ const paragraphBreak = attempt((ctx) =>
  */
 export const para = attempt((ctx) => {
   const start = ctx.pos;
-  const ils = inlines1(ctx);
-  if (ils === FAIL) return FAIL;
-  const end = ctx.pos;
+  const read = inlines1(ctx);
+  if (read === FAIL) return FAIL;
+  const ils = B.trimInlines(read);
+  const end = blockEnd(ctx.text, start, ctx.pos, ils);
   const build = paragraphBreak(ctx) === FAIL ? B.plain : B.para;
-  return build(B.trimInlines(ils), start, end);
+  return build(ils, start, end);
 });
 
 /**
@@ -65,54 +66,43 @@ export const para = attempt((ctx) => {
  */
 export const plain = (ctx) => {
   const start = ctx.pos;
-  const ils = inlines1(ctx);
-  return ils === FAIL ? FAIL : B.plain(B.trimInlines(ils), start, ctx.pos);
+  const read = inlines1(ctx);
+  if (read === FAIL) return FAIL;
+  const ils = B.trimInlines(read);
+  return B.plain(ils, start, blockEnd(ctx.text, start, ctx.pos, ils));
 };
-
-const isHruleChar = (c) => c === '*' || c === '-' || c === '_';
-
-/**
- * Three or more of `*`, `-` or `_`, one of them, spaces between them
- * allowed: a thematic break.
- *
- * @see Text.Pandoc.Readers.Markdown.hrule
- */
-export const hrule = attempt((ctx) => {
-  const start = ctx.pos;
-  skipSpaces(ctx);
-  const c = ctx.text[ctx.pos];
-  if (!isHruleChar(c)) return FAIL;
-  ctx.pos++;
-  for (let k = 0; k < 2; k++) {
-    skipSpaces(ctx);
-    if (ctx.text[ctx.pos] !== c) return FAIL;
-    ctx.pos++;
-  }
-  while (ctx.text[ctx.pos] === c || ctx.text[ctx.pos] === ' ') ctx.pos++;
-  const end = ctx.pos;
-  if (newline(ctx) === FAIL || optionalBlanklines(ctx) === FAIL) return FAIL;
-  return B.horizontalRule(start, end);
-});
 
 /**
  * One block, by the first of Pandoc's block parsers to read one.
  *
  * @see Text.Pandoc.Readers.Markdown.block
+ * @param {import('../core.js').Context} ctx
  */
-export const block = choice([
-  blank,
-  codeBlockFenced,
-  // yamlMetaBlock', bulletList, divHtml, divFenced,
-  header,
-  // lhsCodeBlock, htmlBlock, table,
-  codeBlockIndented,
-  // rawTeXBlock, lineBlock,
-  blockQuote,
-  hrule,
-  // orderedList, definitionList, noteBlock, referenceKey, abbrevKey,
-  para,
-  plain,
-]);
+export function block(ctx) {
+  // Built on first call: some of these come from modules that import this
+  // one, and may not exist yet when it loads.
+  blockChoice ??= choice([
+    blank,
+    codeBlockFenced,
+    // yamlMetaBlock',
+    bulletList,
+    // divHtml, divFenced,
+    header,
+    // lhsCodeBlock, htmlBlock, table,
+    codeBlockIndented,
+    // rawTeXBlock, lineBlock,
+    blockQuote,
+    hrule,
+    orderedList,
+    // definitionList, noteBlock, referenceKey, abbrevKey,
+    para,
+    plain,
+  ]);
+  return blockChoice(ctx);
+}
+
+/** @type {import('../core.js').Parser<unknown> | undefined} */
+let blockChoice;
 
 const blocks = manyTill(block, eof);
 

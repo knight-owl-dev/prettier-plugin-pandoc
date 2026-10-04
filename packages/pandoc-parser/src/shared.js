@@ -3,9 +3,8 @@
 //
 // Ported from Pandoc 3.11's `Text.Pandoc.Shared`.
 
+import { Node } from './ast/nodes.js';
 import { isAlpha, isAlphaNum, isSpace } from './char.js';
-
-/** @typedef {import('./ast/nodes.js').Node} Node */
 
 /** A non-breaking space, U+00A0: a formatter writes the escape as the character. */
 export const NBSP = String.fromCodePoint(0xa0);
@@ -170,4 +169,89 @@ export function uniqueIdent(inlines, used) {
     if (!used.has(`${base}-${n}`)) return `${base}-${n}`;
   }
   return base;
+}
+
+const isPara = (b) => b.t === 'Para';
+const withType = (b, t) => new Node(t, b.c, b.start, b.end);
+
+/**
+ * List items made tight or loose as a whole: where only the last item ends
+ * in a paragraph, that paragraph is plain; where any other has one, every
+ * plain block is a paragraph.
+ *
+ * @see Text.Pandoc.Shared.compactify
+ * @param {Node[][]} items Each item's blocks.
+ * @returns {Node[][]}
+ */
+export function compactify(items) {
+  if (items.length === 0) return items;
+  const others = items.slice(0, -1);
+  const final = items.at(-1);
+  const last = final.at(-1);
+  const otherParas = others.some((item) => item.some(isPara));
+  if (last?.t === 'Para' && !final.slice(0, -1).some(isPara) && !otherParas) {
+    return [...others, [...final.slice(0, -1), withType(last, 'Plain')]];
+  }
+  if (!items.some((item) => item.some(isPara))) return items;
+  return items.map((item) =>
+    item.map((b) => (b.t === 'Plain' ? withType(b, 'Para') : b)),
+  );
+}
+
+const EMPTY_BOX = '\u2610';
+const CHECKED_BOX = '\u2612';
+const SPACE = null;
+
+// Pandoc's patterns in its order: the inlines a box replaces (a string a
+// `Str`, `SPACE` a `Space`), what must follow (a `Space`, kept, or
+// nothing), and the box. `[ ]` as one `Str`, a space inside, no `Str` holds.
+const TASKS = [
+  [['[', SPACE, ']'], 'space', EMPTY_BOX],
+  [['[ ]'], 'space', CHECKED_BOX],
+  [['[x]'], 'space', CHECKED_BOX],
+  [['[X]'], 'space', CHECKED_BOX],
+  [['[', SPACE, ']'], 'end', EMPTY_BOX],
+  [['[ ]'], 'end', EMPTY_BOX],
+  [['[x]'], 'end', CHECKED_BOX],
+  [['[X]'], 'end', CHECKED_BOX],
+];
+
+const matches = (x, want) =>
+  want === SPACE ? x?.t === 'Space' : x?.t === 'Str' && x.c === want;
+
+// The box `xs` opens with and how many of them it replaces, or null.
+function taskBox(xs) {
+  for (const [nodes, then, box] of TASKS) {
+    if (!nodes.every((want, n) => matches(xs[n], want))) continue;
+    const next = xs[nodes.length];
+    if (then === 'space' ? next?.t === 'Space' : next === undefined) {
+      return [box, nodes.length];
+    }
+  }
+  return null;
+}
+
+/**
+ * A task list item's first block with `[ ]` or `[x]` at its start as a
+ * ballot box, `task_lists` on.
+ *
+ * @see Text.Pandoc.Shared.taskListItemFromAscii
+ * @param {boolean} on Whether `task_lists` is.
+ * @param {Node[]} blocks
+ * @returns {Node[]}
+ */
+export function taskListItemFromAscii(on, blocks) {
+  const [first, ...rest] = blocks;
+  if (!on || (first?.t !== 'Plain' && first?.t !== 'Para')) return blocks;
+  const box = taskBox(first.c);
+  if (box === null) return blocks;
+  const [mark, taken] = box;
+  const boxNode = new Node(
+    'Str',
+    mark,
+    first.c[0].start,
+    first.c[taken - 1].end,
+  );
+  const inlines = [boxNode, ...first.c.slice(taken)];
+  return [new Node(first.t, inlines, first.start, first.end), ...rest];
 }

@@ -10,6 +10,8 @@ import * as B from '../ast/builder.js';
 import { char, newline } from '../char.js';
 import { alt, attempt, eof, FAIL, notFollowedBy, optional } from '../core.js';
 import {
+  blockEnd,
+  lastLineEnd,
   optionalBlanklines,
   parseFromStringFresh,
 } from '../parsing/general.js';
@@ -74,6 +76,7 @@ const lineEnd = alt(newline, eof);
  * @type {import('../core.js').Parser<{lines: SourceText, end: number}>}
  */
 export const emailBlockQuote = attempt((ctx) => {
+  const start = ctx.pos;
   if (emailBlockQuoteStart(ctx) === FAIL) return FAIL;
   const parts = [emailLine(ctx)];
   for (;;) {
@@ -81,7 +84,9 @@ export const emailBlockQuote = attempt((ctx) => {
     if (separator(ctx) === FAIL) break;
     parts.push(SourceText.synth('\n', at, ctx.pos), emailLine(ctx));
   }
-  const end = ctx.pos;
+  // A tight list item's text ends at its last newline, which a lazy break
+  // reads: the quote ends on the line before.
+  const end = lastLineEnd(ctx.text, start, ctx.pos);
   if (lineEnd(ctx) === FAIL || optionalBlanklines(ctx) === FAIL) return FAIL;
   return { lines: SourceText.concat(parts), end };
 });
@@ -103,5 +108,7 @@ export function blockQuote(ctx) {
     SourceText.synth('\n\n', quote.end, quote.end),
   ]);
   const contents = parseFromStringFresh(ctx, parseBlocks, text);
-  return contents === FAIL ? FAIL : B.blockQuote(contents, start, quote.end);
+  if (contents === FAIL) return FAIL;
+  const end = blockEnd(ctx.text, start, quote.end, contents);
+  return B.blockQuote(contents, start, end);
 }

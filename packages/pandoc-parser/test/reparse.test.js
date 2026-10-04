@@ -4,8 +4,9 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Node, readMarkdown, withoutSpans } from '../src/index.js';
+import { readMarkdown, withoutSpans } from '../src/index.js';
 import { pandocAst, TAB_STOPS } from './helpers/oracle.js';
+import { assertNested, childrenOf } from './helpers/spans.js';
 
 const CASES = {
   'a block quote': '> a *quote*\n> on two lines',
@@ -39,33 +40,6 @@ for (const [name, text] of Object.entries(CASES)) {
         pandocAst(text, tabStop),
       );
     });
-  }
-}
-
-// Each node's children, in order.
-const childrenOf = (node) => {
-  const out = [];
-  const visit = (v) => {
-    if (v instanceof Node) out.push(v);
-    else if (Array.isArray(v)) v.forEach(visit);
-  };
-  visit(node.c);
-  return out;
-};
-
-// Every node within `[start, end)`, in order, each within its own.
-function assertNested(nodes, start, end, path) {
-  let last = start;
-  for (const node of nodes) {
-    const at = `${path} > ${node.t}`;
-    assert.ok(
-      node.start >= last,
-      `${at} starts at ${node.start}, before ${last}`,
-    );
-    assert.ok(node.end >= node.start, `${at} ends before it starts`);
-    assert.ok(node.end <= end, `${at} ends at ${node.end}, past ${end}`);
-    assertNested(childrenOf(node), node.start, node.end, at);
-    last = node.end;
   }
 }
 

@@ -23,6 +23,8 @@ import { toLower, words } from '../shared.js';
  * @property {PersistentMap<true>} identifiers Header identifiers used.
  * @property {PersistentMap<[[string, string], Attr]>} headerKeys Each
  *   header's reference key: its target and attributes.
+ * @property {number} nextExample The next example list item's number.
+ * @property {PersistentMap<number>} examples Each example label's number.
  */
 
 /** @typedef {[string, string[], [string, string][]]} Attr */
@@ -50,6 +52,8 @@ export const defaultParserState = (options) => ({
   lastStrPos: null,
   identifiers: EMPTY_MAP,
   headerKeys: EMPTY_MAP,
+  nextExample: 1,
+  examples: EMPTY_MAP,
 });
 
 /**

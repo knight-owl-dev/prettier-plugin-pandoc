@@ -8,6 +8,13 @@ import { codePointLength } from './code-points.js';
 
 const TAB = 4;
 
+// The column after the character `code` at `column`.
+const nextColumn = (column, code) => {
+  if (code === 0x0a) return 1;
+  if (code === 0x09) return column + TAB - ((column - 1) % TAB);
+  return column + 1;
+};
+
 // Each offset's column: offsets inside a surrogate pair share the pair's.
 function columnsOf(text) {
   const columns = new Int32Array(text.length + 1);
@@ -15,14 +22,28 @@ function columnsOf(text) {
   for (let i = 0; i < text.length; ) {
     const length = codePointLength(text, i);
     for (let k = 0; k < length; k++) columns[i + k] = column;
-    const c = text.charCodeAt(i);
-    if (c === 0x0a) column = 1;
-    else if (c === 0x09) column += TAB - ((column - 1) % TAB);
-    else column++;
+    column = nextColumn(column, text.charCodeAt(i));
     i += length;
   }
   columns[text.length] = column;
   return columns;
+}
+
+/**
+ * The column of `offset`, counted from its line's start: for a column or
+ * two, where indexing the whole text would not pay.
+ *
+ * @see Text.Pandoc.Sources.updateSourcePos
+ * @param {string} text
+ * @param {number} offset
+ */
+export function columnOf(text, offset) {
+  let column = 1;
+  for (let i = text.lastIndexOf('\n', offset - 1) + 1; i < offset; ) {
+    column = nextColumn(column, text.charCodeAt(i));
+    i += codePointLength(text, i);
+  }
+  return column;
 }
 
 /**
