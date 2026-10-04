@@ -2,7 +2,8 @@
 // rows are spanned too; a cell's contents are in order within its row, but
 // not after another cell's, which in a multiline table share its lines. A
 // caption is checked apart from what it captions: a table's may follow its
-// rows, and an implicit figure's is its image's description.
+// rows, and an implicit figure's is its image's description. A note's
+// contents span its definition, wherever that is.
 
 import assert from 'node:assert/strict';
 import { Node, Row } from '../../src/index.js';
@@ -36,6 +37,8 @@ export function assertNested(nodes, start, end, path) {
       for (const cell of node.cells) {
         assertNested(collect(cell), node.start, node.end, `${at} > Cell`);
       }
+    } else if (node.t === 'Note') {
+      assertNested(childrenOf(node), 0, Number.POSITIVE_INFINITY, at);
     } else if (node.t === 'Table' || node.t === 'Figure') {
       const [, caption, ...parts] = node.c;
       assertNested(collect(caption), node.start, node.end, `${at} > Caption`);

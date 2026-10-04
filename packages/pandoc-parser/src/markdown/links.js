@@ -74,10 +74,22 @@ const noteLabel = many1Till(
   char(']'),
 );
 
-/** @see Text.Pandoc.Readers.Markdown.noteMarker */
-const noteMarker = attempt((ctx) =>
-  noteOpen(ctx) === FAIL ? FAIL : noteLabel(ctx),
-);
+const noteMarkerAt = attempt((ctx) => {
+  if (noteOpen(ctx) === FAIL) return FAIL;
+  const label = noteLabel(ctx);
+  return label === FAIL ? FAIL : label.join('');
+});
+
+/**
+ * `[^`, a label, `]`: the label.
+ *
+ * @see Text.Pandoc.Readers.Markdown.noteMarker
+ * @param {Context} ctx
+ * @returns {string | typeof FAIL}
+ */
+export function noteMarker(ctx) {
+  return noteMarkerAt(ctx);
+}
 const noNoteAhead = notAhead(noteMarker);
 
 // In brackets, what `inBalancedBrackets` reads past whole: a bracket in it
@@ -92,12 +104,17 @@ const openBracket = char('[');
 
 /**
  * Inlines in balanced brackets, a bracket in a code span, math or an
- * escape not counted: the text between them read again, trimmed.
+ * escape not counted: the text between them read again.
  *
  * @see Text.Pandoc.Readers.Markdown.inBalancedBrackets
- * @type {Parser<Inlines>}
+ * @param {Context} ctx
+ * @returns {Inlines | typeof FAIL}
  */
-const inBalancedBrackets = attempt((ctx) => {
+export function inBalancedBrackets(ctx) {
+  return inBalancedBracketsAt(ctx);
+}
+
+const inBalancedBracketsAt = attempt((ctx) => {
   if (openBracket(ctx) === FAIL) return FAIL;
   const from = ctx.pos;
   for (let depth = 1; depth > 0; ) {
@@ -111,8 +128,7 @@ const inBalancedBrackets = attempt((ctx) => {
     ctx.pos += codePointLength(ctx.text, at);
   }
   const label = SourceText.slice(ctx.text, from, ctx.pos - 1);
-  const read = parseFromString(ctx, inlines, label);
-  return read === FAIL ? FAIL : B.trimInlines(read);
+  return parseFromString(ctx, inlines, label);
 });
 
 /**
@@ -128,7 +144,8 @@ export function reference(ctx) {
   const from = ctx.pos;
   const label = inBalancedBrackets(ctx);
   if (label === FAIL) return FAIL;
-  return { label, raw: ctx.text.slice(from, ctx.pos), from, to: ctx.pos };
+  const raw = ctx.text.slice(from, ctx.pos);
+  return { label: B.trimInlines(label), raw, from, to: ctx.pos };
 }
 
 /**
