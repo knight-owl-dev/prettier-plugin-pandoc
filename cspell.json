@@ -48,6 +48,7 @@
     "subsuperscripts",
     "textbf",
     "trimr",
+    "unlines",
     "unwords",
     "vadjust",
     "wikilink",

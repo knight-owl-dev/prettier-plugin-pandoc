@@ -9,6 +9,7 @@
 // parser state, which backtracking and Pandoc's own `setState`s put back:
 // a lookup in a link's text, whose state `link` drops, still happened.
 
+import { Node, Row } from '../ast/nodes.js';
 import { EMPTY_MAP } from '../persistent-map.js';
 
 /** @typedef {import('../core.js').Context} Context */
@@ -21,6 +22,8 @@ import { EMPTY_MAP } from '../persistent-map.js';
  *   Each reference key's target and attributes.
  * @property {import('../persistent-map.js').PersistentMap<unknown>} headerKeys
  *   Each heading's implicit reference key, its target and attributes.
+ * @property {import('../persistent-map.js').PersistentMap<unknown>} notes
+ *   Each note's contents, by its label.
  */
 
 /**
@@ -31,6 +34,7 @@ import { EMPTY_MAP } from '../persistent-map.js';
 const EMPTY_TABLES = Object.freeze({
   keys: EMPTY_MAP,
   headerKeys: EMPTY_MAP,
+  notes: EMPTY_MAP,
 });
 
 /**
@@ -88,18 +92,72 @@ export function withoutTables(ctx, p) {
 }
 
 /**
+ * `p` run with no notes to resolve against, the other tables kept: a
+ * note's contents, which Pandoc evaluates with an empty note table.
+ *
+ * @see Text.Pandoc.Readers.Markdown.note
+ * @template T
+ * @param {Context} ctx
+ * @param {import('../core.js').Parser<T>} p
+ */
+export function withoutNotes(ctx, p) {
+  const references = referencesOf(ctx);
+  const { tables } = references;
+  references.tables = tables && { ...tables, notes: EMPTY_MAP };
+  try {
+    return p(ctx);
+  } finally {
+    references.tables = tables;
+  }
+}
+
+/**
+ * A note whose contents the read fills once it ends: its label.
+ *
+ * @param {string} label
+ */
+export const pendingNote = (label) => Object.freeze({ pendingNote: label });
+
+/**
+ * `value` with each pending note's contents filled from `notes`.
+ *
+ * @param {unknown} value
+ * @param {Tables['notes']} notes
+ * @returns {unknown}
+ */
+function fillNotes(value, notes) {
+  if (value instanceof Node) {
+    const label = value.c?.pendingNote;
+    const c =
+      label === undefined ? fillNotes(value.c, notes) : notes.get(label);
+    return c === value.c ? value : new Node(value.t, c, value.start, value.end);
+  }
+  if (value instanceof Row) {
+    const cells = fillNotes(value.cells, notes);
+    if (cells === value.cells) return value;
+    return new Row(value.attr, cells, value.start, value.end);
+  }
+  if (!Array.isArray(value)) return value;
+  const filled = value.map((v) => fillNotes(v, notes));
+  return filled.every((v, i) => v === value[i]) ? value : filled;
+}
+
+/**
  * The value of `read`, a whole document's parse, its references resolved:
  * read again with the first read's final tables where it looked one up and
- * the document has any.
+ * the document has any, its notes then filled from the second read's.
  *
  * @template T
- * @param {(references: References) => {value: T, state: {keys: Tables['keys'], headerKeys: Tables['headerKeys']}}} read
+ * @param {(references: References) => {value: T, state: Tables}} read
  * @returns {T}
  */
 export function readResolved(read) {
   const first = { tables: null, lookups: 0 };
   const { value, state } = read(first);
-  const { keys, headerKeys } = state;
-  if (first.lookups === 0 || keys.size + headerKeys.size === 0) return value;
-  return read({ tables: { keys, headerKeys }, lookups: 0 }).value;
+  const { keys, headerKeys, notes } = state;
+  if (first.lookups === 0 || keys.size + headerKeys.size + notes.size === 0) {
+    return value;
+  }
+  const second = read({ tables: { keys, headerKeys, notes }, lookups: 0 });
+  return /** @type {T} */ (fillNotes(second.value, second.state.notes));
 }

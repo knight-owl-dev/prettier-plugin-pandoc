@@ -27,6 +27,10 @@ import { toLower, words } from '../shared.js';
  *   key's target and attributes.
  * @property {PersistentMap<[[string, string], Attr]>} headerKeys Each
  *   header's reference key: its target and attributes.
+ * @property {PersistentMap<unknown[]>} notes Each note's contents, by its
+ *   label.
+ * @property {number} noteNumber How many note references and inline notes
+ *   were read: a citation's note number.
  * @property {number} nextExample The next example list item's number.
  * @property {PersistentMap<number>} examples Each example label's number.
  * @property {number} fencedDivLevel How many fenced divs are open.
@@ -59,6 +63,8 @@ export const defaultParserState = (options) => ({
   identifiers: EMPTY_MAP,
   keys: EMPTY_MAP,
   headerKeys: EMPTY_MAP,
+  notes: EMPTY_MAP,
+  noteNumber: 0,
   nextExample: 1,
   examples: EMPTY_MAP,
   fencedDivLevel: 0,

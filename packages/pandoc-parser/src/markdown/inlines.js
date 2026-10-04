@@ -63,6 +63,7 @@ import { notFollowedByDivCloser } from './divs.js';
 import { mark, strikeout, strongOrEmph } from './emphasis.js';
 import { bracketedSpan, image, link } from './links.js';
 import { listStart, listStartInItem } from './lists.js';
+import { inlineNote, note } from './notes.js';
 import { subscript, superscript } from './scripts.js';
 
 const manyInline = many((ctx) => inline(ctx));
@@ -147,8 +148,15 @@ const noDot = notFollowedBy(dot);
 const loneDot = attempt((ctx) => (dot(ctx) === FAIL ? FAIL : noDot(ctx)));
 const strParts = skipMany1(alt(skipMany1(alphaNum), loneDot));
 
-// Not ported yet: neither a citation nor a note after the whitespace.
-const maybeSpaceAfter = option(null, attempt(whitespace));
+// Not ported yet: no citation after the whitespace either.
+const noNoteAhead = notFollowedBy(note);
+const maybeSpaceAfter = option(
+  null,
+  attempt((ctx) => {
+    const space = whitespace(ctx);
+    return space === FAIL || noNoteAhead(ctx) === FAIL ? FAIL : space;
+  }),
+);
 
 /**
  * A word: letters and digits, and dots one at a time. With `smart`, a space
@@ -387,9 +395,9 @@ const BY_CHAR = new Map([
   ['`', then(code)],
   ['_', then((ctx) => strongOrEmph(ctx))],
   ['*', then((ctx) => strongOrEmph(ctx))],
-  ['^', then((ctx) => /* inlineNote, */ superscript(ctx))],
-  // '[': note, cite and wikilink not ported yet.
-  ['[', then(alt(bracketedSpan, link))],
+  ['^', then(alt(inlineNote, (ctx) => superscript(ctx)))],
+  // '[': cite and wikilink not ported yet.
+  ['[', then(alt(note, bracketedSpan, link))],
   ['!', then(image)],
   ['$', then((ctx) => math(ctx))],
   [

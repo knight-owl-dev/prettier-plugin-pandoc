@@ -28,6 +28,7 @@ import { inlines1 } from './inlines.js';
 import { lineBlock } from './line-blocks.js';
 import { implicitFigure, referenceKey } from './links.js';
 import { bulletList, listStartInItem, orderedList } from './lists.js';
+import { noteBlock } from './notes.js';
 import { table } from './tables.js';
 
 const divCloserAhead = lookAhead(divFenceEnd);
@@ -112,7 +113,7 @@ export function block(ctx) {
     hrule,
     orderedList,
     definitionList,
-    // noteBlock,
+    noteBlock,
     referenceKey,
     // abbrevKey,
     para,
