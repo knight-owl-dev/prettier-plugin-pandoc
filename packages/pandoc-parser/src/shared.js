@@ -5,6 +5,7 @@
 
 import { concat, trimInlines } from './ast/inlines.js';
 import { Node } from './ast/nodes.js';
+import { walkInlines } from './ast/walk.js';
 import { isAlpha, isAlphaNum, isSpace } from './char.js';
 import { charWidth } from './text-width.js';
 
@@ -126,6 +127,71 @@ export function extractSpaces(f, is, start, end) {
     : [];
   const right = isBreak(last) ? [new Node(last.t, undefined, end, end)] : [];
   return concat([left, f(trimInlines(is), start, end), right]);
+}
+
+/**
+ * `x` in Roman numerals; `?` from 4000 on or below 0.
+ *
+ * @see Text.Pandoc.Shared.toRomanNumeral
+ * @param {number} x
+ */
+export function toRomanNumeral(x) {
+  if (x >= 4000 || x < 0) return '?';
+  const digits = [
+    [1000, 'M'],
+    [900, 'CM'],
+    [500, 'D'],
+    [400, 'CD'],
+    [100, 'C'],
+    [90, 'XC'],
+    [50, 'L'],
+    [40, 'XL'],
+    [10, 'X'],
+    [9, 'IX'],
+    [5, 'V'],
+    [4, 'IV'],
+    [1, 'I'],
+  ];
+  let out = '';
+  let n = x;
+  for (const [value, numeral] of digits) {
+    while (n >= value) {
+      out += numeral;
+      n -= value;
+    }
+  }
+  return out;
+}
+
+const isPlaintext = (x) =>
+  x.t === 'Str' || x.t === 'Space' || x.t === 'SoftBreak' || x.t === 'Quoted';
+
+/**
+ * Each run of plain text among `ils`, nested ones too, as code with
+ * `attr`.
+ *
+ * @see Text.Pandoc.Shared.formatCode
+ * @param {unknown} attr
+ * @param {Node[]} ils
+ * @returns {Node[]}
+ */
+export function formatCode(attr, ils) {
+  const fmt = (xs) => {
+    const out = [];
+    for (let k = 0; k < xs.length; ) {
+      if (!isPlaintext(xs[k])) {
+        out.push(xs[k++]);
+        continue;
+      }
+      const from = k;
+      while (k < xs.length && isPlaintext(xs[k])) k++;
+      const run = xs.slice(from, k);
+      const { start } = run[0];
+      out.push(new Node('Code', [attr, stringify(run)], start, run.at(-1).end));
+    }
+    return out;
+  };
+  return walkInlines({ inlines: fmt }, ils);
 }
 
 /**

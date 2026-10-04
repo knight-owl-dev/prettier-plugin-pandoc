@@ -416,8 +416,15 @@ export function updateLaTeXState(ctx, fields) {
   ctx.state = { ...ctx.state, s: { ...ctx.state.s, ...fields } };
 }
 
-// Replace the input, as Parsec's `setInput`: no token read.
-const setInput = (ctx, input, expanded) => {
+/**
+ * Replace the input: no token read.
+ *
+ * @see Text.Parsec.Prim.setInput
+ * @param {{state: LPState}} ctx
+ * @param {TokList} input
+ * @param {boolean} expanded Whether macros are expanded at its head.
+ */
+export const setInput = (ctx, input, expanded) => {
   ctx.state = { ...ctx.state, input, expanded };
 };
 

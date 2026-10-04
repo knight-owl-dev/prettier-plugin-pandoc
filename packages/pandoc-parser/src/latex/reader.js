@@ -8,7 +8,7 @@ import * as B from '../ast/builder.js';
 import { doc } from '../ast/document.js';
 import { Node, nullAttr } from '../ast/nodes.js';
 import { mapSpans } from '../ast/spans.js';
-import { walk } from '../ast/walk.js';
+import { walk, walkInlines } from '../ast/walk.js';
 import { renderLang } from '../collate/lang.js';
 import { commonState } from '../common-state.js';
 import {
@@ -22,12 +22,23 @@ import {
   manyTill,
   notFollowedBy,
   option,
+  optional,
 } from '../core.js';
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
 import { readerInput } from '../input.js';
 import { readerOptions } from '../options.js';
-import { NBSP } from '../shared.js';
-import { nameCommands } from './inline.js';
+import { extractSpaces, formatCode, NBSP, toLower } from '../shared.js';
+import {
+  accentCommands,
+  acronymCommands,
+  biblatexInlineCommands,
+  charCommands,
+  miscCommands,
+  nameCommands,
+  rawInlineOr,
+  refCommands,
+  verbCommands,
+} from './inline.js';
 import {
   babelLangToBCP47,
   enquoteCommands,
@@ -52,6 +63,7 @@ import {
   anyTok,
   blankline,
   braced,
+  bracedUrl,
   bracketedToks,
   controlSeq,
   defaultLaTeXState,
@@ -67,16 +79,20 @@ import {
   primEscape,
   rawopt,
   satisfyTok,
+  setInput,
   skipopts,
   sp,
+  spaces,
   spaces1,
   streamOf,
   symbol,
   tokenize,
   tokWith,
   untokenize,
+  updateLaTeXState,
   verbEnv,
   withRaw,
+  withVerbatimMode,
 } from './parsing.js';
 
 /** @typedef {import('../tex.js').Tok} Tok */
@@ -492,8 +508,407 @@ export const tok = tokWith(inline);
 // ---------------------------------------------------------------------
 // Commands
 
+/**
+ * A URL with the escapes of `#$%&~_^\{}` dropped; any other backslash
+ * kept.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.unescapeURL
+ * @param {string} t
+ */
+function unescapeURL(t) {
+  const [first, ...parts] = t.split('\\');
+  return (
+    first +
+    parts
+      .map((x) => (x !== '' && '#$%&~_^\\{}'.includes(x[0]) ? x : `\\${x}`))
+      .join('')
+  );
+}
+
+// `p` with the ligatures of `--`, quotes and the like off.
+const disableLigatures = (p) => (ctx) => {
+  const old = ctx.state.s.ligatures;
+  updateLaTeXState(ctx, { ligatures: false });
+  const res = p(ctx);
+  if (res !== FAIL) updateLaTeXState(ctx, { ligatures: old });
+  return res;
+};
+
+// `p`'s inlines made into others by `f`, which spans what it makes.
+const wrapping = (p, f) => (ctx, start) => {
+  const ils = p(ctx);
+  return ils === FAIL ? FAIL : f(ils, start, ctx.state.at);
+};
+// `f` applied with the spaces at either end kept outside.
+const extracting = (p, f) =>
+  wrapping(p, (ils, start, end) => extractSpaces(f, ils, start, end));
+const classed = (cls) => (ils, start, end) =>
+  B.spanWith(['', [cls], []], ils, start, end);
+const code = (ils) => formatCode(nullAttr, ils);
+const skipping = (p) => (ctx, start) =>
+  skipopts(ctx) === FAIL ? FAIL : p(ctx, start);
+
+const groupedBlock = grouped(
+  (ctx) => block(ctx),
+  (xs) => xs.flat(),
+);
+
+/**
+ * A note, its number the next; labels in it name that number.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.footnote
+ * @param {object} ctx
+ * @param {number} start
+ */
+function footnote(ctx, start) {
+  updateLaTeXState(ctx, { lastNoteNum: ctx.state.s.lastNoteNum + 1 });
+  const contents = noteBlocks(ctx);
+  return contents === FAIL ? FAIL : B.note(contents, start, ctx.state.at);
+}
+
+// A group's blocks, their labels resolved to the current note's number.
+function noteBlocks(ctx) {
+  const bs = groupedBlock(ctx);
+  if (bs === FAIL) return FAIL;
+  return walk({ inline: (x) => resolveNoteLabel(ctx, x) }, bs);
+}
+
+/**
+ * `\footnotemark[n]`: a mark for note `n`, else the next, resolved to the
+ * note `\footnotetext` gives it after reading.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.footnotemark
+ * @param {object} ctx
+ * @param {number} start
+ */
+function footnotemark(ctx, start) {
+  const mbNum = optionalFootnoteNum(ctx);
+  if (mbNum === FAIL) return FAIL;
+  let noteNum = mbNum;
+  if (noteNum === null) {
+    noteNum = ctx.state.s.lastNoteNum + 1;
+    updateLaTeXState(ctx, { lastNoteNum: noteNum });
+  }
+  const attr = ['', ['footnote-mark'], [['note-num', String(noteNum)]]];
+  return B.spanWith(attr, [], start, ctx.state.at);
+}
+
+/**
+ * `\footnotetext[n]{…}`: the text of note `n`, else the current one.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.footnotetext
+ * @param {object} ctx
+ */
+function footnotetext(ctx) {
+  const mbNum = optionalFootnoteNum(ctx);
+  if (mbNum === FAIL) return FAIL;
+  const noteNum = mbNum ?? ctx.state.s.lastNoteNum;
+  const contents = noteBlocks(ctx);
+  if (contents === FAIL) return FAIL;
+  const footnoteTexts = new Map(ctx.state.s.footnoteTexts).set(
+    noteNum,
+    contents,
+  );
+  updateLaTeXState(ctx, { footnoteTexts });
+  return [];
+}
+
+/**
+ * A note's number in brackets; null where it is no number.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.optionalFootnoteNum
+ */
+const optionalFootnoteNum = option(null, (ctx) => {
+  const t = bracketedToks(ctx);
+  if (t === FAIL) return FAIL;
+  // Haskell's `reads` of an `Int`, all of it.
+  const s = untokenize(t).replace(/^\s+/, '');
+  return /^-?[0-9]+$/.test(s) ? Number(BigInt.asIntN(64, BigInt(s))) : null;
+});
+
+/**
+ * A label in a note: its span emptied, the note's number its text.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.resolveNoteLabel
+ * @param {object} ctx
+ * @param {Node} il
+ */
+function resolveNoteLabel(ctx, il) {
+  if (il.t !== 'Span') return il;
+  const [[, cls, kvs]] = il.c;
+  const lab = kvs.find(([k]) => k === 'label')?.[1];
+  if (lab === undefined) return il;
+  const { labels, lastNoteNum } = ctx.state.s;
+  const text = B.text(String(lastNoteNum), il.start);
+  updateLaTeXState(ctx, { labels: new Map(labels).set(lab, text) });
+  return new Node('Span', [[lab, cls, kvs], []], il.start, il.end);
+}
+
+/**
+ * `\lettrine[options]{L}{ead}`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.lettrine
+ * @param {object} ctx
+ * @param {number} start
+ */
+function lettrine(ctx, start) {
+  if (optional(rawopt)(ctx) === FAIL) return FAIL;
+  const x = tok(ctx);
+  if (x === FAIL) return FAIL;
+  const mid = ctx.state.at;
+  const y = tok(ctx);
+  if (y === FAIL) return FAIL;
+  return B.concat([
+    extractSpaces(classed('lettrine'), x, start, mid),
+    B.smallcaps(y, mid, ctx.state.at),
+  ]);
+}
+
+const toFi = manyTill(anyTok, controlSeq('fi'));
+
+/**
+ * `\ifdim…\fi`, raw.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.ifdim
+ * @param {object} ctx
+ * @param {number} start
+ */
+function ifdim(ctx, start) {
+  const contents = toFi(ctx);
+  if (contents === FAIL) return FAIL;
+  const raw = `\\ifdim${untokenize(contents)}\\fi`;
+  return B.rawInline('latex', raw, start, ctx.state.at);
+}
+
+/**
+ * @see Text.Pandoc.Readers.LaTeX.alterStr
+ * @param {(t: string) => string} f
+ */
+const alterStr = (f) => (x) =>
+  x.t === 'Str' ? new Node('Str', f(x.c), x.start, x.end) : x;
+
+/** @see Text.Pandoc.Readers.LaTeX.makeUppercase */
+const makeUppercase = (ils) =>
+  walkInlines({ inline: alterStr((t) => t.toUpperCase()) }, ils);
+
+/** @see Text.Pandoc.Readers.LaTeX.makeLowercase */
+const makeLowercase = (ils) => walkInlines({ inline: alterStr(toLower) }, ils);
+
+/**
+ * Code with the escapes of `%{}\` the LaTeX writer puts in `\passthrough`
+ * dropped.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.fixPassthroughEscapes
+ */
+const fixPassthroughEscapes = (ils) =>
+  walkInlines(
+    {
+      inline: (x) =>
+        x.t === 'Code'
+          ? new Node(
+              'Code',
+              [x.c[0], x.c[1].replace(/\\([%{}\\])/g, '$1')],
+              x.start,
+              x.end,
+            )
+          : x,
+    },
+    ils,
+  );
+
+/**
+ * `\hyperlink{target}{text}`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.hyperlink
+ * @param {object} ctx
+ * @param {number} start
+ */
+function hyperlink(ctx, start) {
+  return attempt((c) => {
+    const src = braced(c);
+    if (src === FAIL) return FAIL;
+    const lab = tok(c);
+    if (lab === FAIL) return FAIL;
+    return B.link(`#${untokenize(src)}`, '', lab, start, c.state.at);
+  })(ctx);
+}
+
+const hyperrefLabel = attempt((ctx) => {
+  if (sp(ctx) === FAIL) return FAIL;
+  const t = bracketedToks(ctx);
+  return t === FAIL || sp(ctx) === FAIL ? FAIL : `#${untokenize(t)}`;
+});
+const hyperrefURL = (ctx) => {
+  const url = bracedUrl(ctx);
+  if (url === FAIL || bracedUrl(ctx) === FAIL || bracedUrl(ctx) === FAIL) {
+    return FAIL;
+  }
+  return untokenize(url);
+};
+
+/**
+ * `\hyperref[label]{text}`, or `\hyperref{url}{category}{name}{text}`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.hyperref
+ * @param {object} ctx
+ * @param {number} start
+ */
+function hyperref(ctx, start) {
+  return attempt((c) => {
+    const url = alt(hyperrefLabel, hyperrefURL)(c);
+    if (url === FAIL) return FAIL;
+    const ils = tok(c);
+    return ils === FAIL ? FAIL : B.link(url, '', ils, start, c.state.at);
+  })(ctx);
+}
+
+/**
+ * `\hypertarget{name}{text}`: a span with the name for identifier.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.hypertargetInline
+ * @param {object} ctx
+ * @param {number} start
+ */
+function hypertargetInline(ctx, start) {
+  return attempt((c) => {
+    const ref = braced(c);
+    if (ref === FAIL) return FAIL;
+    const ils = tok(c);
+    if (ils === FAIL) return FAIL;
+    return B.spanWith([untokenize(ref), [], []], ils, start, c.state.at);
+  })(ctx);
+}
+
+/**
+ * `\newtoggle{name}`: a toggle, off.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.newToggle
+ * @param {object} ctx
+ */
+function newToggle(ctx) {
+  const name = braced(ctx);
+  if (name === FAIL) return FAIL;
+  const toggles = new Map(ctx.state.s.toggles).set(untokenize(name), false);
+  updateLaTeXState(ctx, { toggles });
+  return [];
+}
+
+/**
+ * `\toggletrue{name}` or `\togglefalse{name}`, for a toggle defined.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.setToggle
+ * @param {boolean} on
+ */
+const setToggle = (on) => (ctx) => {
+  const name = braced(ctx);
+  if (name === FAIL) return FAIL;
+  const key = untokenize(name);
+  if (ctx.state.s.toggles.has(key)) {
+    updateLaTeXState(ctx, {
+      toggles: new Map(ctx.state.s.toggles).set(key, on),
+    });
+  }
+  return [];
+};
+
+const verbatimBraced = withVerbatimMode(braced);
+
+/**
+ * `\iftoggle{name}{yes}{no}`: the branch the toggle takes, put back to
+ * read; neither for a toggle not defined.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.ifToggle
+ * @param {object} ctx
+ */
+function ifToggle(ctx) {
+  const name = braced(ctx);
+  if (name === FAIL || spaces(ctx) === FAIL) return FAIL;
+  const yes = verbatimBraced(ctx);
+  if (yes === FAIL || spaces(ctx) === FAIL) return FAIL;
+  const no = verbatimBraced(ctx);
+  if (no === FAIL) return FAIL;
+  const on = ctx.state.s.toggles.get(untokenize(name));
+  // Pandoc warns of a toggle not defined (`UndefinedToggle`).
+  if (on !== undefined) {
+    setInput(ctx, prepend(on ? yes : no, ctx.state.input), false);
+  }
+  return undefined;
+}
+
+/**
+ * A span styled `stylename: color`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.coloredInline
+ * @param {string} stylename
+ */
+const coloredInline = (stylename) => (ctx, start) => {
+  if (skipopts(ctx) === FAIL) return FAIL;
+  const color = braced(ctx);
+  if (color === FAIL) return FAIL;
+  const ils = tok(ctx);
+  if (ils === FAIL) return FAIL;
+  const attr = ['', [], [['style', `${stylename}: ${untokenize(color)}`]]];
+  return B.spanWith(attr, ils, start, ctx.state.at);
+};
+
+/**
+ * A box's spaces unbreakable, its line breaks gone.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.processHBox
+ */
+const processHBox = (ils) =>
+  walkInlines(
+    {
+      inline: (x) => {
+        if (x.t === 'Space' || x.t === 'SoftBreak') {
+          return new Node('Str', NBSP, x.start, x.end);
+        }
+        return x.t === 'LineBreak' ? new Node('Str', '', x.start, x.end) : x;
+      },
+    },
+    ils,
+  );
+
+const tokThen = (f) => wrapping((ctx) => tok(ctx), f);
+const inlinesThen = (f) => wrapping((ctx) => inlines(ctx), f);
+const urlArg = (ctx) => {
+  const url = bracedUrl(ctx);
+  return url === FAIL ? FAIL : unescapeURL(untokenize(url));
+};
+
 // The entries of `LaTeX.hs`'s own table.
 const REST_COMMANDS = [
+  ['emph', extracting((ctx) => tok(ctx), B.emph)],
+  ['textit', extracting((ctx) => tok(ctx), B.emph)],
+  ['textsl', extracting((ctx) => tok(ctx), B.emph)],
+  ['textsc', extracting((ctx) => tok(ctx), B.smallcaps)],
+  ['textsf', extracting((ctx) => tok(ctx), classed('sans-serif'))],
+  ['textmd', extracting((ctx) => tok(ctx), classed('medium'))],
+  ['textrm', extracting((ctx) => tok(ctx), classed('roman'))],
+  ['textup', extracting((ctx) => tok(ctx), classed('upright'))],
+  [
+    'texttt',
+    wrapping(
+      disableLigatures((ctx) => tok(ctx)),
+      code,
+    ),
+  ],
+  ['alert', skipping(tokThen(classed('alert')))], // beamer
+  ['textsuperscript', extracting((ctx) => tok(ctx), B.superscript)],
+  ['textsubscript', extracting((ctx) => tok(ctx), B.subscript)],
+  ['textbf', extracting((ctx) => tok(ctx), B.strong)],
+  ['textnormal', extracting((ctx) => tok(ctx), classed('nodecor'))],
+  ['underline', tokThen(B.underline)],
+  ['mbox', rawInlineOr('mbox', tokThen(processHBox))],
+  ['hbox', rawInlineOr('hbox', tokThen(processHBox))],
+  [
+    'vbox',
+    rawInlineOr(
+      'vbox',
+      tokThen((ils) => ils),
+    ),
+  ],
+  ['lettrine', rawInlineOr('lettrine', lettrine)],
   ['(', mathUntil(')', mathInline)],
   ['[', mathUntil(']', mathDisplay)],
   [
@@ -505,6 +920,102 @@ const REST_COMMANDS = [
         : mathInline(untokenize(toks), start, ctx.state.at);
     },
   ],
+  [
+    'texorpdfstring',
+    (ctx) => {
+      const x = tok(ctx);
+      return x === FAIL || tok(ctx) === FAIL ? FAIL : x;
+    },
+  ],
+  // old TeX commands
+  ['em', extracting((ctx) => inlines(ctx), B.emph)],
+  ['it', extracting((ctx) => inlines(ctx), B.emph)],
+  ['sl', extracting((ctx) => inlines(ctx), B.emph)],
+  ['bf', extracting((ctx) => inlines(ctx), B.strong)],
+  ['tt', inlinesThen(code)],
+  ['rm', (ctx) => inlines(ctx)],
+  ['itshape', extracting((ctx) => inlines(ctx), B.emph)],
+  ['slshape', extracting((ctx) => inlines(ctx), B.emph)],
+  ['scshape', extracting((ctx) => inlines(ctx), B.smallcaps)],
+  ['bfseries', extracting((ctx) => inlines(ctx), B.strong)],
+  ['MakeUppercase', tokThen(makeUppercase)],
+  ['MakeTextUppercase', tokThen(makeUppercase)], // textcase
+  ['uppercase', tokThen(makeUppercase)],
+  ['MakeLowercase', tokThen(makeLowercase)],
+  ['MakeTextLowercase', tokThen(makeLowercase)],
+  ['lowercase', tokThen(makeLowercase)],
+  [
+    'thanks',
+    skipping((ctx, start) => {
+      const bs = groupedBlock(ctx);
+      return bs === FAIL ? FAIL : B.note(bs, start, ctx.state.at);
+    }),
+  ],
+  ['footnote', skipping(footnote)],
+  ['footnotemark', footnotemark],
+  ['footnotetext', footnotetext],
+  ['newline', (ctx, start) => B.linebreak(start, ctx.state.at)],
+  ['passthrough', tokThen(fixPassthroughEscapes)],
+  // \passthrough macro used by latex writer for listings
+  // Not ported yet: `\includegraphics` and `\includesvg`, which probe
+  // files.
+  // hyperref
+  [
+    'url',
+    (ctx, start) => {
+      const url = urlArg(ctx);
+      if (url === FAIL) return FAIL;
+      const end = ctx.state.at;
+      const text = B.str(url, start, end);
+      return B.linkWith(['', ['uri'], []], url, '', text, start, end);
+    },
+  ],
+  [
+    'nolinkurl',
+    (ctx, start) => {
+      const url = urlArg(ctx);
+      return url === FAIL ? FAIL : B.code(url, start, ctx.state.at);
+    },
+  ],
+  [
+    'href',
+    (ctx, start) => {
+      const url = urlArg(ctx);
+      if (url === FAIL || sp(ctx) === FAIL) return FAIL;
+      const ils = tok(ctx);
+      return ils === FAIL ? FAIL : B.link(url, '', ils, start, ctx.state.at);
+    },
+  ],
+  ['hyperlink', hyperlink],
+  ['hyperref', hyperref],
+  ['hypertarget', hypertargetInline],
+  // hyphenat
+  ['nohyphens', (ctx) => tok(ctx)],
+  ['textnhtt', tokThen(code)],
+  ['nhttfamily', tokThen(code)],
+  // LaTeX colors
+  ['textcolor', coloredInline('color')],
+  ['colorbox', coloredInline('background-color')],
+  // etoolbox
+  ['newtoggle', newToggle],
+  ['toggletrue', setToggle(true)],
+  ['togglefalse', setToggle(false)],
+  ['iftoggle', attempt((ctx) => (ifToggle(ctx) === FAIL ? FAIL : inline(ctx)))],
+  // Not ported yet: `\input`, which reads a file.
+  // soul package
+  ['st', extracting((ctx) => tok(ctx), B.strikeout)],
+  ['ul', tokThen(B.underline)],
+  ['hl', extracting((ctx) => tok(ctx), classed('mark'))],
+  // ulem package
+  ['sout', extracting((ctx) => tok(ctx), B.strikeout)],
+  ['uline', tokThen(B.underline)],
+  // plain tex stuff that should just be passed through as raw tex
+  ['ifdim', ifdim],
+  // Not ported yet: `\today`, generally only used in `\date`, which reads
+  // the clock.
+  // this is used internally by pandoc but the definition is too complicated
+  // for pandoc to handle (see #11140):
+  ['pandocbounded', (ctx) => tok(ctx)],
 ];
 
 /**
@@ -517,9 +1028,17 @@ const REST_COMMANDS = [
  */
 const INLINE_COMMANDS = new Map([
   ...REST_COMMANDS,
+  ...biblatexInlineCommands(tok),
   ...inlineLanguageCommands(tok),
   ...enquoteCommands(tok),
+  ...charCommands,
+  ...verbCommands,
   ...nameCommands,
+  ...refCommands,
+  ...acronymCommands,
+  // Not ported yet: citations and siunitx.
+  ...miscCommands,
+  ...accentCommands(tok),
 ]);
 
 function mathUntil(close, f) {
@@ -543,6 +1062,11 @@ const BLOCK_COMMANDS = new Map([
   // polyglossia
   ['setdefaultlanguage', setDefaultLanguage],
   ['setmainlanguage', setDefaultLanguage],
+  // etoolbox
+  ['newtoggle', newToggle],
+  ['toggletrue', setToggle(true)],
+  ['togglefalse', setToggle(false)],
+  ['iftoggle', attempt((ctx) => (ifToggle(ctx) === FAIL ? FAIL : block(ctx)))],
 ]);
 
 /**
@@ -863,10 +1387,6 @@ const ctrlSeqBlock = alt(
   macroDef((t, start, end) => B.rawBlock('latex', t, start, end)),
   blockCommand,
 );
-const groupedBlocks = grouped(
-  (ctx) => block(ctx),
-  (xs) => xs.flat(),
-);
 
 /**
  * A block, by its first token; else a paragraph or a group of blocks.
@@ -893,7 +1413,7 @@ export function block(ctx) {
     default:
       first = () => FAIL;
   }
-  return alt(first, paragraph, groupedBlocks)(ctx);
+  return alt(first, paragraph, groupedBlock)(ctx);
 }
 
 const manyBlocks = many(block);
