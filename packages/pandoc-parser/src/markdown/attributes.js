@@ -7,7 +7,6 @@ import {
   alphaNum,
   char,
   isAlphaNum,
-  isSpace,
   letter,
   noneOf,
   oneOf,
@@ -16,6 +15,7 @@ import {
 } from '../char.js';
 import { alt, attempt, FAIL, many, many1 } from '../core.js';
 import { enclosed, skipSpaces, textOf } from '../parsing/general.js';
+import { words } from '../shared.js';
 import { escapedCharacter, litChar, spnl } from './common.js';
 
 /** @typedef {[string, string[], [string, string][]]} Attr */
@@ -73,21 +73,6 @@ const value = alt(
   emptyQuotes("''"),
   asText(many(alt(escapedCharacter, noneOf(' \t\n\r}')))),
 );
-
-// Haskell's `words`: the runs between its spaces.
-function words(s) {
-  const out = [];
-  let word = '';
-  for (const c of s) {
-    if (!isSpace(c)) word += c;
-    else if (word !== '') {
-      out.push(word);
-      word = '';
-    }
-  }
-  if (word !== '') out.push(word);
-  return out;
-}
 
 const keyValAttr = attempt((ctx) => {
   const key = identifier(ctx);

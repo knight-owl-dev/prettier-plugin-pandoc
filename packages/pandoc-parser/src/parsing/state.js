@@ -6,6 +6,8 @@
 // replaces it, so a choice point restores it by reference.
 
 import { FAIL } from '../core.js';
+import { EMPTY_MAP } from '../persistent-map.js';
+import { toLower, words } from '../shared.js';
 
 /** @typedef {import('../core.js').Context} Context */
 /** @typedef {import('../options.js').ReaderOptions} ReaderOptions */
@@ -17,7 +19,13 @@ import { FAIL } from '../core.js';
  * @property {'NoQuote' | 'InSingleQuote' | 'InDoubleQuote'} quoteContext
  * @property {boolean} allowLineBreaks
  * @property {number | null} lastStrPos Where the last `str` ended.
+ * @property {PersistentMap<true>} identifiers Header identifiers used.
+ * @property {PersistentMap<[[string, string], Attr]>} headerKeys Each
+ *   header's reference key: its target and attributes.
  */
+
+/** @typedef {[string, string[], [string, string][]]} Attr */
+/** @template V @typedef {import('../persistent-map.js').PersistentMap<V>} PersistentMap */
 
 /**
  * The state a parse starts in.
@@ -32,6 +40,8 @@ export const defaultParserState = (options) => ({
   quoteContext: 'NoQuote',
   allowLineBreaks: true,
   lastStrPos: null,
+  identifiers: EMPTY_MAP,
+  headerKeys: EMPTY_MAP,
 });
 
 /**
@@ -107,3 +117,18 @@ export const withQuoteContext = (context, p) => (ctx) => {
  */
 export const failIfInQuoteContext = (context) => (ctx) =>
   ctx.state.quoteContext === context ? FAIL : undefined;
+
+/**
+ * The key a reference label is looked up by: brackets dropped, spaces
+ * collapsed, lowercased.
+ *
+ * @see Text.Pandoc.Parsing.State.toKey
+ * @param {string} label
+ */
+export function toKey(label) {
+  const inner =
+    label.startsWith('[') && label.endsWith(']') && label.length >= 2
+      ? label.slice(1, -1)
+      : label;
+  return toLower(words(inner).join(' '));
+}

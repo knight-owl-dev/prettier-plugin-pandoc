@@ -46,7 +46,9 @@ import {
   whenEnabled,
   withQuoteContext,
 } from '../parsing/state.js';
+import { trim } from '../shared.js';
 import { attributes, rawAttribute } from './attributes.js';
+import { codeBlockFenced } from './code.js';
 import { escapedCharacter } from './common.js';
 import { mark, strikeout, strongOrEmph } from './emphasis.js';
 
@@ -74,13 +76,17 @@ export const inlines1 = (ctx) => {
 };
 
 const noBlankLine = notFollowedBy(blankline);
+const backtickFence = whenEnabled(
+  'backtick_code_blocks',
+  lookAhead((ctx) => (ctx.text[ctx.pos] === '`' ? codeBlockFenced(ctx) : FAIL)),
+);
 
 /**
  * A line break that is only a space: no blank line, and no block that may
  * interrupt a paragraph, after it.
  *
- * Not ported yet, each needing a construct or a non-default extension: a
- * backtick fence; a list start in a list item, or anywhere with
+ * A backtick fence interrupts. Not ported yet, each needing a construct or
+ * a non-default extension: a list start in a list item, or anywhere with
  * `lists_without_preceding_blankline`; the closer of an open HTML block or
  * div. A block quote or ATX heading interrupts only with
  * `blank_before_blockquote` or `blank_before_header` off.
@@ -90,7 +96,7 @@ const noBlankLine = notFollowedBy(blankline);
 export const endline = attempt((ctx) => {
   const start = ctx.pos;
   if (newline(ctx) === FAIL || noBlankLine(ctx) === FAIL) return FAIL;
-  if (!ctx.state.allowLineBreaks) return FAIL;
+  if (!ctx.state.allowLineBreaks || backtickFence(ctx) !== FAIL) return FAIL;
   if (eof(ctx) !== FAIL) return [];
   if (enabled(ctx, 'hard_line_breaks')) return B.linebreak(start, ctx.pos);
   if (enabled(ctx, 'ignore_line_breaks')) return [];
@@ -277,9 +283,6 @@ export const code = attempt((ctx) => {
   const attr = codeAttributes(ctx);
   return attr === FAIL ? FAIL : B.codeWith(attr, result, start, ctx.pos);
 });
-
-// Haskell's `trim`: no spaces, tabs or line breaks at either end.
-const trim = (s) => s.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
 
 const backslash = char('\\');
 const newlineAhead = lookAhead(newline);
