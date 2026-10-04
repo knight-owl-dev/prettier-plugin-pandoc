@@ -9,6 +9,7 @@
     "blanklines",
     "combinators",
     "COMMONMARK",
+    "compactify",
     "dedent",
     "dedented",
     "dedents",

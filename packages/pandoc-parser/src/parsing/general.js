@@ -195,6 +195,23 @@ export function anyLineNewline(ctx) {
 }
 
 /**
+ * Exactly `n` spaces, or nothing read. Pandoc expands a tab here; the
+ * reader's input holds none.
+ *
+ * @see Text.Pandoc.Parsing.General.gobbleSpaces
+ * @param {Context} ctx
+ * @param {number} n
+ * @returns {undefined | typeof FAIL}
+ */
+export function gobbleSpaces(ctx, n) {
+  for (let k = 0; k < n; k++) {
+    if (ctx.text[ctx.pos + k] !== ' ') return FAIL;
+  }
+  ctx.pos += n;
+  return undefined;
+}
+
+/**
  * Up to `n` spaces: how many. Pandoc expands a tab here; the reader's input
  * holds none.
  *
@@ -295,4 +312,41 @@ export function parseFromStringFresh(ctx, parser, source) {
   const x = parseFromString(ctx, parser, source);
   updateState(ctx, { lastStrPos: outer });
   return x;
+}
+
+// A line of spaces and tabs alone: `blankline`'s, not every Unicode space.
+const BLANK = /^[ \t]*$/;
+
+/**
+ * Where what was read from `from` to `to` ends as a block: its last line
+ * not blank, the newline left out.
+ *
+ * @param {string} text
+ * @param {number} from
+ * @param {number} to
+ */
+export function lastLineEnd(text, from, to) {
+  let end = to;
+  for (;;) {
+    while (end > from && text[end - 1] === '\n') end--;
+    const lineStart = text.lastIndexOf('\n', end - 1) + 1;
+    if (lineStart <= from || !BLANK.test(text.slice(lineStart, end))) {
+      return end;
+    }
+    end = lineStart;
+  }
+}
+
+/**
+ * Where a block read from `from` to `to` ends: its last line not blank,
+ * or where its last child does, whichever is later; a line break the block
+ * keeps at its end spans the newline.
+ *
+ * @param {string} text
+ * @param {number} from
+ * @param {number} to
+ * @param {import('../ast/nodes.js').Node[]} children
+ */
+export function blockEnd(text, from, to, children) {
+  return Math.max(lastLineEnd(text, from, to), children.at(-1)?.end ?? from);
 }

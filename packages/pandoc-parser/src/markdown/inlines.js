@@ -51,6 +51,7 @@ import { attributes, rawAttribute } from './attributes.js';
 import { codeBlockFenced } from './code.js';
 import { escapedCharacter, unescaped } from './common.js';
 import { mark, strikeout, strongOrEmph } from './emphasis.js';
+import { listStart, listStartInItem } from './lists.js';
 import { subscript, superscript } from './scripts.js';
 
 const manyInline = many((ctx) => inline(ctx));
@@ -77,6 +78,8 @@ export const inlines1 = (ctx) => {
 };
 
 const noBlankLine = notFollowedBy(blankline);
+const noListItemStart = notFollowedBy(listStartInItem);
+const noListStart = notFollowedBy(listStart);
 const backtickFence = whenEnabled(
   'backtick_code_blocks',
   lookAhead((ctx) => (ctx.text[ctx.pos] === '`' ? codeBlockFenced(ctx) : FAIL)),
@@ -86,18 +89,22 @@ const backtickFence = whenEnabled(
  * A line break that is only a space: no blank line, and no block that may
  * interrupt a paragraph, after it.
  *
- * A backtick fence interrupts. Not ported yet, each needing a construct or
- * a non-default extension: a list start in a list item, or anywhere with
- * `lists_without_preceding_blankline`; the closer of an open HTML block or
- * div. A block quote or ATX heading interrupts only with
- * `blank_before_blockquote` or `blank_before_header` off.
+ * A list start interrupts in a list item, or anywhere with
+ * `lists_without_preceding_blankline`; so does a backtick fence. Not ported
+ * yet: the closer of an open HTML block or div. A block quote or ATX
+ * heading interrupts only with `blank_before_blockquote` or
+ * `blank_before_header` off.
  *
  * @see Text.Pandoc.Readers.Markdown.endline
  */
 export const endline = attempt((ctx) => {
   const start = ctx.pos;
   if (newline(ctx) === FAIL || noBlankLine(ctx) === FAIL) return FAIL;
-  if (!ctx.state.allowLineBreaks || backtickFence(ctx) !== FAIL) return FAIL;
+  if (!ctx.state.allowLineBreaks || noListItemStart(ctx) === FAIL) return FAIL;
+  if (enabled(ctx, 'lists_without_preceding_blankline')) {
+    if (noListStart(ctx) === FAIL) return FAIL;
+  }
+  if (backtickFence(ctx) !== FAIL) return FAIL;
   if (eof(ctx) !== FAIL) return [];
   if (enabled(ctx, 'hard_line_breaks')) return B.linebreak(start, ctx.pos);
   if (enabled(ctx, 'ignore_line_breaks')) return [];
@@ -236,8 +243,12 @@ const noBlank = notAhead(blankline);
 const codeText = alt(
   textOf(skipMany1(noneOf('`\n'))),
   textOf(backticks),
-  // Not ported yet: no list start after the newline, in a list item.
-  (ctx) => (newline(ctx) === FAIL || noBlank(ctx) === FAIL ? FAIL : ' '),
+  (ctx) =>
+    newline(ctx) === FAIL ||
+    noListItemStart(ctx) === FAIL ||
+    noBlank(ctx) === FAIL
+      ? FAIL
+      : ' ',
 );
 const noBacktick = notFollowedBy(backtick);
 
