@@ -7,7 +7,15 @@
 
 import * as B from '../ast/builder.js';
 import { nullAttr } from '../ast/nodes.js';
-import { alphaNum, char, newline, noneOf, string } from '../char.js';
+import {
+  alphaNum,
+  char,
+  isSpace,
+  newline,
+  noneOf,
+  satisfy,
+  string,
+} from '../char.js';
 import {
   alt,
   attempt,
@@ -30,6 +38,7 @@ import {
   spaceChar,
   textOf,
 } from '../parsing/general.js';
+import { mathDisplay, mathInline } from '../parsing/math.js';
 import {
   apostrophe,
   dash,
@@ -240,6 +249,42 @@ export const smart = whenEnabled(
   alt(doubleQuoted, singleQuoted, doubleCloseQuote, apostrophe, dash, ellipses),
 );
 
+const displayMath = (ctx) => {
+  const start = ctx.pos;
+  const t = mathDisplay(ctx);
+  return t === FAIL ? FAIL : B.displayMath(t, start, ctx.pos);
+};
+const inlineMath = (ctx) => {
+  const start = ctx.pos;
+  const t = mathInline(ctx);
+  return t === FAIL ? FAIL : B.math(t, start, ctx.pos);
+};
+const noSpaceOrPunctuation = notFollowedBy(
+  satisfy((c) => isSpace(c) || /^\p{P}$/u.test(c)),
+);
+const apostropheAfter = option(
+  [],
+  attempt(
+    whenEnabled('smart', (ctx) => {
+      const a = apostrophe(ctx);
+      return a === FAIL || noSpaceOrPunctuation(ctx) === FAIL ? FAIL : a;
+    }),
+  ),
+);
+
+/**
+ * TeX math, display or inline; with `smart`, an apostrophe right after
+ * inline math, a word's.
+ *
+ * @see Text.Pandoc.Readers.Markdown.math
+ */
+export const math = alt(displayMath, (ctx) => {
+  const m = inlineMath(ctx);
+  if (m === FAIL) return FAIL;
+  const a = apostropheAfter(ctx);
+  return a === FAIL ? FAIL : B.concat([m, a]);
+});
+
 const backtick = char('`');
 const backticks = skipMany1(backtick);
 const noBlank = notAhead(blankline);
@@ -342,7 +387,8 @@ const BY_CHAR = new Map([
   ['_', then((ctx) => strongOrEmph(ctx))],
   ['*', then((ctx) => strongOrEmph(ctx))],
   ['^', then((ctx) => /* inlineNote, */ superscript(ctx))],
-  // '[': note, cite, bracketedSpan, wikilink, link; '!': image; '$': math;
+  // '[': note, cite, bracketedSpan, wikilink, link; '!': image.
+  ['$', then((ctx) => math(ctx))],
   [
     '~',
     then(
@@ -355,7 +401,13 @@ const BY_CHAR = new Map([
   ['=', then((ctx) => mark(ctx))],
   [
     '\\',
-    then(alt(/* math, */ escapedNewline, escapedChar /* , rawLaTeXInline' */)),
+    then(
+      alt(
+        (ctx) => math(ctx),
+        escapedNewline,
+        escapedChar /* , rawLaTeXInline' */,
+      ),
+    ),
   ],
   // '@': cite, exampleRef; ':': emoji.
   ['&', then(charRef)],
