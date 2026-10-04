@@ -147,6 +147,7 @@ fancyvrb
 femto
 figurename
 filecontents
+firstline
 firstnumber
 flalign
 flqq
@@ -226,6 +227,7 @@ kmol
 kohm
 koma
 kurmanji
+lastline
 lbreak
 ldots
 letmacro

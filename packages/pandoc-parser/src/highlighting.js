@@ -1,6 +1,9 @@
 // Skylighting's language names beside the listings package's, both ways.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Highlighting`: its language map.
+// Ported from Pandoc 3.11's `Text.Pandoc.Highlighting`: its language map,
+// and its languages by file extension.
+
+import { syntaxesByExtension } from './skylighting/core.js';
 
 // cspell:disable
 
@@ -133,3 +136,12 @@ export const toListingsLanguage = (lang) =>
  */
 export const fromListingsLanguage = (lang) =>
   LISTINGS_TO_LANG.get(lang) ?? null;
+
+/**
+ * The languages for a file extension, lowercased.
+ *
+ * @see Text.Pandoc.Highlighting.languagesByExtension
+ * @param {string} ext
+ */
+export const languagesByExtension = (ext) =>
+  syntaxesByExtension(ext).map((name) => name.toLowerCase());
