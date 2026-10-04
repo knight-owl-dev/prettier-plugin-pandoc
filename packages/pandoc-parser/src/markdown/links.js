@@ -47,6 +47,7 @@ import { toLower, words } from '../shared.js';
 import { SourceText } from '../source-text.js';
 import { base64DataURIEnd, escapeURI } from '../uri.js';
 import { attributes } from './attributes.js';
+import { cite, normalCite } from './citations.js';
 import { litChar, skipNonindentSpaces, spnl } from './common.js';
 import { code, endline, escapedChar, inlines, math } from './inlines.js';
 import { lookupTables } from './references.js';
@@ -266,7 +267,7 @@ const maybeTitle = option('', titleAfter);
  * @see Text.Pandoc.Readers.Markdown.source
  * @type {Parser<{url: string, title: string}>}
  */
-function source(ctx) {
+export function source(ctx) {
   if (openParen(ctx) === FAIL) return FAIL;
   skipSpaces(ctx);
   const src = url(ctx);
@@ -342,12 +343,22 @@ function combineAttr([id1, classes1, kvs1], [id2, classes2, kvs2]) {
   ];
 }
 
+// Spaces before the second brackets where `spaced_reference_links` allows.
+const spacing = (ctx) =>
+  enabled(ctx, 'spaced_reference_links') ? spnl(ctx) : undefined;
+// Citations in the second brackets: none read, a shortcut reference.
+const citationsAhead = lookAhead(
+  attempt(
+    whenEnabled('citations', (ctx) =>
+      spacing(ctx) === FAIL || normalCite(ctx) === FAIL ? FAIL : null,
+    ),
+  ),
+);
 const secondReference = option(
   null,
-  attempt((ctx) =>
-    enabled(ctx, 'spaced_reference_links') && spnl(ctx) === FAIL
-      ? FAIL
-      : reference(ctx),
+  alt(
+    citationsAhead,
+    attempt((ctx) => (spacing(ctx) === FAIL ? FAIL : reference(ctx))),
   ),
 );
 
@@ -360,16 +371,13 @@ const slice = (ctx, from, to) => SourceText.slice(ctx.text, from, to);
  * `shortcut_reference_links`; attributes after it. Its key, else its text,
  * names a reference key, else a heading's; with none, the text as read.
  *
- * Not ported yet: a citation in the second brackets, which ends a
- * shortcut reference before it.
- *
  * @see Text.Pandoc.Readers.Markdown.referenceLink
  * @param {Context} ctx
  * @param {typeof B.linkWith} build `B.linkWith` or `B.imageWith`.
  * @param {Reference} ref
  * @param {number} start Where the link starts: its `[`, an image's `!`.
  */
-function referenceLink(ctx, build, ref, start) {
+export function referenceLink(ctx, build, ref, start) {
   const spaceAfter = ctx.text[ctx.pos] === ' ';
   const second = secondReference(ctx);
   if (second === FAIL) return FAIL;
@@ -618,8 +626,7 @@ const noBracket = notFollowedBy(openBracket);
  * and attributes. Recorded, the last of a key's definitions its target; no
  * block.
  *
- * Not ported yet: no citation where the key would be (`notFollowedBy
- * cite`), and the warning of a key defined again.
+ * Not ported yet: the warning of a key defined again.
  *
  * @see Text.Pandoc.Readers.Markdown.referenceKey
  * @param {Context} ctx
@@ -628,8 +635,12 @@ export function referenceKey(ctx) {
   return referenceKeyAt(ctx);
 }
 
+const noCitation = notFollowedBy((ctx) => cite(ctx));
+
 const referenceKeyAt = attempt((ctx) => {
-  if (skipNonindentSpaces(ctx) === FAIL) return FAIL;
+  if (skipNonindentSpaces(ctx) === FAIL || noCitation(ctx) === FAIL) {
+    return FAIL;
+  }
   const ref = reference(ctx);
   if (ref === FAIL || colon(ctx) === FAIL) return FAIL;
   lineSpace(ctx);

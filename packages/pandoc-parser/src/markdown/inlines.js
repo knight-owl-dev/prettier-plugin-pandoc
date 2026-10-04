@@ -57,6 +57,7 @@ import {
 } from '../parsing/state.js';
 import { NBSP, trim } from '../shared.js';
 import { attributes, rawAttribute } from './attributes.js';
+import { cite, exampleRef } from './citations.js';
 import { codeBlockFenced } from './code.js';
 import { escapedCharacter, unescaped } from './common.js';
 import { notFollowedByDivCloser } from './divs.js';
@@ -148,8 +149,7 @@ const noDot = notFollowedBy(dot);
 const loneDot = attempt((ctx) => (dot(ctx) === FAIL ? FAIL : noDot(ctx)));
 const strParts = skipMany1(alt(skipMany1(alphaNum), loneDot));
 
-// Not ported yet: no citation after the whitespace either.
-const noNoteAhead = notFollowedBy(note);
+const noNoteAhead = notFollowedBy(alt(cite, note));
 const maybeSpaceAfter = option(
   null,
   attempt((ctx) => {
@@ -396,8 +396,8 @@ const BY_CHAR = new Map([
   ['_', then((ctx) => strongOrEmph(ctx))],
   ['*', then((ctx) => strongOrEmph(ctx))],
   ['^', then(alt(inlineNote, (ctx) => superscript(ctx)))],
-  // '[': cite and wikilink not ported yet.
-  ['[', then(alt(note, bracketedSpan, link))],
+  // '[': wikilinks, off by default, not ported yet.
+  ['[', then(alt(note, cite, bracketedSpan, link))],
   ['!', then(image)],
   ['$', then((ctx) => math(ctx))],
   [
@@ -420,7 +420,8 @@ const BY_CHAR = new Map([
       ),
     ),
   ],
-  // '@': cite, exampleRef; ':': emoji.
+  ['@', then(alt(cite, exampleRef))],
+  // ':': emoji, off by default, not ported yet.
   ['&', then(charRef)],
   ['<', then(/* autoLink, spanHtml, rawHtmlInline, */ ltSign)],
   ['"', then(smart)],
@@ -429,7 +430,7 @@ const BY_CHAR = new Map([
   ['\u0091', then(smart)],
   ['“', then(smart)],
   ['\u0093', then(smart)],
-  ['-', then(/* cite, */ smart)],
+  ['-', then(alt(cite, smart))],
   ['.', then(smart)],
 ]);
 

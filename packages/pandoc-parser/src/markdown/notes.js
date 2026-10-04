@@ -55,7 +55,8 @@ const noteAt = attempt((ctx) => {
   if (!lookupTables(ctx).notes.has(label)) {
     return B.str(`[^${label}]`, start, ctx.pos);
   }
-  return [new Node('Note', pendingNote(label), start, ctx.pos)];
+  const pending = pendingNote(label, ctx.state.noteNumber);
+  return [new Node('Note', pending, start, ctx.pos)];
 });
 
 const caret = char('^');
@@ -80,10 +81,11 @@ const inlineNoteAt = whenEnabled(
   attempt((ctx) => {
     const start = ctx.pos;
     if (caret(ctx) === FAIL) return FAIL;
-    countNote(ctx);
+    updateState(ctx, { inNote: true, noteNumber: ctx.state.noteNumber + 1 });
     const from = ctx.pos + 1;
     const contents = contentsInBrackets(ctx);
     if (contents === FAIL || noLinkAfter(ctx) === FAIL) return FAIL;
+    updateState(ctx, { inNote: false });
     const para = B.para(contents, from, ctx.pos - 1);
     return B.note(para, start, ctx.pos);
   }),
@@ -161,8 +163,7 @@ const unlined = (chunks) =>
  * where indented, read again as blocks with no notes resolved. Recorded,
  * the last of a label's definitions its contents; no block.
  *
- * Not ported yet: the warning of a note defined again, and `stateInNote`,
- * which citations read.
+ * Not ported yet: the warning of a note defined again.
  *
  * @see Text.Pandoc.Readers.Markdown.noteBlock
  * @param {Context} ctx
@@ -177,6 +178,7 @@ const noteBlockAt = attempt((ctx) => {
   if (label === FAIL || colon(ctx) === FAIL) return FAIL;
   maybeBlankline(ctx);
   maybeIndent(ctx);
+  updateState(ctx, { inNote: true });
   const first = rawLines(ctx);
   if (first === FAIL) return FAIL;
   const rest = moreLines(ctx);
@@ -189,6 +191,9 @@ const noteBlockAt = attempt((ctx) => {
     parseFromStringFresh(c, parseBlocks, text),
   );
   if (contents === FAIL) return FAIL;
-  updateState(ctx, { notes: ctx.state.notes.set(label, contents) });
+  updateState(ctx, {
+    notes: ctx.state.notes.set(label, contents),
+    inNote: false,
+  });
   return [];
 });

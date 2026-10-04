@@ -31,6 +31,8 @@ import { toLower, words } from '../shared.js';
  *   label.
  * @property {number} noteNumber How many note references and inline notes
  *   were read: a citation's note number.
+ * @property {boolean} inNote Whether a note's contents are being read,
+ *   whose citations take its reference's number.
  * @property {number} nextExample The next example list item's number.
  * @property {PersistentMap<number>} examples Each example label's number.
  * @property {number} fencedDivLevel How many fenced divs are open.
@@ -65,6 +67,7 @@ export const defaultParserState = (options) => ({
   headerKeys: EMPTY_MAP,
   notes: EMPTY_MAP,
   noteNumber: 0,
+  inNote: false,
   nextExample: 1,
   examples: EMPTY_MAP,
   fencedDivLevel: 0,
