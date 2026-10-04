@@ -1,10 +1,9 @@
 // The reader options the port reads: Pandoc's defaults for its `markdown`
-// format, as `pandoc -f markdown-latex_macros` sets them.
+// and `latex` formats.
 
 import { ABBREVIATIONS } from './abbreviations.js';
 
-// `pandoc --list-extensions=markdown`, those on, `latex_macros` left out: its
-// expansion rewrites raw TeX and math, which the port keeps as written.
+// `pandoc --list-extensions=markdown`, those on.
 const EXTENSIONS = [
   'all_symbols_escapable',
   'auto_identifiers',
@@ -28,6 +27,7 @@ const EXTENSIONS = [
   'inline_code_attributes',
   'inline_notes',
   'intraword_underscores',
+  'latex_macros',
   'line_blocks',
   'link_attributes',
   'markdown_in_html_blocks',

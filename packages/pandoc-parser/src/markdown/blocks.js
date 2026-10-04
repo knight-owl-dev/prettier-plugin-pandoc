@@ -30,6 +30,7 @@ import { implicitFigure, referenceKey } from './links.js';
 import { bulletList, listStartInItem, orderedList } from './lists.js';
 import { noteBlock } from './notes.js';
 import { divHtml, htmlBlock, htmlDivCloserAhead } from './raw-html.js';
+import { rawTeXBlock } from './raw-tex.js';
 import { table } from './tables.js';
 
 const divCloserAhead = lookAhead(divFenceEnd);
@@ -109,7 +110,7 @@ export function block(ctx) {
     htmlBlock,
     table,
     codeBlockIndented,
-    // rawTeXBlock,
+    rawTeXBlock,
     lineBlock,
     blockQuote,
     hrule,

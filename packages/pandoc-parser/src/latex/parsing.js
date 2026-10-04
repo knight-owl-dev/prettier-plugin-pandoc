@@ -6,6 +6,8 @@
 import * as B from '../ast/builder.js';
 import { Node } from '../ast/nodes.js';
 import { walk } from '../ast/walk.js';
+import { codePointLength } from '../code-points.js';
+import { commonState } from '../common-state.js';
 import {
   alt,
   attempt,
@@ -23,6 +25,7 @@ import {
 } from '../core.js';
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
 import { readInt } from '../parsing/lists.js';
+import { getPosition } from '../parsing/state.js';
 import { addMetaField, uniqueIdent } from '../shared.js';
 
 /** @typedef {import('../tex.js').Tok} Tok */
@@ -1720,4 +1723,103 @@ export function removeLabel(lbl, value) {
     return out;
   };
   return walk({ inlines: go }, value);
+}
+
+// ---------------------------------------------------------------------
+// Raw TeX in other formats
+
+/**
+ * The tokens of what a parse of another format has left to read, from
+ * where it is.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.getInputTokens
+ * @param {{text: string, pos: number}} ctx
+ * @returns {TokList}
+ */
+export function getInputTokens(ctx) {
+  if (ctx.pos >= ctx.text.length) return null;
+  return streamOf(tokenize(ctx.text, ctx.pos, getPosition(ctx)));
+}
+
+const before = (a, b) =>
+  a.line < b.line || (a.line === b.line && a.column < b.column);
+
+/**
+ * Raw TeX in another format's parse: `parser`'s extent of `toks`, read
+ * with no macros, then `valParser`'s value of the tokens it took, read
+ * with the parse's macros, which take those it defines. The parse reads
+ * on to where the extent ends, as Pandoc's positions map it back,
+ * tokenizer drifts included: the text it reads, or with `latex_macros` the
+ * tokens' text, macros expanded. Null where either parse fails.
+ *
+ * Its host reads no files: the other format's parse has none.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.rawLaTeXParser
+ * @template A
+ * @param {TokList} toks
+ * @param {import('../core.js').Parser<unknown>} parser
+ * @param {import('../core.js').Parser<A>} valParser
+ * @returns {import('../core.js').Parser<[A, string]>}
+ */
+export const rawLaTeXParser = (toks, parser, valParser) => (ctx) => {
+  const pstate = ctx.state;
+  const common = commonState();
+  const lstate = defaultLaTeXState(pstate.options);
+  const extent = lpContext(toks, lstate, undefined, common);
+  const first = withRaw((c) =>
+    parser(c) === FAIL ? FAIL : { line: c.state.line, column: c.state.column },
+  )(extent);
+  if (first === FAIL) return FAIL;
+  const [endpos, toks2] = first;
+  const lstate2 = { ...lstate, macros: [pstate.macros] };
+  const value = lpContext(
+    prepend(toks2, null),
+    lstate2,
+    toks2.at(-1)?.end,
+    common,
+  );
+  const second = withRaw(valParser)(value);
+  if (second === FAIL) return FAIL;
+  const [val, raw] = second;
+  const macros = new Map([...pstate.macros, ...value.state.s.macros[0]]);
+  ctx.state = { ...ctx.state, macros };
+  const from = ctx.pos;
+  while (ctx.pos < ctx.text.length && before(getPosition(ctx), endpos)) {
+    ctx.pos += codePointLength(ctx.text, ctx.pos);
+  }
+  let result = pstate.options.extensions.has('latex_macros')
+    ? untokenize(raw)
+    : ctx.text.slice(from, ctx.pos);
+  // ensure we end with space if input did, see #4442
+  const last = toks2.at(-1);
+  if (
+    last?.type === 'CtrlSeq' &&
+    last.text.endsWith(' ') &&
+    !result.endsWith(' ')
+  ) {
+    result += ' ';
+  }
+  return [val, result];
+};
+
+/**
+ * Math with the parse's macros applied, where `latex_macros` is on.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.applyMacros
+ * @param {{state: {options: object, macros: Map<string, Macro>}}} ctx
+ * @param {string} s
+ * @returns {string}
+ */
+export function applyMacros(ctx, s) {
+  const { options, macros } = ctx.state;
+  if (!options.extensions.has('latex_macros')) return s;
+  const lstate = { ...defaultLaTeXState(options), macros: [macros] };
+  const math = lpContext(
+    streamOf(tokenize(s)),
+    lstate,
+    s.length,
+    commonState(),
+  );
+  const toks = many(anyTok)(math);
+  return untokenize(toks);
 }

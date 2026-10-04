@@ -132,6 +132,7 @@ endfirsthead
 endgroup
 endhead
 endinput
+endpos
 enquote
 ensuremath
 enumi
@@ -245,6 +246,7 @@ longtable
 lowersorbian
 lowertitleback
 lsorbian
+lstate
 lstinline
 lstinputlisting
 lstlisting
@@ -349,6 +351,7 @@ privateuse
 proofname
 providecommand
 provideenvironment
+pstate
 punct
 qtylist
 qtyrange
@@ -356,6 +359,7 @@ quotedblbase
 quotesinglbase
 raggedright
 raisetothe
+rawargs
 rawcells
 rawcommand
 rawcontents
@@ -388,9 +392,15 @@ smartcite
 sout
 startchs
 startcontents
+startitemize
+startname
+starttext
 startvalue
 startvalueprefix
 stopchar
+stopitemize
+stopname
+stoptext
 stopvalue
 stopvalueprefix
 straße
