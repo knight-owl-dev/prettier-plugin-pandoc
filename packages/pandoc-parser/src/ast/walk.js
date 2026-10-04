@@ -24,6 +24,22 @@ import { Node, Row } from './nodes.js';
  * @returns {T}
  */
 export function walk(visitor, value) {
+  const w = walker(visitor);
+  return Array.isArray(value) ? w.blocks(value) : w.block(value);
+}
+
+/**
+ * A list of inlines with `visitor` applied throughout.
+ *
+ * @see Text.Pandoc.Walk.walk
+ * @param {Visitor} visitor
+ * @param {Node[]} xs
+ * @returns {Node[]}
+ */
+export const walkInlines = (visitor, xs) => walker(visitor).inlines(xs);
+
+// The traversals of each kind, applying `visitor`.
+function walker(visitor) {
   const inlines = (xs) => {
     const ys = xs.map(inline);
     return visitor.inlines ? visitor.inlines(ys) : ys;
@@ -132,6 +148,5 @@ export function walk(visitor, value) {
     return visitor.block ? visitor.block(y) : y;
   }
 
-  if (Array.isArray(value)) return /** @type {T} */ (blocks(value));
-  return /** @type {T} */ (block(/** @type {Node} */ (value)));
+  return { inlines, blocks, block };
 }
