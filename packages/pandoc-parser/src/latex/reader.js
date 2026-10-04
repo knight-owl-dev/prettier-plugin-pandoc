@@ -23,11 +23,22 @@ import {
   notFollowedBy,
   option,
   optional,
+  sepBy,
+  skipMany,
 } from '../core.js';
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
 import { readerInput } from '../input.js';
 import { readerOptions } from '../options.js';
-import { extractSpaces, formatCode, NBSP, toLower } from '../shared.js';
+import {
+  blocksToInlines,
+  extractSpaces,
+  formatCode,
+  NBSP,
+  splitTextBy,
+  stringify,
+  toLower,
+  trim,
+} from '../shared.js';
 import { citationCommands, cites } from './citation.js';
 import {
   accentCommands,
@@ -60,8 +71,11 @@ import {
   withMathMode,
 } from './math.js';
 import {
+  addMeta,
   anyControlSeq,
   anyTok,
+  begin_,
+  bgroup,
   blankline,
   braced,
   bracedUrl,
@@ -69,10 +83,12 @@ import {
   bracketedToks,
   controlSeq,
   defaultLaTeXState,
+  egroup,
   endline,
   env,
   getRawCommand,
   grouped,
+  incrementDottedNum,
   isNewlineTok,
   lpContext,
   overlaySpecification,
@@ -80,7 +96,10 @@ import {
   prepend,
   primEscape,
   rawopt,
+  registerHeader,
+  renderDottedNum,
   satisfyTok,
+  setCaption,
   setInput,
   skipopts,
   sp,
@@ -298,7 +317,7 @@ const doubleQuote = alt(
 const startsWithLetter = (t) =>
   t.type === 'Word' && t.text !== '' && isLetter([...t.text][0]);
 const notLetter = notFollowedBy(satisfyTok(startsWithLetter));
-const closing = (c) =>
+const closingQuote = (c) =>
   attempt((ctx) => (symbol(c)(ctx) === FAIL ? FAIL : notLetter(ctx)));
 
 /**
@@ -308,8 +327,8 @@ const closing = (c) =>
  * @type {Parser<Inlines>}
  */
 const singleQuote = alt(
-  quoted(B.singleQuoted, tokens(symbol('`')), closing("'")),
-  quoted(B.singleQuoted, tokens(symbol('‘')), closing('’')),
+  quoted(B.singleQuoted, tokens(symbol('`')), closingQuote("'")),
+  quoted(B.singleQuoted, tokens(symbol('‘')), closingQuote('’')),
 );
 
 /**
@@ -1022,6 +1041,8 @@ const REST_COMMANDS = [
   ['pandocbounded', (ctx) => tok(ctx)],
 ];
 
+const UNNUMBERED = ['', ['unnumbered'], []];
+
 /**
  * Inline commands, by name: each reads what follows the command, which
  * starts at `start`. Haskell's `M.unions` keeps the first map's entry for
@@ -1062,11 +1083,88 @@ function mathUntil(close, f) {
  * @type {Map<string, (ctx: object, start: number) => Blocks | typeof FAIL>}
  */
 const BLOCK_COMMANDS = new Map([
+  ['par', (ctx) => (skipopts(ctx) === FAIL ? FAIL : [])],
+  ['parbox', parbox],
+  ['title', title],
+  ['subtitle', metaTok('subtitle')],
+  ['author', (ctx) => (skipopts(ctx) === FAIL ? FAIL : authors(ctx))],
+  // -- in letter class, temp. store address & sig as title, author
+  ['address', metaTok('address')],
+  ['signature', (ctx) => (skipopts(ctx) === FAIL ? FAIL : authors(ctx))],
+  ['date', metaTok('date')],
   ['newtheorem', newtheorem],
   ['theoremstyle', theoremstyle],
+  // KOMA-Script metadata commands
+  ['extratitle', metaTok('extratitle')],
+  ['frontispiece', metaTok('frontispiece')],
+  ['titlehead', metaTok('titlehead')],
+  ['subject', metaTok('subject')],
+  ['publishers', metaTok('publishers')],
+  ['uppertitleback', metaTok('uppertitleback')],
+  ['lowertitleback', metaTok('lowertitleback')],
+  ['dedication', metaTok('dedication')],
+  // sectioning
+  ['part', section(nullAttr, -1)],
+  ['part*', section(UNNUMBERED, -1)],
+  ['chapter', section(nullAttr, 0)],
+  ['chapter*', section(UNNUMBERED, 0)],
+  ['section', section(nullAttr, 1)],
+  ['section*', section(UNNUMBERED, 1)],
+  ['subsection', section(nullAttr, 2)],
+  ['subsection*', section(UNNUMBERED, 2)],
+  ['subsubsection', section(nullAttr, 3)],
+  ['subsubsection*', section(UNNUMBERED, 3)],
+  ['paragraph', section(nullAttr, 4)],
+  ['paragraph*', section(UNNUMBERED, 4)],
+  ['subparagraph', section(nullAttr, 5)],
+  ['subparagraph*', section(UNNUMBERED, 5)],
+  ['minisec', section(['', ['unnumbered', 'unlisted'], []], 6)], // from KOMA
+  // beamer slides
+  ['frametitle', section(nullAttr, 3)],
+  ['framesubtitle', section(nullAttr, 4)],
+  // letters
+  ['opening', centered],
+  [
+    'closing',
+    (ctx, start) => (skipopts(ctx) === FAIL ? FAIL : closing(ctx, start)),
+  ],
+  // memoir
+  ['plainbreak', bracedRule(1)],
+  ['plainbreak*', bracedRule(1)],
+  ['fancybreak', bracedRule(1)],
+  ['fancybreak*', bracedRule(1)],
+  ['plainfancybreak', bracedRule(3)],
+  ['plainfancybreak*', bracedRule(3)],
+  ['pfbreak', bracedRule(0)],
+  ['pfbreak*', bracedRule(0)],
+  //
+  ['hrule', bracedRule(0)],
+  ['strut', () => []],
+  ['rule', rule],
+  ['item', looseItem],
+  [
+    'documentclass',
+    (ctx) =>
+      skipopts(ctx) === FAIL || braced(ctx) === FAIL ? FAIL : preamble(ctx),
+  ],
+  ['centerline', centered],
+  [
+    'caption',
+    (ctx) => (setCaption((c) => inline(c))(ctx) === FAIL ? FAIL : []),
+  ],
+  ['bibliography', bibliography],
+  ['addbibresource', bibliography],
+  ['endinput', skipSameFileToks],
+  // Not ported yet: `\lstinputlisting`, `\inputminted` and `\graphicspath`,
+  // which read files.
   // polyglossia
   ['setdefaultlanguage', setDefaultLanguage],
   ['setmainlanguage', setDefaultLanguage],
+  // hyperlink
+  ['hypertarget', hypertargetBlock],
+  // LaTeX colors
+  ['textcolor', coloredBlock('color')],
+  ['colorbox', coloredBlock('background-color')],
   // csquotes
   ['blockquote', blockquote(false, null)],
   ['blockcquote', blockquote(true, null)],
@@ -1074,6 +1172,20 @@ const BLOCK_COMMANDS = new Map([
   ['foreignblockcquote', foreignBlockquote(true)],
   ['hyphenblockquote', foreignBlockquote(false)],
   ['hyphenblockcquote', foreignBlockquote(true)],
+  // Not ported yet: `\include`, `\input`, `\subfile` and `\usepackage`,
+  // which read files.
+  // preamble
+  [
+    'PackageError',
+    (ctx) =>
+      braced(ctx) === FAIL || braced(ctx) === FAIL || braced(ctx) === FAIL
+        ? FAIL
+        : [],
+  ],
+  // epigraph package
+  ['epigraph', epigraph],
+  // alignment
+  ['raggedright', () => []],
   // etoolbox
   ['newtoggle', newToggle],
   ['toggletrue', setToggle(true)],
@@ -1094,6 +1206,368 @@ const ENVIRONMENTS = new Map([
   // other
   ['otherlanguage', otherlanguageEnv],
 ]);
+
+/**
+ * `\title{…}`: the title's inlines in the metadata, else its blocks.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.blockCommands
+ * @param {object} ctx
+ */
+function title(ctx) {
+  return alt(
+    (c) => {
+      if (skipopts(c) === FAIL) return FAIL;
+      const ils = groupedInlines(c);
+      if (ils === FAIL) return FAIL;
+      addMeta(c, 'title', B.metaInlines(ils));
+      return [];
+    },
+    (c) => {
+      const bs = groupedBlock(c);
+      if (bs === FAIL) return FAIL;
+      addMeta(c, 'title', B.metaBlocks(bs));
+      return [];
+    },
+  )(ctx);
+}
+
+/**
+ * A metadata command: its argument's inlines into the metadata at `field`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.blockCommands
+ * @param {string} field
+ */
+function metaTok(field) {
+  return (ctx) => {
+    if (skipopts(ctx) === FAIL) return FAIL;
+    const ils = tok(ctx);
+    if (ils === FAIL) return FAIL;
+    addMeta(ctx, field, B.metaInlines(ils));
+    return [];
+  };
+}
+
+const andSeparator = controlSeq('and');
+
+/**
+ * `\author{A \and B}`: each author's blocks squashed into inlines, into
+ * the metadata.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.authors
+ * @param {object} ctx
+ */
+function authors(ctx) {
+  const oneAuthor = (c) => {
+    const bs = many1((d) => block(d))(c);
+    return bs === FAIL ? FAIL : blocksToInlines(bs.flat());
+  };
+  return attempt((c) => {
+    if (bgroup(c) === FAIL) return FAIL;
+    const auths = sepBy(oneAuthor, andSeparator)(c);
+    if (auths === FAIL || egroup(c) === FAIL) return FAIL;
+    const value = {
+      t: 'MetaList',
+      c: auths.map((a) => B.metaInlines(B.trimInlines(a))),
+    };
+    addMeta(c, 'author', value);
+    return [];
+  })(ctx);
+}
+
+/**
+ * An item outside a list: nothing.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.looseItem
+ * @param {object} ctx
+ */
+function looseItem(ctx) {
+  if (ctx.state.s.inListItem) return FAIL;
+  return skipopts(ctx) === FAIL ? FAIL : [];
+}
+
+/**
+ * `\epigraph{quote}{source}`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.epigraph
+ * @param {object} ctx
+ * @param {number} start
+ */
+function epigraph(ctx, start) {
+  const p1 = groupedBlock(ctx);
+  if (p1 === FAIL) return FAIL;
+  const p2 = groupedBlock(ctx);
+  if (p2 === FAIL) return FAIL;
+  return B.divWith(['', ['epigraph'], []], [...p1, ...p2], start, ctx.state.at);
+}
+
+const sectionLabel = attempt((ctx) => {
+  if (spaces(ctx) === FAIL || controlSeq('label')(ctx) === FAIL) return FAIL;
+  if (spaces(ctx) === FAIL) return FAIL;
+  const t = braced(ctx);
+  return t === FAIL ? FAIL : untokenize(t);
+});
+
+/**
+ * A sectioning command at level `lvl`: numbered unless `unnumbered`, its
+ * number the label's text, which follows it or is its identifier.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.section
+ * @param {[string, string[], [string, string][]]} attr
+ * @param {number} lvl
+ */
+function section([ident, classes, kvs], lvl) {
+  return (ctx, start) => {
+    if (skipopts(ctx) === FAIL) return FAIL;
+    const contents = groupedInlines(ctx);
+    if (contents === FAIL) return FAIL;
+    const lab = option(ident, sectionLabel)(ctx);
+    if (lab === FAIL) return FAIL;
+    if (lvl === 0) updateLaTeXState(ctx, { hasChapters: true });
+    if (!classes.includes('unnumbered')) {
+      const { lastHeaderNum, hasChapters, labels } = ctx.state.s;
+      const num = incrementDottedNum(
+        lvl + (hasChapters ? 1 : 0),
+        lastHeaderNum,
+      );
+      updateLaTeXState(ctx, {
+        lastHeaderNum: num,
+        labels: new Map(labels).set(
+          lab,
+          B.str(renderDottedNum(num), start, start),
+        ),
+      });
+    }
+    const attr = registerHeader(ctx, [lab, classes, kvs], contents);
+    return B.headerWith(attr, lvl, contents, start, ctx.state.at);
+  };
+}
+
+// A paragraph of an argument, trimmed: `\opening` and `\centerline`.
+function centered(ctx, start) {
+  if (skipopts(ctx) === FAIL) return FAIL;
+  const ils = tok(ctx);
+  if (ils === FAIL) return FAIL;
+  return B.para(B.trimInlines(ils), start, ctx.state.at);
+}
+
+// An author's inlines, where they are blocks of one paragraph.
+function extractInlines(value) {
+  if (value.t !== 'MetaBlocks' || value.c.length !== 1) return [];
+  const [b] = value.c;
+  return b.t === 'Plain' || b.t === 'Para' ? b.c : [];
+}
+
+/**
+ * A letter's `\closing{…}`, the authors' signatures after it.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.closing
+ * @param {object} ctx
+ * @param {number} start
+ */
+function closing(ctx, start) {
+  const contents = tok(ctx);
+  if (contents === FAIL) return FAIL;
+  const end = ctx.state.at;
+  const author = ctx.state.s.meta.author;
+  let sigs = [];
+  if (author?.t === 'MetaList') {
+    const lines = author.c
+      .map(extractInlines)
+      .flatMap((x, k) =>
+        k === 0 ? x : [new Node('LineBreak', undefined, end, end), ...x],
+      );
+    // Made from the metadata: no text here.
+    sigs = mapSpans(
+      B.para(B.trimInlines(lines), end, end),
+      () => end,
+      () => end,
+    );
+  }
+  return [...B.para(B.trimInlines(contents), start, end), ...sigs];
+}
+
+/**
+ * `\parbox[pos]{width}{…}`: its blocks, read as outside a table cell.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.parbox
+ * @param {object} ctx
+ */
+function parbox(ctx) {
+  return attempt((c) => {
+    if (skipopts(c) === FAIL || braced(c) === FAIL) return FAIL;
+    const old = c.state.s.inTableCell;
+    // see #5711
+    updateLaTeXState(c, { inTableCell: false });
+    const res = groupedBlock(c);
+    if (res === FAIL) return FAIL;
+    updateLaTeXState(c, { inTableCell: old });
+    return res;
+  })(ctx);
+}
+
+/**
+ * `\rule[raise]{width}{thickness}`: a horizontal rule, but of width 0,
+ * which fixes spacing.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.rule
+ * @param {object} ctx
+ * @param {number} start
+ */
+function rule(ctx, start) {
+  if (skipopts(ctx) === FAIL) return FAIL;
+  const w = tok(ctx);
+  if (w === FAIL) return FAIL;
+  const width = /^[0-9.]*/.exec(stringify(w))[0];
+  if (tok(ctx) === FAIL) return FAIL;
+  // 0-width rules are used to fix spacing issues: Haskell's `read` of a
+  // `Double`.
+  const zero = /^[0-9]+(\.[0-9]+)?$/.test(width) && Number(width) === 0;
+  return zero ? [] : B.horizontalRule(start, ctx.state.at);
+}
+
+// A horizontal rule after `n` braced arguments: memoir's breaks.
+function bracedRule(n) {
+  return (ctx, start) => {
+    for (let k = 0; k < n; k++) if (braced(ctx) === FAIL) return FAIL;
+    return B.horizontalRule(start, ctx.state.at);
+  };
+}
+
+// `path` with its extension `ext`, as `System.FilePath.replaceExtension`.
+function replaceExtension(path, ext) {
+  const slash = path.lastIndexOf('/');
+  const dot = path.lastIndexOf('.');
+  const base = dot > slash ? path.slice(0, dot) : path;
+  return `${base}.${ext}`;
+}
+
+/**
+ * Bibliography files, each as `.bib`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.splitBibs
+ * @param {string} t
+ */
+const splitBibs = (t) =>
+  splitTextBy((c) => c === ',', t).map((x) =>
+    B.str(replaceExtension(trim(x), 'bib')),
+  );
+
+// `\bibliography{a,b}` and `\addbibresource{…}`: the files in the metadata.
+function bibliography(ctx) {
+  if (skipopts(ctx) === FAIL) return FAIL;
+  const t = braced(ctx);
+  if (t === FAIL) return FAIL;
+  const bibs = splitBibs(untokenize(t)).map((x) => B.metaInlines(x));
+  addMeta(ctx, 'bibliography', { t: 'MetaList', c: bibs });
+  return [];
+}
+
+/**
+ * `\endinput`: the rest of the file skipped. One file so far: the rest.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.skipSameFileToks
+ * @param {object} ctx
+ */
+function skipSameFileToks(ctx) {
+  return skipMany(anyTok)(ctx) === FAIL ? FAIL : [];
+}
+
+/**
+ * `\hypertarget{name}{…}`: a div with the name for identifier, or the
+ * section it holds, named so already.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.hypertargetBlock
+ * @param {object} ctx
+ * @param {number} start
+ */
+function hypertargetBlock(ctx, start) {
+  return attempt((c) => {
+    const ref = braced(c);
+    if (ref === FAIL) return FAIL;
+    const name = untokenize(ref);
+    const bs = groupedBlock(c);
+    if (bs === FAIL) return FAIL;
+    const [h] = bs;
+    if (
+      bs.length === 1 &&
+      h.t === 'Header' &&
+      h.c[0] === 1 &&
+      h.c[1][0] === name
+    ) {
+      return bs;
+    }
+    return B.divWith([name, [], []], bs, start, c.state.at);
+  })(ctx);
+}
+
+/**
+ * A div styled `stylename: color`, its argument blocks, not inlines.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.coloredBlock
+ * @param {string} stylename
+ */
+function coloredBlock(stylename) {
+  const notInlines = notFollowedBy(groupedInlines);
+  return (ctx, start) =>
+    attempt((c) => {
+      if (skipopts(c) === FAIL) return FAIL;
+      const color = braced(c);
+      if (color === FAIL || notInlines(c) === FAIL) return FAIL;
+      const bs = groupedBlock(c);
+      if (bs === FAIL) return FAIL;
+      const attr = ['', [], [['style', `${stylename}: ${untokenize(color)}`]]];
+      return B.divWith(attr, bs, start, c.state.at);
+    })(ctx);
+}
+
+const notDocument = notFollowedBy(begin_('document'));
+
+/**
+ * What precedes `\begin{document}`: macro definitions, and file contents,
+ * read; the rest skipped.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.preamble
+ * @param {object} ctx
+ */
+function preamble(ctx) {
+  const preambleBlock = alt(
+    (c) => (spaces1(c) === FAIL ? FAIL : []),
+    macroDef((t, start, end) => B.rawBlock('latex', t, start, end)),
+    filecontents,
+    (c) => (blockCommand(c) === FAIL ? FAIL : []),
+    (c) => (braced(c) === FAIL ? FAIL : []),
+    (c) => (notDocument(c) === FAIL || anyTok(c) === FAIL ? FAIL : []),
+  );
+  const bs = many(preambleBlock)(ctx);
+  return bs === FAIL ? FAIL : bs.flat();
+}
+
+/**
+ * `\begin{filecontents}{name}…`: the file's text, kept for `\input`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.filecontents
+ * @param {object} ctx
+ */
+function filecontents(ctx) {
+  return attempt((c) => {
+    if (controlSeq('begin')(c) === FAIL) return FAIL;
+    const nameToks = braced(c);
+    if (nameToks === FAIL) return FAIL;
+    const name = untokenize(nameToks);
+    if (name !== 'filecontents' && name !== 'filecontents*') return FAIL;
+    if (skipopts(c) === FAIL) return FAIL;
+    const fp = braced(c);
+    if (fp === FAIL) return FAIL;
+    const txt = verbEnv(name)(c);
+    if (txt === FAIL) return FAIL;
+    const fileContents = new Map(c.state.s.fileContents).set(
+      untokenize(fp),
+      txt,
+    );
+    updateLaTeXState(c, { fileContents });
+    return [];
+  })(ctx);
+}
 
 const bracketedInlines = bracketed((ctx) => inline(ctx), B.concat);
 const closingPunct = optional(symbolIn('.:;?!'));
