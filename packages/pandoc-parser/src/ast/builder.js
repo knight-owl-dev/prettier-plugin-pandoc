@@ -222,3 +222,16 @@ export const figureWith = (attr, capt, blocks, start, end) =>
 /** @see Text.Pandoc.Builder.figure */
 export const figure = (capt, blocks, start, end) =>
   figureWith(nullAttr, capt, blocks, start, end);
+
+/**
+ * `meta` with `key` set to inlines, as `MetaInlines`.
+ *
+ * @see Text.Pandoc.Builder.setMeta
+ * @param {string} key
+ * @param {Inlines} value
+ * @param {Record<string, unknown>} meta
+ */
+export const setMeta = (key, value, meta) => ({
+  ...meta,
+  [key]: { t: 'MetaInlines', c: value },
+});

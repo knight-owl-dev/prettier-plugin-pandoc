@@ -9,6 +9,8 @@ import { doc } from '../ast/document.js';
 import { Node, nullAttr } from '../ast/nodes.js';
 import { mapSpans } from '../ast/spans.js';
 import { walk } from '../ast/walk.js';
+import { renderLang } from '../collate/lang.js';
+import { commonState } from '../common-state.js';
 import {
   alt,
   attempt,
@@ -24,6 +26,14 @@ import {
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
 import { readerInput } from '../input.js';
 import { readerOptions } from '../options.js';
+import { NBSP } from '../shared.js';
+import { nameCommands } from './inline.js';
+import {
+  babelLangToBCP47,
+  enquoteCommands,
+  inlineLanguageCommands,
+  setDefaultLanguage,
+} from './lang.js';
 import { macroDef } from './macro.js';
 import {
   dollarsMath,
@@ -57,6 +67,7 @@ import {
   primEscape,
   rawopt,
   satisfyTok,
+  skipopts,
   sp,
   spaces1,
   streamOf,
@@ -73,8 +84,6 @@ import {
 /** @typedef {import('../ast/builder.js').Blocks} Blocks */
 /** @template T @typedef {import('../core.js').Parser<T>} Parser */
 
-const NBSP = ' ';
-
 const enabled = (ctx, ext) => ctx.state.s.options.extensions.has(ext);
 
 /**
@@ -85,13 +94,16 @@ const enabled = (ctx, ext) => ctx.state.s.options.extensions.has(ext);
  *
  * @see Text.Pandoc.Readers.LaTeX.readLaTeX
  * @param {string} source
- * @param {{tabStop?: number, extensions?: string[]}} [options]
+ * @param {{tabStop?: number, extensions?: string[], lang?: string}} [options]
+ *   `lang` is the BCP 47 tag of the language terms are translated to, as
+ *   `-M lang=…` gives it.
  */
 export function readLaTeX(source, options) {
   const opts = readerOptions({ ...options, format: 'latex' });
   const { text, toSource } = readerInput(source, opts.tabStop, 1);
   const input = streamOf(tokenize(text));
-  const ctx = lpContext(input, defaultLaTeXState(opts), text.length);
+  const common = commonState({ lang: options?.lang });
+  const ctx = lpContext(input, defaultLaTeXState(opts), text.length, common);
   const pandoc = parseLaTeX(ctx);
   return { ...pandoc, blocks: mapSpans(pandoc.blocks, toSource, toSource) };
 }
@@ -456,7 +468,12 @@ const optToks = attempt((ctx) => {
 export function opt(ctx) {
   const toks = optToks(ctx);
   if (toks === FAIL) return FAIL;
-  const sub = lpContext(prepend(toks, null), ctx.state.s, toks.at(-1)?.end);
+  const sub = lpContext(
+    prepend(toks, null),
+    ctx.state.s,
+    toks.at(-1)?.end,
+    ctx.common,
+  );
   const result = inlines(sub);
   if (result === FAIL) {
     throw new Error(
@@ -475,14 +492,8 @@ export const tok = tokWith(inline);
 // ---------------------------------------------------------------------
 // Commands
 
-/**
- * Inline commands, by name: each reads what follows the command, which
- * starts at `start`.
- *
- * @see Text.Pandoc.Readers.LaTeX.inlineCommands
- * @type {Map<string, (ctx: object, start: number) => Inlines | typeof FAIL>}
- */
-const INLINE_COMMANDS = new Map([
+// The entries of `LaTeX.hs`'s own table.
+const REST_COMMANDS = [
   ['(', mathUntil(')', mathInline)],
   ['[', mathUntil(']', mathDisplay)],
   [
@@ -494,6 +505,21 @@ const INLINE_COMMANDS = new Map([
         : mathInline(untokenize(toks), start, ctx.state.at);
     },
   ],
+];
+
+/**
+ * Inline commands, by name: each reads what follows the command, which
+ * starts at `start`. Haskell's `M.unions` keeps the first map's entry for
+ * a name: each map here overrides those before it.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.inlineCommands
+ * @type {Map<string, (ctx: object, start: number) => Inlines | typeof FAIL>}
+ */
+const INLINE_COMMANDS = new Map([
+  ...REST_COMMANDS,
+  ...inlineLanguageCommands(tok),
+  ...enquoteCommands(tok),
+  ...nameCommands,
 ]);
 
 function mathUntil(close, f) {
@@ -514,6 +540,9 @@ function mathUntil(close, f) {
 const BLOCK_COMMANDS = new Map([
   ['newtheorem', newtheorem],
   ['theoremstyle', theoremstyle],
+  // polyglossia
+  ['setdefaultlanguage', setDefaultLanguage],
+  ['setmainlanguage', setDefaultLanguage],
 ]);
 
 /**
@@ -523,7 +552,12 @@ const BLOCK_COMMANDS = new Map([
  * @see Text.Pandoc.Readers.LaTeX.environments
  * @type {Map<string, (ctx: object, start: number) => Blocks | typeof FAIL>}
  */
-const ENVIRONMENTS = new Map([['proof', proof(blocks, opt)]]);
+const ENVIRONMENTS = new Map([
+  // amsthm
+  ['proof', proof(blocks, opt)],
+  // other
+  ['otherlanguage', otherlanguageEnv],
+]);
 
 /** @see Text.Pandoc.Readers.LaTeX.isBlockCommand */
 const isBlockCommand = (s) => BLOCK_COMMANDS.has(s) || TREAT_AS_BLOCK.has(s);
@@ -700,9 +734,9 @@ export const environment = attempt((ctx) => {
   if (nameToks === FAIL) return FAIL;
   const name = untokenize(nameToks);
   const known = ENVIRONMENTS.get(name);
-  // Not ported yet: `langEnvironment`, which needs babel's languages.
   return alt(
     (c) => (known === undefined ? FAIL : known(c, start)),
+    langEnvironment(name, start),
     theoremEnvironment(blocks, inlines, opt, name, start),
     (c) =>
       INLINE_ENVIRONMENTS.has(name)
@@ -710,6 +744,48 @@ export const environment = attempt((ctx) => {
         : alt(attempt(rawEnv(name, start)), rawVerbEnv(name, start))(c),
   )(ctx);
 });
+
+const langAttr = (l) => ['', [], [['lang', renderLang(l)]]];
+
+const otherlanguageBody = env('otherlanguage', (ctx) => {
+  if (skipopts(ctx) === FAIL) return FAIL;
+  const name = braced(ctx);
+  if (name === FAIL) return FAIL;
+  const bs = blocks(ctx);
+  return bs === FAIL ? FAIL : [babelLangToBCP47(untokenize(name)), bs];
+});
+
+/**
+ * `otherlanguage`: a div in the language where babel knows it.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.otherlanguageEnv
+ * @param {object} ctx
+ * @param {number} start
+ */
+function otherlanguageEnv(ctx, start) {
+  const read = otherlanguageBody(ctx);
+  if (read === FAIL) return FAIL;
+  const [l, bs] = read;
+  return l === null ? bs : B.divWith(langAttr(l), bs, start, ctx.state.at);
+}
+
+/**
+ * An environment named for a babel language: a div in that language.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.langEnvironment
+ * @param {string} name
+ * @param {number} start
+ * @returns {Parser<Blocks>}
+ */
+function langEnvironment(name, start) {
+  const l = babelLangToBCP47(name);
+  if (l === null) return () => FAIL;
+  const body = env(name, blocks);
+  return (ctx) => {
+    const bs = body(ctx);
+    return bs === FAIL ? FAIL : B.divWith(langAttr(l), bs, start, ctx.state.at);
+  };
+}
 
 const rawopts = many(rawopt);
 

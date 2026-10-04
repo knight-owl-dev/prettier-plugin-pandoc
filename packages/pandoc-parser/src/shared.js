@@ -3,6 +3,7 @@
 //
 // Ported from Pandoc 3.11's `Text.Pandoc.Shared`.
 
+import { concat, trimInlines } from './ast/inlines.js';
 import { Node } from './ast/nodes.js';
 import { isAlpha, isAlphaNum, isSpace } from './char.js';
 import { charWidth } from './text-width.js';
@@ -103,6 +104,28 @@ export function trimMath(s) {
   let start = 0;
   while (start < end && isWS(s[start])) start++;
   return s.slice(start, end);
+}
+
+/**
+ * `f` of `is` with no space or soft break at either end, the space or soft
+ * break it had there kept outside. `f` makes a node from `start` to `end`;
+ * a space kept outside it spans nothing, at its edge.
+ *
+ * @see Text.Pandoc.Shared.extractSpaces
+ * @param {(ils: Node[], start: number, end: number) => Node[]} f
+ * @param {Node[]} is
+ * @param {number} start
+ * @param {number} end
+ * @returns {Node[]}
+ */
+export function extractSpaces(f, is, start, end) {
+  const isBreak = (x) => x?.t === 'Space' || x?.t === 'SoftBreak';
+  const [first, last] = [is[0], is.at(-1)];
+  const left = isBreak(first)
+    ? [new Node(first.t, undefined, start, start)]
+    : [];
+  const right = isBreak(last) ? [new Node(last.t, undefined, end, end)] : [];
+  return concat([left, f(trimInlines(is), start, end), right]);
 }
 
 /**

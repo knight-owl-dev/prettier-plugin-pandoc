@@ -380,13 +380,15 @@ export const defaultLaTeXState = (options) => ({
 
 /**
  * A context reading `input` in state `s`, at its first token's position;
- * `end` where the input ends, else its last token's end.
+ * `end` where the input ends, else its last token's end. `common` is the
+ * run's state, which backtracking leaves alone.
  *
  * @param {TokList} input
  * @param {ReturnType<typeof defaultLaTeXState>} s
  * @param {number} [end]
+ * @param {import('../common-state.js').CommonState} [common]
  */
-export function lpContext(input, s, end) {
+export function lpContext(input, s, end, common) {
   const first = input?.tok;
   return {
     pos: 0,
@@ -400,6 +402,7 @@ export function lpContext(input, s, end) {
       raws: [],
       s,
     },
+    common,
   };
 }
 
@@ -510,6 +513,23 @@ export const disablingWithRaw = (parser) => (ctx) => {
   updateLaTeXState(ctx, { enableWithRaw: false });
   const result = parser(ctx);
   if (result !== FAIL) updateLaTeXState(ctx, { enableWithRaw: outer });
+  return result;
+};
+
+/**
+ * `parser` in quote context `context`, the old context put back after it:
+ * the LaTeX state's instance of `HasQuoteContext`.
+ *
+ * @see Text.Pandoc.Parsing.Capabilities.withQuoteContext
+ * @template T
+ * @param {'NoQuote' | 'InSingleQuote' | 'InDoubleQuote'} context
+ * @param {import('../core.js').Parser<T>} parser
+ */
+export const withQuoteContext = (context, parser) => (ctx) => {
+  const outer = ctx.state.s.quoteContext;
+  updateLaTeXState(ctx, { quoteContext: context });
+  const result = parser(ctx);
+  if (result !== FAIL) updateLaTeXState(ctx, { quoteContext: outer });
   return result;
 };
 
@@ -674,7 +694,11 @@ function handleMacros(ctx, n, at, name, rest) {
           })();
     return args;
   };
-  const sub = { pos: 0, state: { ...ctx.state, input: rest, expanded: false } };
+  const sub = {
+    pos: 0,
+    state: { ...ctx.state, input: rest, expanded: false },
+    common: ctx.common,
+  };
   const args =
     macro.expansionPoint === 'ExpandWhenUsed'
       ? withVerbatimMode(read)(sub)
@@ -782,17 +806,13 @@ function trySpecialMacro(ctx, name, rest) {
       return expanded;
     }
     case 'iftrue':
-      return handleIf(ifParser(true), rest, ctx.state.s.options);
+      return handleIf(ctx, ifParser(true), rest);
     case 'iffalse':
-      return handleIf(ifParser(false), rest, ctx.state.s.options);
+      return handleIf(ctx, ifParser(false), rest);
     case 'ifmmode':
-      return handleIf(
-        ifParser(ctx.state.s.mathMode),
-        rest,
-        ctx.state.s.options,
-      );
+      return handleIf(ctx, ifParser(ctx.state.s.mathMode), rest);
     case 'ifstrequal':
-      return handleIf(ifStrequalParser, rest, ctx.state.s.options);
+      return handleIf(ctx, ifStrequalParser, rest);
     default:
       return null;
   }
@@ -801,8 +821,14 @@ function trySpecialMacro(ctx, name, rest) {
 // What a conditional leaves of `rest`, read in a fresh state; null where
 // it does not parse.
 // @see Text.Pandoc.Readers.LaTeX.Parsing.handleIf
-function handleIf(parser, rest, options) {
-  const sub = lpContext(rest, defaultLaTeXState(options));
+function handleIf(ctx, parser, rest) {
+  const { options } = ctx.state.s;
+  const sub = lpContext(
+    rest,
+    defaultLaTeXState(options),
+    undefined,
+    ctx.common,
+  );
   const result = parser(sub);
   return result === FAIL ? null : result;
 }

@@ -458,6 +458,8 @@ function addTitle(ils, bs) {
   return [...B.para(ils, from, to), ...bs];
 }
 
+const QED_SIGN = '\u00a0\u25fb';
+
 /**
  * A QED sign at the end of the last paragraph; else a paragraph of it
  * last, at `end`.
@@ -470,13 +472,13 @@ function addTitle(ils, bs) {
 function addQed(bs, end) {
   const last = bs.at(-1);
   if (last?.t === 'Para') {
-    const sign = B.str(' ◻', last.end, last.end);
+    const sign = B.str(QED_SIGN, last.end, last.end);
     return [
       ...bs.slice(0, -1),
       ...B.para([...last.c, ...sign], last.start, last.end),
     ];
   }
-  return [...bs, ...B.para(B.str(' ◻', end, end), end, end)];
+  return [...bs, ...B.para(B.str(QED_SIGN, end, end), end, end)];
 }
 
 const isImage = (ils) => ils.length === 1 && ils[0].t === 'Image';
