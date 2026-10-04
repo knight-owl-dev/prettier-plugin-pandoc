@@ -30,3 +30,31 @@ export function lookupEntity(body) {
     code >= 1 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff);
   return valid ? String.fromCodePoint(code) : REPLACEMENT;
 }
+
+/**
+ * `text` with each character reference in it resolved, a reference's `;`
+ * optional; one that resolves to nothing kept.
+ *
+ * @see Text.Pandoc.XML.fromEntities
+ * @param {string} text
+ */
+export function fromEntities(text) {
+  let out = '';
+  let rest = text;
+  for (let amp = rest.indexOf('&'); amp !== -1; amp = rest.indexOf('&')) {
+    out += rest.slice(0, amp);
+    const tail = rest.slice(amp);
+    const end = tail.search(/[\s;]/u);
+    const ent = end === -1 ? tail : tail.slice(0, end);
+    const after = end === -1 ? '' : tail.slice(end);
+    const resolved = lookupEntity(`${ent.slice(1)};`);
+    if (resolved === undefined) {
+      out += ent;
+      rest = after;
+    } else {
+      out += resolved;
+      rest = after.startsWith(';') ? after.slice(1) : after;
+    }
+  }
+  return out + rest;
+}

@@ -62,7 +62,7 @@ import { codeBlockFenced } from './code.js';
 import { escapedCharacter, unescaped } from './common.js';
 import { notFollowedByDivCloser } from './divs.js';
 import { mark, strikeout, strongOrEmph } from './emphasis.js';
-import { bracketedSpan, image, link } from './links.js';
+import { autoLink, bracketedSpan, image, link } from './links.js';
 import { listStart, listStartInItem } from './lists.js';
 import { inlineNote, note } from './notes.js';
 import { subscript, superscript } from './scripts.js';
@@ -423,7 +423,7 @@ const BY_CHAR = new Map([
   ['@', then(alt(cite, exampleRef))],
   // ':': emoji, off by default, not ported yet.
   ['&', then(charRef)],
-  ['<', then(/* autoLink, spanHtml, rawHtmlInline, */ ltSign)],
+  ['<', then(alt(autoLink /* , spanHtml, rawHtmlInline */, ltSign))],
   ['"', then(smart)],
   ["'", then(smart)],
   ['‘', then(smart)],
