@@ -6,23 +6,29 @@
 // inlines themselves. A parser not ported yet keeps its place as a comment.
 
 import * as B from '../ast/builder.js';
-import { alphaNum, char, newline, noneOf } from '../char.js';
+import { nullAttr } from '../ast/nodes.js';
+import { alphaNum, char, newline, noneOf, string } from '../char.js';
 import {
   alt,
   attempt,
   eof,
   FAIL,
+  lookAhead,
   many,
   many1,
+  manyTill,
   notFollowedBy,
   option,
   skipMany1,
 } from '../core.js';
 import {
   blankline,
+  charRef,
   many1Till,
+  notAhead,
   skipSpaces,
   spaceChar,
+  textOf,
 } from '../parsing/general.js';
 import {
   apostrophe,
@@ -36,10 +42,13 @@ import {
 } from '../parsing/smart.js';
 import {
   enabled,
-  guardEnabled,
   updateLastStrPos,
+  whenEnabled,
   withQuoteContext,
 } from '../parsing/state.js';
+import { attributes, rawAttribute } from './attributes.js';
+import { escapedCharacter } from './common.js';
+import { mark, strikeout, strongOrEmph } from './emphasis.js';
 
 const manyInline = many((ctx) => inline(ctx));
 const many1Inline = many1((ctx) => inline(ctx));
@@ -204,37 +213,126 @@ export function ltSign(ctx) {
   return lessThan(ctx) === FAIL ? FAIL : B.str('<', start, ctx.pos);
 }
 
-const smartOn = guardEnabled('smart');
-const smartPunctuation = alt(
-  doubleQuoted,
-  singleQuoted,
-  doubleCloseQuote,
-  apostrophe,
-  dash,
-  ellipses,
-);
-
 /**
  * Smart punctuation, where `smart` is on.
  *
  * @see Text.Pandoc.Readers.Markdown.smart
  */
-export const smart = (ctx) =>
-  smartOn(ctx) === FAIL ? FAIL : smartPunctuation(ctx);
+export const smart = whenEnabled(
+  'smart',
+  alt(doubleQuoted, singleQuoted, doubleCloseQuote, apostrophe, dash, ellipses),
+);
+
+const backtick = char('`');
+const backticks = skipMany1(backtick);
+const noBlank = notAhead(blankline);
+const codeText = alt(
+  textOf(skipMany1(noneOf('`\n'))),
+  textOf(backticks),
+  // Not ported yet: no list start after the newline, in a list item.
+  (ctx) => (newline(ctx) === FAIL || noBlank(ctx) === FAIL ? FAIL : ' '),
+);
+const noBacktick = notFollowedBy(backtick);
+
+// The body of a code span opened by `n` backticks, through the `n` that
+// close it: one parser for each `n`.
+const codeBodies = new Map();
+function codeBody(n) {
+  let body = codeBodies.get(n);
+  if (body === undefined) {
+    const run = string('`'.repeat(n));
+    const closes = attempt((ctx) => {
+      skipSpaces(ctx);
+      return run(ctx) === FAIL ? FAIL : noBacktick(ctx);
+    });
+    body = manyTill(codeText, closes);
+    codeBodies.set(n, body);
+  }
+  return body;
+}
+
+const rawAttr = whenEnabled('raw_attribute', attempt(rawAttribute));
+const codeAttributes = option(
+  nullAttr,
+  whenEnabled('inline_code_attributes', attributes),
+);
+
+/**
+ * A code span: the text between runs of the same number of backticks,
+ * trimmed, a line break in it a space; with attributes after it, or as raw
+ * inline content with a raw attribute.
+ *
+ * @see Text.Pandoc.Readers.Markdown.code
+ */
+export const code = attempt((ctx) => {
+  const start = ctx.pos;
+  if (backticks(ctx) === FAIL) return FAIL;
+  const n = ctx.pos - start;
+  skipSpaces(ctx);
+  const parts = codeBody(n)(ctx);
+  if (parts === FAIL) return FAIL;
+  const result = trim(parts.join(''));
+  const format = rawAttr(ctx);
+  if (format !== FAIL) return B.rawInline(format, result, start, ctx.pos);
+  const attr = codeAttributes(ctx);
+  return attr === FAIL ? FAIL : B.codeWith(attr, result, start, ctx.pos);
+});
+
+// Haskell's `trim`: no spaces, tabs or line breaks at either end.
+const trim = (s) => s.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
+
+const backslash = char('\\');
+const newlineAhead = lookAhead(newline);
+
+/**
+ * A backslash ending a line: a line break, the newline left to read.
+ *
+ * @see Text.Pandoc.Readers.Markdown.escapedNewline
+ */
+export const escapedNewline = whenEnabled(
+  'escaped_line_breaks',
+  attempt((ctx) => {
+    const start = ctx.pos;
+    if (backslash(ctx) === FAIL || newlineAhead(ctx) === FAIL) return FAIL;
+    return B.linebreak(start, ctx.pos);
+  }),
+);
+
+/**
+ * An escaped character, as itself; an escaped space, a non-breaking one.
+ *
+ * @see Text.Pandoc.Readers.Markdown.escapedChar
+ */
+export function escapedChar(ctx) {
+  const start = ctx.pos;
+  const c = escapedCharacter(ctx);
+  if (c === FAIL) return FAIL;
+  return B.str(c === ' ' ? '\u00a0' : c, start, ctx.pos);
+}
 
 // `inline`'s dispatch: a parser by the character it starts with, then a
 // word, then a symbol. Pandoc's choices not ported yet stay as comments.
+// `emphasis.js`'s parsers are read when called: it imports this module, so
+// whichever loads first, they may not exist yet here.
 const WORD_OR_SYMBOL = alt(/* bareURL, */ str, symbol);
 const then = (p) => alt(p, WORD_OR_SYMBOL);
 const BY_CHAR = new Map([
   [' ', then(whitespace)],
   ['\t', then(whitespace)],
   ['\n', then(endline)],
-  // '`': code; '_', '*': strongOrEmph; '^': inlineNote, superscript;
+  ['`', then(code)],
+  ['_', then((ctx) => strongOrEmph(ctx))],
+  ['*', then((ctx) => strongOrEmph(ctx))],
+  // '^': inlineNote, superscript;
   // '[': note, cite, bracketedSpan, wikilink, link; '!': image; '$': math;
-  // '~': strikeout, subscript; '=': mark;
-  // '\\': math, escapedNewline, escapedChar, rawLaTeXInline';
-  // '@': cite, exampleRef; '&': charRef; ':': emoji.
+  ['~', then((ctx) => strikeout(ctx) /* , subscript */)],
+  ['=', then((ctx) => mark(ctx))],
+  [
+    '\\',
+    then(alt(/* math, */ escapedNewline, escapedChar /* , rawLaTeXInline' */)),
+  ],
+  // '@': cite, exampleRef; ':': emoji.
+  ['&', then(charRef)],
   ['<', then(/* autoLink, spanHtml, rawHtmlInline, */ ltSign)],
   ['"', then(smart)],
   ["'", then(smart)],
