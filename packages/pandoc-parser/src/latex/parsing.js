@@ -22,6 +22,7 @@ import {
 } from '../core.js';
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
 import { readInt } from '../parsing/lists.js';
+import { addMetaField } from '../shared.js';
 
 /** @typedef {import('../tex.js').Tok} Tok */
 
@@ -1600,6 +1601,18 @@ export const env = (name, p) => {
     return end(ctx) === FAIL ? FAIL : result;
   };
 };
+
+/**
+ * `val`, a metadata value, added to the document's metadata at `field`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.addMeta
+ * @param {{state: LPState}} ctx
+ * @param {string} field
+ * @param {{t: string, c: unknown}} val
+ */
+export function addMeta(ctx, field, val) {
+  updateLaTeXState(ctx, { meta: addMetaField(field, val, ctx.state.s.meta) });
+}
 
 /**
  * The caption and last label forgotten.

@@ -195,6 +195,25 @@ export function formatCode(attr, ils) {
 }
 
 /**
+ * `meta` with `val` added at `key`: a list of the values there and it.
+ *
+ * @see Text.Pandoc.Shared.addMetaField
+ * @param {string} key
+ * @param {{t: string, c: unknown}} val A metadata value.
+ * @param {Record<string, {t: string, c: unknown}>} meta
+ */
+export function addMetaField(key, val, meta) {
+  if (!Object.hasOwn(meta, key)) return { ...meta, [key]: val };
+  const old = meta[key];
+  const tolist = (y) => (y.t === 'MetaList' ? y.c : [y]);
+  const combined =
+    old.t === 'MetaList'
+      ? { t: 'MetaList', c: [...old.c, ...tolist(val)] }
+      : { t: 'MetaList', c: [old, val] };
+  return { ...meta, [key]: combined };
+}
+
+/**
  * `s` without line breaks at its end.
  *
  * @see Text.Pandoc.Shared.stripTrailingNewlines

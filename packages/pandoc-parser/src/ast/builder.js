@@ -224,7 +224,23 @@ export const figure = (capt, blocks, start, end) =>
   figureWith(nullAttr, capt, blocks, start, end);
 
 /**
- * `meta` with `key` set to inlines, as `MetaInlines`.
+ * Inlines as a metadata value.
+ *
+ * @see Text.Pandoc.Builder.toMetaValue
+ * @param {Inlines} ils
+ */
+export const metaInlines = (ils) => ({ t: 'MetaInlines', c: ils });
+
+/**
+ * Blocks as a metadata value.
+ *
+ * @see Text.Pandoc.Builder.toMetaValue
+ * @param {Blocks} bs
+ */
+export const metaBlocks = (bs) => ({ t: 'MetaBlocks', c: bs });
+
+/**
+ * `meta` with `key` set to inlines.
  *
  * @see Text.Pandoc.Builder.setMeta
  * @param {string} key
@@ -233,5 +249,5 @@ export const figure = (capt, blocks, start, end) =>
  */
 export const setMeta = (key, value, meta) => ({
   ...meta,
-  [key]: { t: 'MetaInlines', c: value },
+  [key]: metaInlines(value),
 });
