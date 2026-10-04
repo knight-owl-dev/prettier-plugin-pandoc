@@ -1,6 +1,7 @@
 // Checks on spans: each node's within its parent's, in order. A table's
 // rows are spanned too; a cell's contents are in order within its row, but
-// not after another cell's, which in a multiline table share its lines. A
+// not after another cell's, which in a multiline table share its lines;
+// a cell spanning rows within the table, past its own row. A
 // caption is checked apart from what it captions: a table's may follow its
 // rows, and an implicit figure's is its image's description. A note's
 // contents span its definition, wherever that is.
@@ -35,7 +36,9 @@ export function assertNested(nodes, start, end, path) {
     assert.ok(node.end <= end, `${at} ends at ${node.end}, past ${end}`);
     if (node instanceof Row) {
       for (const cell of node.cells) {
-        assertNested(collect(cell), node.start, node.end, `${at} > Cell`);
+        // A cell spanning rows runs on past its own row, within the table.
+        const cellEnd = cell[2] > 1 ? end : node.end;
+        assertNested(collect(cell), node.start, cellEnd, `${at} > Cell`);
       }
     } else if (node.t === 'Note') {
       assertNested(childrenOf(node), 0, Number.POSITIVE_INFINITY, at);
