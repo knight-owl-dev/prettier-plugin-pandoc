@@ -55,22 +55,16 @@ export function updateState(ctx, fields) {
 export const enabled = (ctx, name) => ctx.state.options.extensions.has(name);
 
 /**
- * Succeed, reading nothing, where extension `name` is on.
+ * `p` where extension `name` is on: Haskell's `guardEnabled name >> p`.
  *
  * @see Text.Pandoc.Parsing.Capabilities.guardEnabled
+ * @template T
  * @param {string} name
+ * @param {import('../core.js').Parser<T>} p
+ * @returns {import('../core.js').Parser<T>}
  */
-export const guardEnabled = (name) => (ctx) =>
-  enabled(ctx, name) ? undefined : FAIL;
-
-/**
- * Succeed, reading nothing, where extension `name` is off.
- *
- * @see Text.Pandoc.Parsing.Capabilities.guardDisabled
- * @param {string} name
- */
-export const guardDisabled = (name) => (ctx) =>
-  enabled(ctx, name) ? FAIL : undefined;
+export const whenEnabled = (name, p) => (ctx) =>
+  enabled(ctx, name) ? p(ctx) : FAIL;
 
 /**
  * Record that a `str` ends here.

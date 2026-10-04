@@ -2,8 +2,17 @@
 //
 // Ported from Pandoc 3.11's `Text.Pandoc.Parsing.General`.
 
-import { newline, satisfy } from '../char.js';
-import { attempt, FAIL, many1, manyTill, skipMany } from '../core.js';
+import * as B from '../ast/builder.js';
+import { char, newline, satisfy, space } from '../char.js';
+import {
+  attempt,
+  FAIL,
+  many1,
+  manyTill,
+  notFollowedBy,
+  skipMany,
+} from '../core.js';
+import { lookupEntity } from '../entities.js';
 
 /** @template T @typedef {import('../core.js').Parser<T>} Parser */
 
@@ -15,6 +24,13 @@ import { attempt, FAIL, many1, manyTill, skipMany } from '../core.js';
  */
 export const isSpaceChar = (c) =>
   c === ' ' || c === '\t' || c === '\n' || c === '\r';
+
+/**
+ * Any character but a space, tab, line feed or carriage return.
+ *
+ * @see Text.Pandoc.Parsing.General.nonspaceChar
+ */
+export const nonspaceChar = satisfy((c) => !isSpaceChar(c));
 
 /**
  * A space or a tab.
@@ -82,5 +98,65 @@ export function many1Till(p, end) {
     if (first === FAIL) return FAIL;
     const xs = rest(ctx);
     return xs === FAIL ? FAIL : [first, ...xs];
+  };
+}
+
+/**
+ * One or more of `p` between `start` and `end`, `start` not followed by a
+ * space.
+ *
+ * @see Text.Pandoc.Parsing.General.enclosed
+ * @template T
+ * @param {Parser<unknown>} start
+ * @param {Parser<unknown>} end
+ * @param {Parser<T>} p
+ * @returns {Parser<T[]>}
+ */
+export function enclosed(start, end, p) {
+  const noSpace = notFollowedBy(space);
+  const body = many1Till(p, end);
+  return attempt((ctx) =>
+    start(ctx) === FAIL || noSpace(ctx) === FAIL ? FAIL : body(ctx),
+  );
+}
+
+const ampersand = char('&');
+const referenceBody = many1Till(nonspaceChar, char(';'));
+
+/**
+ * A character reference, `&name;` or `&#n;`, as the text it stands for.
+ *
+ * @see Text.Pandoc.Parsing.General.characterReference
+ * @type {Parser<string>}
+ */
+export const characterReference = attempt((ctx) => {
+  if (ampersand(ctx) === FAIL) return FAIL;
+  const body = referenceBody(ctx);
+  if (body === FAIL) return FAIL;
+  return lookupEntity(`${body.join('')};`) ?? FAIL;
+});
+
+/**
+ * A character reference, as a `Str` of the text it stands for.
+ *
+ * @see Text.Pandoc.Parsing.General.charRef
+ */
+export function charRef(ctx) {
+  const start = ctx.pos;
+  const t = characterReference(ctx);
+  return t === FAIL ? FAIL : B.str(t, start, ctx.pos);
+}
+
+/**
+ * The text `p` reads.
+ *
+ * @template T
+ * @param {Parser<T>} p
+ * @returns {Parser<string>}
+ */
+export function textOf(p) {
+  return (ctx) => {
+    const start = ctx.pos;
+    return p(ctx) === FAIL ? FAIL : ctx.text.slice(start, ctx.pos);
   };
 }
