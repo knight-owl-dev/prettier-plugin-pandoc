@@ -13,6 +13,7 @@ import {
   parseOptions,
   parseTagsOptions,
 } from './tagsoup/parser.js';
+import { renderOptions, renderTagsOptions } from './tagsoup/render.js';
 
 /** @typedef {import('./core.js').Context} Context */
 /** @typedef {import('./tagsoup/parser.js').Tag} Tag */
@@ -281,4 +282,128 @@ export function htmlTag(ctx, f) {
   if (close === -1) return FAIL;
   ctx.pos = close + 1;
   return { tag, raw: text.slice(start, ctx.pos) };
+}
+
+/** @see Text.Pandoc.Readers.HTML.TagCategories.voidTags */
+export const VOID_TAGS = new Set([
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
+]);
+
+const MINIMIZE_TAGS = new Set([
+  'hr',
+  'br',
+  'img',
+  'meta',
+  'link',
+  'col',
+  'use',
+  'path',
+  'rect',
+]);
+const RAW_TAGS = new Set(['script', 'style']);
+
+/**
+ * Tags as HTML, as Pandoc writes them: void tags closed at once minimized,
+ * `<script>` and `<style>` raw.
+ *
+ * @see Text.Pandoc.Shared.renderTags'
+ * @param {Tag[]} tags
+ */
+export const renderTags = (tags) =>
+  renderTagsOptions(
+    {
+      ...renderOptions,
+      minimize: (name) => MINIMIZE_TAGS.has(lowerCase(name)),
+      rawTag: (name) => RAW_TAGS.has(lowerCase(name)),
+    },
+    tags,
+  );
+
+// Haskell's `T.toLower`: the full mapping.
+const lowerCase = (s) => s.toLowerCase();
+
+const BALANCED_OPTIONS = {
+  ...parseOptions,
+  tagWarning: true,
+  tagPosition: true,
+};
+
+/**
+ * The tags of an element, its opening tag `open` first, to its closing
+ * tag, nested elements of its name between: none where it is not closed.
+ *
+ * @see Text.Pandoc.Readers.HTML.htmlInBalanced'
+ * @param {Tag} open
+ * @param {Iterator<Tag>} tags
+ * @returns {Tag[]}
+ */
+function balancedTags(open, tags) {
+  const out = [open];
+  let depth = 1;
+  for (let next = tags.next(); !next.done; next = tags.next()) {
+    const t = canonicalizeTag(next.value);
+    out.push(t);
+    if (t.t === 'TagOpen' && t.name === open.name) depth++;
+    else if (t.t === 'TagClose' && t.name === open.name && --depth === 0) {
+      return out;
+    }
+  }
+  return [];
+}
+
+/**
+ * An element whose opening tag `f` holds of, to its balanced closing tag,
+ * read as written: as many lines as TagSoup counts to the closing tag, as
+ * many characters on as its columns differ, then to the next `>`.
+ *
+ * Pandoc's check that TagSoup warns of nothing at the opening tag tests the
+ * opening tag itself, which is no warning: it holds of any.
+ *
+ * @see Text.Pandoc.Readers.HTML.htmlInBalanced
+ * @param {Context} ctx
+ * @param {(tag: Tag) => boolean} f
+ * @returns {string | typeof FAIL}
+ */
+export function htmlInBalanced(ctx, f) {
+  const { text, pos: start } = ctx;
+  if (text[start] !== '<') return FAIL;
+  // A closing tag is `</` and its name: with none, no element closes, and
+  // TagSoup need not lex to the end.
+  if (text.indexOf('</', start) === -1) return FAIL;
+  const tags = parseTagsOptions(BALANCED_OPTIONS, text, start);
+  const first = tags.next().value;
+  const found = tags.next().value;
+  if (first?.t !== 'TagPosition' || found?.t !== 'TagOpen') return FAIL;
+  const open = canonicalizeTag(found);
+  if (!f(open)) return FAIL;
+  const element = balancedTags(open, tags);
+  const [close, end] = [element.at(-1), element.at(-2)];
+  if (close?.t !== 'TagClose' || end?.t !== 'TagPosition') return FAIL;
+  let at = start;
+  for (let n = end.row - first.row; n > 0; n--) {
+    const eol = text.indexOf('\n', at);
+    if (eol === -1) return FAIL;
+    at = eol + 1;
+  }
+  for (let n = end.column - first.column; n > 0; n--) {
+    if (at >= text.length) return FAIL;
+    at += codePointLength(text, at);
+  }
+  const angle = text.indexOf('>', at);
+  if (angle === -1) return FAIL;
+  ctx.pos = angle + 1;
+  return text.slice(start, ctx.pos);
 }
