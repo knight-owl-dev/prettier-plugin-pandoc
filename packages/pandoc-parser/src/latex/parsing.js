@@ -603,6 +603,7 @@ export const withRaw = (parser) => (ctx) => {
 // text of the source, an empty span where the other starts.
 const setpos = (at, tok) => ({
   ...tok,
+  source: at.source,
   line: at.line,
   column: at.column,
   start: at.start,

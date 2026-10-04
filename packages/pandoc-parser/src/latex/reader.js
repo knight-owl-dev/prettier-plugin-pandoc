@@ -1,14 +1,15 @@
 // Pandoc's LaTeX reader: TeX to Pandoc's AST, each block and inline with
 // the span of the source it was read from.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX`. Its command and
-// environment tables hold the math module's entries so far.
+// Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX`. What it reads
+// outside the text it reads through its host's hooks: `common-state.js`.
 
 import * as B from '../ast/builder.js';
 import { doc } from '../ast/document.js';
 import { DefaultDelim, DefaultStyle, Node, nullAttr } from '../ast/nodes.js';
 import { mapSpans } from '../ast/spans.js';
 import { walk, walkInlines } from '../ast/walk.js';
+import { isSpace } from '../char.js';
 import { renderLang } from '../collate/lang.js';
 import { commonState } from '../common-state.js';
 import {
@@ -28,6 +29,7 @@ import {
   skipMany,
 } from '../core.js';
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
+import { numUnit, showFl } from '../image-size.js';
 import { readerInput } from '../input.js';
 import { readerOptions } from '../options.js';
 import { anyOrderedListMarker } from '../parsing/lists.js';
@@ -99,6 +101,7 @@ import {
   label,
   lpContext,
   overlaySpecification,
+  parseFromToks,
   peekTok,
   prepend,
   primEscape,
@@ -137,20 +140,19 @@ const enabled = (ctx, ext) => ctx.state.s.options.extensions.has(ext);
 /**
  * Read `source` as Pandoc's LaTeX reader does.
  *
- * Not ported yet: the command and environment tables but math's, and
- * metadata.
+ * Not ported yet: `\lstinputlisting`.
  *
  * @see Text.Pandoc.Readers.LaTeX.readLaTeX
  * @param {string} source
- * @param {{tabStop?: number, extensions?: string[], lang?: string}} [options]
+ * @param {{tabStop?: number, extensions?: string[], lang?: string, defaultImageExtension?: string, host?: Partial<import('../common-state.js').Host>}} [options]
  *   `lang` is the BCP 47 tag of the language terms are translated to, as
- *   `-M lang=…` gives it.
+ *   `-M lang=…` gives it; `host` the IO allowed, by default none.
  */
 export function readLaTeX(source, options) {
   const opts = readerOptions({ ...options, format: 'latex' });
   const { text, toSource } = readerInput(source, opts.tabStop, 1);
   const input = streamOf(tokenize(text));
-  const common = commonState({ lang: options?.lang });
+  const common = commonState({ lang: options?.lang, host: options?.host });
   const ctx = lpContext(input, defaultLaTeXState(opts), text.length, common);
   const pandoc = parseLaTeX(ctx);
   return { ...pandoc, blocks: mapSpans(pandoc.blocks, toSource, toSource) };
@@ -989,8 +991,9 @@ const REST_COMMANDS = [
   ['newline', (ctx, start) => B.linebreak(start, ctx.state.at)],
   ['passthrough', tokThen(fixPassthroughEscapes)],
   // \passthrough macro used by latex writer for listings
-  // Not ported yet: `\includegraphics` and `\includesvg`, which probe
-  // files.
+  ['includegraphics', includegraphics],
+  // svg
+  ['includesvg', includegraphics],
   // hyperref
   [
     'url',
@@ -1033,7 +1036,8 @@ const REST_COMMANDS = [
   ['toggletrue', setToggle(true)],
   ['togglefalse', setToggle(false)],
   ['iftoggle', attempt((ctx) => (ifToggle(ctx) === FAIL ? FAIL : inline(ctx)))],
-  // Not ported yet: `\input`, which reads a file.
+  // include
+  ['input', rawInlineOr('input', include('input'))],
   // soul package
   ['st', extracting((ctx) => tok(ctx), B.strikeout)],
   ['ul', tokThen(B.underline)],
@@ -1043,12 +1047,374 @@ const REST_COMMANDS = [
   ['uline', tokThen(B.underline)],
   // plain tex stuff that should just be passed through as raw tex
   ['ifdim', ifdim],
-  // Not ported yet: `\today`, generally only used in `\date`, which reads
-  // the clock.
+  // generally only used in \date
+  ['today', today],
   // this is used internally by pandoc but the definition is too complicated
   // for pandoc to handle (see #11140):
   ['pandocbounded', (ctx) => tok(ctx)],
 ];
+
+// ---------------------------------------------------------------------
+// Files and the clock, through the host's hooks
+
+/**
+ * A file name's extension, its dot included; none for none.
+ *
+ * @see System.FilePath.takeExtension
+ * @param {string} fp
+ */
+function takeExtension(fp) {
+  const name = fp.slice(fp.lastIndexOf('/') + 1);
+  const dot = name.lastIndexOf('.');
+  return dot === -1 ? '' : name.slice(dot);
+}
+
+/**
+ * @see System.FilePath.addExtension
+ * @param {string} fp
+ * @param {string} ext
+ */
+const addExtension = (fp, ext) =>
+  ext === '' ? fp : ext.startsWith('.') ? fp + ext : `${fp}.${ext}`;
+
+/**
+ * @see System.FilePath.</>
+ * @param {string} dir
+ * @param {string} fp
+ */
+const joinPath = (dir, fp) =>
+  fp.startsWith('/') ? fp : dir.endsWith('/') ? dir + fp : `${dir}/${fp}`;
+
+/**
+ * `fp`, with `defaultExt` added where its own extension is not allowed.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.ensureExtension
+ * @param {(ext: string) => boolean} isAllowed
+ * @param {string} defaultExt
+ * @param {string} fp
+ */
+const ensureExtension = (isAllowed, defaultExt, fp) =>
+  isAllowed(takeExtension(fp)) ? fp : addExtension(fp, defaultExt);
+
+/** @see Text.Pandoc.Readers.LaTeX.removeDoubleQuotes */
+const removeDoubleQuotes = (t) =>
+  t.length >= 2 && t.startsWith('"') && t.endsWith('"') ? t.slice(1, -1) : t;
+
+// Haskell's `T.strip`.
+const strip = (t) => {
+  const cs = [...t];
+  let [from, to] = [0, cs.length];
+  while (from < to && isSpace(cs[from])) from++;
+  while (to > from && isSpace(cs[to - 1])) to--;
+  return cs.slice(from, to).join('');
+};
+
+const isCommentTok = (t) => t.type === 'Comment';
+
+/**
+ * A braced file name: comments dropped, spaces and double quotes around
+ * it too.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.bracedFilename
+ * @param {object} ctx
+ */
+function bracedFilename(ctx) {
+  const t = braced(ctx);
+  if (t === FAIL) return FAIL;
+  return removeDoubleQuotes(
+    strip(untokenize(t.filter((x) => !isCommentTok(x)))),
+  );
+}
+
+// Braced file names separated by commas.
+function bracedFilenames(ctx) {
+  const t = braced(ctx);
+  if (t === FAIL) return FAIL;
+  return untokenize(t.filter((x) => !isCommentTok(x)))
+    .split(',')
+    .map((f) => removeDoubleQuotes(strip(f)));
+}
+
+// A file's text as Pandoc decodes it: its byte order mark and carriage
+// returns dropped.
+// @see Text.Pandoc.UTF8.toText
+const toText = (t) => t.replace(/^﻿/, '').replaceAll('\r', '');
+
+/**
+ * A file's text: one `filecontents` gave, else the first found in the
+ * directories `TEXINPUTS` names, the current one by default.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.readFileFromTexinputs
+ * @see Text.Pandoc.Class.PandocMonad.readFileFromDirs
+ * @param {object} ctx
+ * @param {string} fp
+ * @returns {string | null}
+ */
+function readFileFromTexinputs(ctx, fp) {
+  const given = ctx.state.s.fileContents.get(fp);
+  if (given !== undefined) return given;
+  const { host } = ctx.common;
+  const dirs = (host.env('TEXINPUTS') ?? '')
+    .split(':')
+    .map((t) => (t === '' ? '.' : t));
+  for (const dir of dirs) {
+    const text = host.readFile(joinPath(dir, fp));
+    if (text !== null) return toText(text);
+  }
+  return null;
+}
+
+/**
+ * A file's tokens, read in at `at`: from that file, spanning nothing
+ * there, as an expansion does. A file including itself while it is read
+ * is a loop.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.getIncludedToks
+ * @param {object} ctx
+ * @param {string} f
+ * @param {number} start
+ * @returns {Tok[]}
+ */
+function getIncludedToks(ctx, f, at) {
+  if (ctx.state.s.containers.includes(f)) {
+    throw new Error(`Include file loop at offset ${ctx.state.at}`);
+  }
+  updateLaTeXState(ctx, { containers: [f, ...ctx.state.s.containers] });
+  // Pandoc warns of a file it cannot load (`CouldNotLoadIncludeFile`).
+  const contents = readFileFromTexinputs(ctx, f) ?? '';
+  updateLaTeXState(ctx, { containers: ctx.state.s.containers.slice(1) });
+  return [...tokenize(contents)].map((t) => ({
+    ...t,
+    source: f,
+    start: at,
+    end: at,
+  }));
+}
+
+/**
+ * A file's tokens before the input, where it is.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.insertIncluded
+ * @param {object} ctx
+ * @param {string} f
+ */
+function insertIncluded(ctx, f) {
+  const toks = getIncludedToks(ctx, f, ctx.state.at);
+  setInput(ctx, prepend(toks, ctx.state.input), false);
+}
+
+const skipOpts = skipMany((ctx) => opt(ctx));
+
+/**
+ * `\input{a,b}` or `\include{a}`: the files read in its place, `.tex`
+ * added where the extension is not one it takes.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.include
+ * @param {string} name
+ */
+function include(name) {
+  const isAllowed =
+    name === 'include'
+      ? (ext) => ext === '.tex'
+      : name === 'input'
+        ? (ext) => ext !== ''
+        : () => false;
+  return (ctx) => {
+    if (skipOpts(ctx) === FAIL) return FAIL;
+    const fs = bracedFilenames(ctx);
+    if (fs === FAIL) return FAIL;
+    for (const f of fs)
+      insertIncluded(ctx, ensureExtension(isAllowed, '.tex', f));
+    return [];
+  };
+}
+
+/**
+ * The command raw where `raw_tex` is on, else `fallback`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.rawBlockOr
+ * @param {string} name
+ * @param {(ctx: object, start: number) => Blocks | typeof FAIL} fallback
+ */
+function rawBlockOr(name, fallback) {
+  const raw = getRawCommand(name, `\\${name}`);
+  return (ctx, start) => {
+    if (!enabled(ctx, 'raw_tex')) return fallback(ctx, start);
+    const t = raw(ctx);
+    return t === FAIL ? FAIL : B.rawBlock('latex', t, start, ctx.state.at);
+  };
+}
+
+/**
+ * `\subfile{f}`: the file's blocks, to its end.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.doSubfile
+ * @param {object} ctx
+ */
+function doSubfile(ctx) {
+  if (skipOpts(ctx) === FAIL) return FAIL;
+  const f = bracedFilename(ctx);
+  if (f === FAIL) return FAIL;
+  const { input, expanded } = ctx.state;
+  setInput(ctx, null, false);
+  insertIncluded(
+    ctx,
+    ensureExtension((ext) => ext !== '', '.tex', f),
+  );
+  const bs = blocks(ctx);
+  if (bs === FAIL || ctx.state.input !== null) return FAIL;
+  setInput(ctx, input, expanded);
+  return bs;
+}
+
+/**
+ * `\usepackage{p}`: a local `p.sty` read for its macros.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.usepackage
+ * @param {object} ctx
+ */
+function usepackage(ctx) {
+  if (skipOpts(ctx) === FAIL) return FAIL;
+  const fs = bracedFilenames(ctx);
+  if (fs === FAIL) return FAIL;
+  for (const f of fs) {
+    const sty = ensureExtension((ext) => ext === '.sty', '.sty', f);
+    const ts = getIncludedToks(ctx, sty, ctx.state.at);
+    // Pandoc warns of a package it cannot read to its end
+    // (`CouldNotParseIncludeFile`).
+    if (parseFromToks(blocks, ts)(ctx) === FAIL) return FAIL;
+  }
+  return [];
+}
+
+const IMAGE_EXTENSIONS = [
+  '.pdf',
+  '.png',
+  '.jpg',
+  '.mps',
+  '.jpeg',
+  '.jbig2',
+  '.jb2',
+];
+const RELATIVE_UNITS = new Set(['\\textwidth', '\\linewidth', '\\textheight']);
+
+/**
+ * An image of `src`: its width and height, relative ones as percentages,
+ * and its alt text; an extension found for it where it has none.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.mkImage
+ * @param {object} ctx
+ * @param {[string, string][]} options
+ * @param {string} src
+ * @param {number} start
+ */
+function mkImage(ctx, options, src, start) {
+  const replaceRelative = ([k, v]) => {
+    const nu = numUnit(v);
+    return nu !== null && RELATIVE_UNITS.has(nu[1])
+      ? [k, `${showFl(nu[0] * 100)}%`]
+      : [k, v];
+  };
+  const kvs = options
+    .filter(([k]) => k === 'width' || k === 'height')
+    .map(replaceRelative);
+  const altText = options.find(([k]) => k === 'alt')?.[1] ?? 'image';
+  const { defaultImageExtension } = ctx.state.s.options;
+  let src2 = src;
+  if (takeExtension(src) === '') {
+    if (defaultImageExtension !== '') {
+      src2 = addExtension(src, defaultImageExtension);
+    } else {
+      const exts = [
+        ...IMAGE_EXTENSIONS,
+        ...IMAGE_EXTENSIONS.map((e) => e.toUpperCase()),
+      ];
+      const found = exts
+        .map((e) => addExtension(src, e))
+        .find((s2) => ctx.common.host.fileExists(s2));
+      if (found !== undefined) src2 = found;
+    }
+  }
+  const end = ctx.state.at;
+  return B.imageWith(
+    ['', [], kvs],
+    src2,
+    '',
+    B.str(altText, start, start),
+    start,
+    end,
+  );
+}
+
+const imageOptions = option([], keyvals);
+
+/**
+ * `\includegraphics[options]{file}`, and `\includesvg`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.inlineCommands
+ * @param {object} ctx
+ * @param {number} start
+ */
+function includegraphics(ctx, start) {
+  const options = imageOptions(ctx);
+  if (options === FAIL) return FAIL;
+  const src = bracedFilename(ctx);
+  if (src === FAIL) return FAIL;
+  return mkImage(ctx, options, unescapeURL(src), start);
+}
+
+/**
+ * `\today`: the date, as the host's clock gives it.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.today
+ * @param {object} ctx
+ * @param {number} start
+ */
+function today(ctx, start) {
+  const d = ctx.common.host.now();
+  const pad = (n, w) => String(n).padStart(w, '0');
+  const t = `${pad(d.getFullYear(), 4)}-${pad(d.getMonth() + 1, 2)}-${pad(d.getDate(), 2)}`;
+  return B.str(t, start, ctx.state.at);
+}
+
+/**
+ * `\inputminted{language}{file}`: the file as code.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.inputMinted
+ * @param {object} ctx
+ * @param {number} start
+ */
+function inputMinted(ctx, start) {
+  const attr = mintedAttr(ctx);
+  if (attr === FAIL) return FAIL;
+  const f = braced(ctx);
+  if (f === FAIL) return FAIL;
+  // Pandoc warns of a file it cannot load (`CouldNotLoadIncludeFile`).
+  const code =
+    readFileFromTexinputs(ctx, untokenize(f).replaceAll('"', '')) ?? '';
+  return B.codeBlockWith(attr, code, start, ctx.state.at);
+}
+
+const graphicsDirs = (ctx) => {
+  if (bgroup(ctx) === FAIL || spaces(ctx) === FAIL) return FAIL;
+  return manyTill((c) => {
+    const t = braced(c);
+    return t === FAIL || spaces(c) === FAIL ? FAIL : untokenize(t);
+  }, egroup)(ctx);
+};
+
+/**
+ * `\graphicspath{{dir/}…}`: directories added to the resource path.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.graphicsPath
+ * @param {object} ctx
+ */
+function graphicsPath(ctx) {
+  const ps = graphicsDirs(ctx);
+  if (ps === FAIL) return FAIL;
+  ctx.common.resourcePath = [...ctx.common.resourcePath, ...ps];
+  return [];
+}
 
 const UNNUMBERED = ['', ['unnumbered'], []];
 
@@ -1164,8 +1530,11 @@ const BLOCK_COMMANDS = new Map([
   ['bibliography', bibliography],
   ['addbibresource', bibliography],
   ['endinput', skipSameFileToks],
-  // Not ported yet: `\lstinputlisting`, `\inputminted` and `\graphicspath`,
-  // which read files.
+  // includes
+  // Not ported yet: `\lstinputlisting`, which takes a language from
+  // skylighting's syntax definitions.
+  ['inputminted', inputMinted],
+  ['graphicspath', graphicsPath],
   // polyglossia
   ['setdefaultlanguage', setDefaultLanguage],
   ['setmainlanguage', setDefaultLanguage],
@@ -1181,8 +1550,11 @@ const BLOCK_COMMANDS = new Map([
   ['foreignblockcquote', foreignBlockquote(true)],
   ['hyphenblockquote', foreignBlockquote(false)],
   ['hyphenblockcquote', foreignBlockquote(true)],
-  // Not ported yet: `\include`, `\input`, `\subfile` and `\usepackage`,
-  // which read files.
+  // include
+  ['include', rawBlockOr('include', include('include'))],
+  ['input', rawBlockOr('input', include('input'))],
+  ['subfile', rawBlockOr('subfile', doSubfile)],
+  ['usepackage', rawBlockOr('usepackage', usepackage)],
   // preamble
   [
     'PackageError',
@@ -1539,13 +1911,15 @@ function bibliography(ctx) {
 }
 
 /**
- * `\endinput`: the rest of the file skipped. One file so far: the rest.
+ * `\endinput`: the rest of the file it is in skipped.
  *
  * @see Text.Pandoc.Readers.LaTeX.skipSameFileToks
  * @param {object} ctx
  */
 function skipSameFileToks(ctx) {
-  return skipMany(anyTok)(ctx) === FAIL ? FAIL : [];
+  const source = ctx.state.input?.tok.source;
+  const infile = satisfyTok((t) => t.source === source);
+  return skipMany(infile)(ctx) === FAIL ? FAIL : [];
 }
 
 /**

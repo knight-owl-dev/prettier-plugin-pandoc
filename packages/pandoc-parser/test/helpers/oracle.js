@@ -26,15 +26,17 @@ export function pandocAst(text, tabStop = 4) {
 
 /**
  * Pandoc's AST of `text` read as LaTeX, its extensions changed by `ext`
- * (`+raw_tex`, …), as its JSON; `args` passed to Pandoc too.
+ * (`+raw_tex`, …), as its JSON; `args` passed to Pandoc too, run in `cwd`.
  *
  * @param {string} text
  * @param {string} [ext]
  * @param {string[]} [args]
+ * @param {string} [cwd]
  * @returns {object}
  */
-export function pandocLaTeXAst(text, ext = '', args = []) {
-  return JSON.parse(pandoc(['-f', `latex${ext}`, '-t', 'json', ...args], text));
+export function pandocLaTeXAst(text, ext = '', args = [], cwd = undefined) {
+  const flags = ['-f', `latex${ext}`, '-t', 'json', ...args];
+  return JSON.parse(pandoc(flags, text, cwd));
 }
 
 /**
@@ -51,9 +53,9 @@ export function pandocRealLength(texts) {
   return out.trimEnd().split('\n').map(Number);
 }
 
-// What Pandoc writes, run with `args` on `input`.
-function pandoc(args, input) {
-  const options = { input, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 };
+// What Pandoc writes, run with `args` on `input`, in `cwd`.
+function pandoc(args, input, cwd) {
+  const options = { input, cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 };
   const run = spawnSync('pandoc', args, options);
   if (run.error) throw run.error;
   if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);

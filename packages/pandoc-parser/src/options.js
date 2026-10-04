@@ -61,6 +61,8 @@ const EXTENSIONS = [
  *   fractions of: the CLI's `--columns`, 72.
  * @property {ReadonlySet<string>} extensions
  * @property {ReadonlySet<string>} abbreviations
+ * @property {string} defaultImageExtension The extension an image without
+ *   one takes: the CLI's `--default-image-extension`.
  */
 
 // `pandoc --list-extensions=latex`, those on.
@@ -73,18 +75,25 @@ const FORMATS = { markdown: EXTENSIONS, latex: LATEX_EXTENSIONS };
  * default extensions changed as `+name` and `-name` in `extensions` say.
  *
  * @see Text.Pandoc.Options.ReaderOptions
- * @param {{tabStop?: number, format?: 'markdown' | 'latex', extensions?: string[]}} [options]
+ * @param {{tabStop?: number, format?: 'markdown' | 'latex', extensions?: string[], defaultImageExtension?: string}} [options]
  * @returns {ReaderOptions}
  */
 export function readerOptions({
   tabStop = 4,
   format = 'markdown',
   extensions = [],
+  defaultImageExtension = '',
 } = {}) {
   const on = new Set(FORMATS[format]);
   for (const change of extensions) {
     if (change.startsWith('-')) on.delete(change.slice(1));
     else on.add(change.replace(/^\+/, ''));
   }
-  return { tabStop, columns: 72, extensions: on, abbreviations: ABBREVIATIONS };
+  return {
+    tabStop,
+    columns: 72,
+    extensions: on,
+    abbreviations: ABBREVIATIONS,
+    defaultImageExtension,
+  };
 }

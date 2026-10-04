@@ -214,9 +214,11 @@ iftoggle
 iftrue
 includegraphics
 includesvg
+infile
 inputminted
 itemindent
 itshape
+jbig
 katal
 keyval
 keyvals
@@ -283,6 +285,7 @@ multipostnote
 multiprenote
 multirow
 multline
+mypkg
 mzero
 natbib
 naustrian
@@ -405,6 +408,7 @@ tablename
 tabularnewline
 tabularx
 tera
+texinputs
 texmath
 texorpdfstring
 textarabic
@@ -432,6 +436,7 @@ textfrench
 textgerman
 textgreater
 textgreek
+textheight
 textit
 textless
 textlira

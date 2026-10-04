@@ -26,6 +26,8 @@
  * @property {number} column From 1.
  * @property {number} start
  * @property {number} end
+ * @property {string} [source] The file it was read from, where it is not
+ *   the document: Pandoc's source name.
  */
 
 /**
