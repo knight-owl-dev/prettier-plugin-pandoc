@@ -97,6 +97,7 @@ import {
   withRaw,
   withVerbatimMode,
 } from './parsing.js';
+import { siunitxCommands } from './siunitx.js';
 
 /** @typedef {import('../tex.js').Tok} Tok */
 /** @typedef {import('../ast/builder.js').Inlines} Inlines */
@@ -1039,7 +1040,7 @@ const INLINE_COMMANDS = new Map([
   ...nameCommands,
   ...refCommands,
   ...acronymCommands,
-  // Not ported yet: siunitx.
+  ...siunitxCommands(tok),
   ...citationCommands(inline),
   ...miscCommands,
   ...accentCommands(tok),
