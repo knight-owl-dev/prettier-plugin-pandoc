@@ -29,6 +29,7 @@ import {
   skipMany,
 } from '../core.js';
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
+import { languagesByExtension } from '../highlighting.js';
 import { numUnit, showFl } from '../image-size.js';
 import { readerInput } from '../input.js';
 import { readerOptions } from '../options.js';
@@ -139,8 +140,6 @@ const enabled = (ctx, ext) => ctx.state.s.options.extensions.has(ext);
 
 /**
  * Read `source` as Pandoc's LaTeX reader does.
- *
- * Not ported yet: `\lstinputlisting`.
  *
  * @see Text.Pandoc.Readers.LaTeX.readLaTeX
  * @param {string} source
@@ -1395,6 +1394,49 @@ function inputMinted(ctx, start) {
   return B.codeBlockWith(attr, code, start, ctx.state.at);
 }
 
+// Haskell's `read` of an `Int`, spaces around it allowed.
+const safeReadInt = (t) =>
+  /^\s*-?[0-9]+\s*$/.test(t)
+    ? Number(BigInt.asIntN(64, BigInt(t.trim())))
+    : null;
+
+/**
+ * `\lstinputlisting[options]{file}`: the file, or the lines `firstline`
+ * to `lastline` of it, as code; in the language its extension gives
+ * where the options give none.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.inputListing
+ * @param {object} ctx
+ * @param {number} start
+ */
+function inputListing(ctx, start) {
+  const options = optionalKeyvals(ctx);
+  if (options === FAIL) return FAIL;
+  const ft = braced(ctx);
+  if (ft === FAIL) return FAIL;
+  const f = untokenize(ft).replaceAll('"', '');
+  // Pandoc warns of a file it cannot load (`CouldNotLoadIncludeFile`).
+  const text = readFileFromTexinputs(ctx, f);
+  // Haskell's `T.lines`.
+  const codeLines =
+    text === null || text === '' ? [] : text.replace(/\n$/, '').split('\n');
+  const [ident, classes, kvs] = parseListingsOptions(options);
+  const byExtension =
+    listingsLanguage(options) === null
+      ? languagesByExtension(takeExtension(f)).slice(0, 1)
+      : [];
+  const lookup = (k) => options.find(([key]) => key === k)?.[1];
+  const firstline = safeReadInt(lookup('firstline') ?? '') ?? 1;
+  const lastline = safeReadInt(lookup('lastline') ?? '') ?? codeLines.length;
+  const take = Math.max(0, 1 + lastline - firstline);
+  const code = codeLines
+    .slice(Math.max(0, firstline - 1))
+    .slice(0, take)
+    .join('\n');
+  const attr = [ident, [...byExtension, ...classes], kvs];
+  return B.codeBlockWith(attr, code, start, ctx.state.at);
+}
+
 const graphicsDirs = (ctx) => {
   if (bgroup(ctx) === FAIL || spaces(ctx) === FAIL) return FAIL;
   return manyTill((c) => {
@@ -1531,8 +1573,7 @@ const BLOCK_COMMANDS = new Map([
   ['addbibresource', bibliography],
   ['endinput', skipSameFileToks],
   // includes
-  // Not ported yet: `\lstinputlisting`, which takes a language from
-  // skylighting's syntax definitions.
+  ['lstinputlisting', inputListing],
   ['inputminted', inputMinted],
   ['graphicspath', graphicsPath],
   // polyglossia

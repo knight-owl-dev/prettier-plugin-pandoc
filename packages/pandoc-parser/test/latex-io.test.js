@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, test } from 'node:test';
 import { readLaTeX, withoutSpans } from '../src/index.js';
+import { SYNTAXES } from '../src/skylighting/syntaxes.js';
 import { pandocLaTeXAst } from './helpers/oracle.js';
 import { assertNested } from './helpers/spans.js';
 
@@ -41,6 +42,16 @@ const CASES = {
   ],
   graphicspath: [{}, '\\graphicspath{{figs/}{img/}} text'],
   'endinput in a file': [{ 'a.tex': 'A \\endinput B\nC\n' }, '\\input{a} D'],
+  listings: [
+    {
+      'code.py': 'print(1)\nprint(2)\nprint(3)\n',
+      'x.hs': 'main = 1\n',
+      'f.none': 'a\n',
+      Makefile: 'all:\n',
+      'c.h': 'int\n',
+    },
+    '\\lstinputlisting{code.py}\n\\lstinputlisting[language=Haskell]{x.hs}\n\\lstinputlisting[firstline=2,lastline=3,numbers=left,label=l]{code.py}\n\\lstinputlisting[firstline=3]{code.py} \\lstinputlisting[lastline=0]{code.py}\n\\lstinputlisting{f.none}\n\\lstinputlisting{Makefile}\n\\lstinputlisting{c.h}\n\\lstinputlisting{"missing.js"}',
+  ],
   'filecontents input': [
     {},
     '\\begin{filecontents}{x.tex}\nFrom filecontents.\n\\end{filecontents}\n\\input{x}',
@@ -88,6 +99,23 @@ for (const [name, [files, text]] of Object.entries(CASES)) {
     assertNested(readLaTeX(text, { host }).blocks, 0, text.length, 'document');
   });
 }
+
+test("listings' languages by extension, each of skylighting's", () => {
+  const exts = [
+    ...new Set(
+      SYNTAXES.flatMap(([, globs]) => globs)
+        .filter((g) => /^\*\.[A-Za-z0-9_+-]+$/.test(g))
+        .map((g) => g.slice(1)),
+    ),
+  ];
+  const files = Object.fromEntries(exts.map((e) => [`f${e}`, 'x\n']));
+  const { dir, host } = where(files);
+  const text = exts.map((e) => `\\lstinputlisting{f${e}}`).join('\n');
+  assert.deepEqual(
+    withoutSpans(readLaTeX(text, { host })),
+    pandocLaTeXAst(text, '', [], dir),
+  );
+});
 
 test('the date, as the clock gives it', () => {
   const text = '\\today';
