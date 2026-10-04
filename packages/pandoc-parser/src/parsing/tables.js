@@ -82,7 +82,7 @@ export function tableWith(header, row, separator, footer) {
  * @param {RawRow[]} rows
  * @returns {TableComponents}
  */
-function toTableComponents(aligns, widths, heads, rows) {
+export function toTableComponents(aligns, widths, heads, rows) {
   const headRows = heads.filter((h) => h.cells.some((c) => c.length > 0));
   return {
     specs: toColSpecs(aligns, widths),
