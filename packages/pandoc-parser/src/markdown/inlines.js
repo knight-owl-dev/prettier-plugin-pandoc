@@ -30,6 +30,7 @@ import {
   skipMany1,
 } from '../core.js';
 import { htmlTag, isBlockTag } from '../html.js';
+import { applyMacros } from '../latex/parsing.js';
 import {
   blankline,
   charRef,
@@ -71,6 +72,7 @@ import {
   rawHtmlInline,
   spanHtml,
 } from './raw-html.js';
+import { rawLaTeXInlinePrime, rawTeXBlock } from './raw-tex.js';
 import { subscript, superscript } from './scripts.js';
 
 const manyInline = many((ctx) => inline(ctx));
@@ -187,8 +189,16 @@ export function str(ctx) {
   return B.join(word, space ? B.str(NBSP, end, ctx.pos) : after);
 }
 
-// Not ported yet: a backslash only where no raw TeX block opens.
-const symbolChar = alt(noneOf('<\\\n\t '), char('\\'));
+const noRawTeXBlock = notAhead((ctx) => rawTeXBlock(ctx));
+// A backslash only where no raw TeX block opens.
+const symbolChar = alt(
+  noneOf('<\\\n\t '),
+  attempt((ctx) =>
+    ctx.text[ctx.pos] !== '\\' || noRawTeXBlock(ctx) === FAIL
+      ? FAIL
+      : char('\\')(ctx),
+  ),
+);
 
 /**
  * Any other character, as a word of its own.
@@ -278,12 +288,14 @@ export const smart = whenEnabled(
 const displayMath = (ctx) => {
   const start = ctx.pos;
   const t = mathDisplay(ctx);
-  return t === FAIL ? FAIL : B.displayMath(t, start, ctx.pos);
+  if (t === FAIL) return FAIL;
+  return B.displayMath(applyMacros(ctx, t), start, ctx.pos);
 };
 const inlineMath = (ctx) => {
   const start = ctx.pos;
   const t = mathInline(ctx);
-  return t === FAIL ? FAIL : B.math(t, start, ctx.pos);
+  if (t === FAIL) return FAIL;
+  return B.math(applyMacros(ctx, t), start, ctx.pos);
 };
 const noSpaceOrPunctuation = notFollowedBy(
   satisfy((c) => isSpace(c) || /^\p{P}$/u.test(c)),
@@ -433,7 +445,8 @@ const BY_CHAR = new Map([
       alt(
         (ctx) => math(ctx),
         escapedNewline,
-        escapedChar /* , rawLaTeXInline' */,
+        escapedChar,
+        (ctx) => rawLaTeXInlinePrime(ctx),
       ),
     ),
   ],

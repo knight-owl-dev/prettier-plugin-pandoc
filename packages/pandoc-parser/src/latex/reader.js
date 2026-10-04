@@ -9,7 +9,7 @@ import { doc } from '../ast/document.js';
 import { DefaultDelim, DefaultStyle, Node, nullAttr } from '../ast/nodes.js';
 import { mapSpans } from '../ast/spans.js';
 import { walk, walkInlines } from '../ast/walk.js';
-import { isSpace } from '../char.js';
+import { isSpace, string } from '../char.js';
 import { renderLang } from '../collate/lang.js';
 import { commonState } from '../common-state.js';
 import {
@@ -93,6 +93,7 @@ import {
   egroup,
   endline,
   env,
+  getInputTokens,
   getNextNumber,
   getRawCommand,
   grouped,
@@ -106,6 +107,7 @@ import {
   peekTok,
   prepend,
   primEscape,
+  rawLaTeXParser,
   rawopt,
   registerHeader,
   renderDottedNum,
@@ -249,6 +251,151 @@ function resolveFootnoteMarks(fnTexts, x) {
   return contents === undefined
     ? new Node('Str', '', x.start, x.end)
     : new Node('Note', contents, x.start, x.end);
+}
+
+// ---------------------------------------------------------------------
+// Raw TeX in other formats
+
+// A backslash and a letter next in another format's text.
+const commandAhead = (ctx) => {
+  const c = ctx.text[ctx.pos];
+  const next = ctx.text.codePointAt(ctx.pos + 1);
+  return (
+    c === '\\' && next !== undefined && isLetter(String.fromCodePoint(next))
+  );
+};
+
+/**
+ * `\makeatletter` to `\makeatother`: macro definitions, environments and
+ * block commands in it.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.makeAtLetterSection
+ * @type {Parser<undefined>}
+ */
+const makeAtLetterSection = attempt((ctx) => {
+  if (controlSeq('makeatletter')(ctx) === FAIL) return FAIL;
+  const part = alt(
+    (c) => (anyTokOf(c, 'Spaces') === FAIL ? FAIL : undefined),
+    (c) => (anyTokOf(c, 'Newline') === FAIL ? FAIL : undefined),
+    macroDef(() => []),
+    (c) => (environment(c) === FAIL ? FAIL : undefined),
+    (c) => (blockCommand(c) === FAIL ? FAIL : undefined),
+  );
+  return manyTill(part, controlSeq('makeatother'))(ctx) === FAIL
+    ? FAIL
+    : undefined;
+});
+
+// A token of `type`.
+const anyTokOf = (ctx, type) => satisfyTok((t) => t.type === type)(ctx);
+
+/**
+ * `\begin{name}` or `\end{name}` alone, raw: macros sometimes expand to
+ * one (#4667), which no block command takes. Not an inline environment's.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.beginOrEndCommand
+ * @type {Parser<Blocks>}
+ */
+const beginOrEndCommand = attempt((ctx) => {
+  const start = ctx.state.at;
+  const cs = anyControlSeq(ctx);
+  if (cs === FAIL || (cs.name !== 'begin' && cs.name !== 'end')) return FAIL;
+  const r = withRaw(braced)(ctx);
+  if (r === FAIL) return FAIL;
+  const [envname, rawargs] = r;
+  if (INLINE_ENVIRONMENTS.has(untokenize(envname))) return FAIL;
+  return B.rawBlock(
+    'latex',
+    cs.text + untokenize(rawargs),
+    start,
+    ctx.state.at,
+  );
+});
+
+const declarative = alt(
+  makeAtLetterSection,
+  macroDef(() => []),
+  (ctx) => {
+    const names = ['include', 'input', 'subfile', 'usepackage'];
+    if (alt(...names.map(controlSeq))(ctx) === FAIL) return FAIL;
+    if (skipMany((c) => opt(c))(ctx) === FAIL) return FAIL;
+    return braced(ctx) === FAIL ? FAIL : [];
+  },
+);
+const blockOrBeginEnd = many(alt((ctx) => block(ctx), beginOrEndCommand));
+const blocksOrBeginEnd = (ctx) => {
+  const bs = blockOrBeginEnd(ctx);
+  return bs === FAIL ? FAIL : bs.flat();
+};
+
+/**
+ * Raw TeX blocks in another format: macro definitions and the like, else
+ * an environment or a block command; the text they take.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.rawLaTeXBlock
+ * @param {object} ctx Another format's parse.
+ * @returns {string | typeof FAIL}
+ */
+export function rawLaTeXBlock(ctx) {
+  if (!commandAhead(ctx)) return FAIL;
+  const toks = getInputTokens(ctx);
+  const r = alt(
+    rawLaTeXParser(toks, declarative, (c) => blocks(c)),
+    rawLaTeXParser(
+      toks,
+      (c) => (alt(environment, blockCommand)(c) === FAIL ? FAIL : undefined),
+      blocksOrBeginEnd,
+    ),
+  )(ctx);
+  return r === FAIL ? FAIL : r[1];
+}
+
+const inputCommand = (ctx) => {
+  if (controlSeq('input')(ctx) === FAIL) return FAIL;
+  return skipMany(rawopt)(ctx) === FAIL ? FAIL : braced(ctx);
+};
+const finalBraces = many(
+  attempt((ctx) => (string('{}')(ctx) === FAIL ? FAIL : '{}')),
+);
+
+/**
+ * Raw TeX inline in another format: the text an inline takes, and empty
+ * braces after it (#5439).
+ *
+ * @see Text.Pandoc.Readers.LaTeX.rawLaTeXInline
+ * @param {object} ctx Another format's parse.
+ * @returns {string | typeof FAIL}
+ */
+export function rawLaTeXInline(ctx) {
+  if (!commandAhead(ctx)) return FAIL;
+  const toks = getInputTokens(ctx);
+  const r = alt(
+    rawLaTeXParser(toks, inputCommand, (c) => inlines(c)),
+    rawLaTeXParser(
+      toks,
+      (c) => (inline(c) === FAIL ? FAIL : undefined),
+      (c) => inlines(c),
+    ),
+  )(ctx);
+  if (r === FAIL) return FAIL;
+  const braces = finalBraces(ctx);
+  return braces === FAIL ? FAIL : r[1] + braces.join('');
+}
+
+/**
+ * An inline LaTeX command in another format: its inlines.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.inlineCommand
+ * @param {object} ctx Another format's parse.
+ * @returns {Inlines | typeof FAIL}
+ */
+export function inlineCommand(ctx) {
+  if (!commandAhead(ctx)) return FAIL;
+  const toks = getInputTokens(ctx);
+  const parser = (c) =>
+    alt(inlineEnvironment, inlineCommandPrime)(c) === FAIL ? FAIL : undefined;
+  const r = rawLaTeXParser(toks, parser, (c) => inlines(c))(ctx);
+  return r === FAIL ? FAIL : r[0];
 }
 
 // ---------------------------------------------------------------------

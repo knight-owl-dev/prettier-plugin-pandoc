@@ -38,6 +38,8 @@ import { toLower, words } from '../shared.js';
  * @property {number} nextExample The next example list item's number.
  * @property {PersistentMap<number>} examples Each example label's number.
  * @property {number} fencedDivLevel How many fenced divs are open.
+ * @property {Map<string, import('../latex/parsing.js').Macro>} macros The
+ *   TeX macros defined so far.
  */
 
 /** @typedef {[string, string[], [string, string][]]} Attr */
@@ -70,6 +72,7 @@ export const defaultParserState = (options) => ({
   notes: EMPTY_MAP,
   noteNumber: 0,
   inNote: false,
+  macros: new Map(),
   inHtmlBlock: null,
   nextExample: 1,
   examples: EMPTY_MAP,
@@ -151,11 +154,22 @@ function placeOf(end) {
   return place;
 }
 
-function placeHere(ctx) {
-  let now = reading.get(ctx);
+/**
+ * The line and column a parse is at, as Pandoc's input counts them.
+ *
+ * @see Text.Parsec.Prim.getPosition
+ * @param {Context} ctx
+ * @param {number} [offset] Another offset in the text it reads.
+ * @returns {{line: number, column: number}}
+ */
+export const getPosition = (ctx, offset = ctx.pos) =>
+  placeHere({ ...ctx, pos: offset }, ctx);
+
+function placeHere(ctx, key = ctx) {
+  let now = reading.get(key);
   if (now?.text !== ctx.text) {
     now = { text: ctx.text, positions: positions(ctx.text) };
-    reading.set(ctx, now);
+    reading.set(key, now);
   }
   return now.positions.locate(ctx.pos);
 }

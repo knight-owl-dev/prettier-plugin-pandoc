@@ -1,16 +1,11 @@
 // Pandoc as the oracle: its AST of a document, which the port's must equal,
-// spans left out.
-//
-// `latex_macros` is off: its expansion rewrites raw TeX and math content,
-// which the port leaves as written (#74).
+// spans left out. Each format reads with Pandoc's default extensions.
 
 import { spawnSync } from 'node:child_process';
 
 // The tab stops every comparison runs at: below, at and above Pandoc's
 // default, since each indentation rule moves with it.
 export const TAB_STOPS = [2, 4, 8];
-
-const READER = 'markdown-latex_macros';
 
 /**
  * Pandoc's AST of `text`, as its JSON.
@@ -20,7 +15,7 @@ const READER = 'markdown-latex_macros';
  * @returns {object}
  */
 export function pandocAst(text, tabStop = 4) {
-  const args = ['-f', READER, '-t', 'json', `--tab-stop=${tabStop}`];
+  const args = ['-f', 'markdown', '-t', 'json', `--tab-stop=${tabStop}`];
   return JSON.parse(pandoc(args, text));
 }
 

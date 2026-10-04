@@ -54,6 +54,7 @@ import { cite, normalCite } from './citations.js';
 import { litChar, skipNonindentSpaces, spnl } from './common.js';
 import { code, endline, escapedChar, inlines, math } from './inlines.js';
 import { rawHtmlInline } from './raw-html.js';
+import { rawLaTeXInlinePrime } from './raw-tex.js';
 import { lookupTables } from './references.js';
 
 /** @typedef {import('../core.js').Context} Context */
@@ -98,13 +99,14 @@ export function noteMarker(ctx) {
 const noNoteAhead = notAhead(noteMarker);
 
 // In brackets, what `inBalancedBrackets` reads past whole: a bracket in it
-// is no bracket. Not ported yet: raw TeX.
+// is no bracket.
 const bracketSkip = alt(
   escapedChar,
   (ctx) => code(ctx),
   (ctx) => math(ctx),
   (ctx) => endline(ctx),
   (ctx) => rawHtmlInline(ctx),
+  (ctx) => rawLaTeXInlinePrime(ctx),
 );
 const openBracket = char('[');
 

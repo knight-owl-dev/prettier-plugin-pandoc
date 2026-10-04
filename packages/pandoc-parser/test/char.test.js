@@ -57,11 +57,11 @@ test('satisfy, char, oneOf and noneOf', () => {
 });
 
 test('isSpace: the Latin-1 spaces, and Unicode space separators only', () => {
-  for (const c of [' ', '\t', '\n', '\r', '\f', '\v', ' ', ' ']) {
+  for (const c of [' ', '\t', '\n', '\r', '\f', '\v', '\u00a0', '\u2003']) {
     assert.ok(isSpace(c), JSON.stringify(c));
   }
   // Line and paragraph separators are no spaces to GHC.
-  for (const c of [' ', ' ', '​', 'a']) {
+  for (const c of ['\u2028', '\u2029', '\u200b', 'a']) {
     assert.ok(!isSpace(c), JSON.stringify(c));
   }
 });
@@ -83,7 +83,7 @@ test('the named parsers test their predicates', () => {
   assert.equal(value(letter, 'é'), 'é');
   assert.equal(value(digit, '٣'), FAIL);
   assert.equal(value(alphaNum, '٣'), '٣');
-  assert.equal(value(space, ' '), ' ');
+  assert.equal(value(space, '\u00a0'), '\u00a0');
   assert.equal(value(newline, '\r\n'), FAIL);
   assert.equal(parse(spaces, ' \t\nx').pos, 3);
 });
