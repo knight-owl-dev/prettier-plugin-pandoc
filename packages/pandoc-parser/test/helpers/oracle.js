@@ -26,14 +26,15 @@ export function pandocAst(text, tabStop = 4) {
 
 /**
  * Pandoc's AST of `text` read as LaTeX, its extensions changed by `ext`
- * (`+raw_tex`, …), as its JSON.
+ * (`+raw_tex`, …), as its JSON; `args` passed to Pandoc too.
  *
  * @param {string} text
  * @param {string} [ext]
+ * @param {string[]} [args]
  * @returns {object}
  */
-export function pandocLaTeXAst(text, ext = '') {
-  return JSON.parse(pandoc(['-f', `latex${ext}`, '-t', 'json'], text));
+export function pandocLaTeXAst(text, ext = '', args = []) {
+  return JSON.parse(pandoc(['-f', `latex${ext}`, '-t', 'json', ...args], text));
 }
 
 /**
