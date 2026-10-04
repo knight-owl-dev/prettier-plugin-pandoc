@@ -1,7 +1,7 @@
 {
   "version": "0.2",
   "language": "en-US",
-  "dictionaries": ["docker", "node", "typescript"],
+  "dictionaries": ["docker", "node", "typescript", "tex"],
   "ignorePaths": ["LICENSE", "package-lock.json", "packages/*/test/corpus/**"],
   "words": [
     "Accum",
@@ -30,18 +30,10 @@
     "Inlines",
     "inlines",
     "intraword",
-    "literalline",
-    "lstinline",
     "MacFarlane",
-    "makeatletter",
-    "makeatother",
     "mconcat",
     "mdast",
-    "minipage",
-    "mintinline",
     "Monoid",
-    "newcommand",
-    "newpage",
     "nonindent",
     "nonspace",
     "nullary",
@@ -60,16 +52,17 @@
     "startnum",
     "subsuperscripts",
     "tagsoup",
-    "textbf",
-    "toks",
-    "totoks",
     "trimr",
     "unlines",
-    "untoken",
-    "untokenize",
     "unwords",
-    "vadjust",
     "wikilink",
     "wikilinks"
+  ],
+  "dictionaryDefinitions": [
+    {
+      "name": "tex",
+      "path": "./.cspell-tex.txt",
+      "addWords": true
+    }
   ]
 }
