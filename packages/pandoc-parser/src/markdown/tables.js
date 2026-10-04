@@ -31,18 +31,23 @@ import {
   blankline,
   blanklines,
   blockEnd,
+  gobbleSpaces,
   notAhead,
   optionalBlanklines,
   parseFromStringFresh,
   spaceChar,
 } from '../parsing/general.js';
 import { whenEnabled } from '../parsing/state.js';
-import { tableWith, withDefaultWidths } from '../parsing/tables.js';
+import {
+  gridTableWith,
+  tableWith,
+  withDefaultWidths,
+} from '../parsing/tables.js';
 import { splitTextByIndices } from '../shared.js';
 import { SourceText } from '../source-text.js';
 import { realLength } from '../text-width.js';
 import { attributes } from './attributes.js';
-import { plain } from './blocks.js';
+import { parseBlocks, plain } from './blocks.js';
 import { skipNonindentSpaces } from './common.js';
 import { divFenceEnd, inDiv } from './divs.js';
 import { inline } from './inlines.js';
@@ -447,11 +452,49 @@ const tableCaption = whenEnabled(
 
 const maybeCaption = option(null, tableCaption);
 
-// Not ported yet: pipe tables, tried first, and grid tables, last.
+const gridTableAt = gridTableWith((ctx) => parseBlocks(ctx));
+// An indented grid table's lines, each from its `+` or `|`: by indent.
+const gridLinesByIndent = new Map();
+function gridLines(indent) {
+  let lines = gridLinesByIndent.get(indent);
+  if (lines === undefined) {
+    lines = many1(
+      attempt((ctx) => {
+        if (gobbleSpaces(ctx, indent) === FAIL) return FAIL;
+        const start = ctx.pos;
+        const c = ctx.text[start];
+        if ((c !== '+' && c !== '|') || anyLine(ctx) === FAIL) return FAIL;
+        return SourceText.slice(ctx.text, start, ctx.pos);
+      }),
+    );
+    gridLinesByIndent.set(indent, lines);
+  }
+  return lines;
+}
+
+/**
+ * A grid table, its indentation of up to a tab stop less one stripped from
+ * every line first, where it has some.
+ *
+ * @see Text.Pandoc.Readers.Markdown.gridTable
+ */
+const gridTable = attempt((ctx) => {
+  const { pos } = ctx;
+  const indent = skipNonindentSpaces(ctx);
+  ctx.pos = pos;
+  if (indent === FAIL) return FAIL;
+  if (indent === 0) return gridTableAt(ctx);
+  const lines = gridLines(indent)(ctx);
+  if (lines === FAIL) return FAIL;
+  return parseFromStringFresh(ctx, gridTableAt, SourceText.concat(lines));
+});
+
+// Not ported yet: pipe tables, tried first.
 const tableKinds = alt(
   whenEnabled('multiline_tables', multilineTable(false)),
   whenEnabled('simple_tables', alt(simpleTable(true), simpleTable(false))),
   whenEnabled('multiline_tables', multilineTable(true)),
+  whenEnabled('grid_tables', gridTable),
 );
 
 /**
