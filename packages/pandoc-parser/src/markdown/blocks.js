@@ -25,6 +25,7 @@ import { divFenced, divFenceEnd, inDiv } from './divs.js';
 import { header } from './headers.js';
 import { hrule } from './hrule.js';
 import { inlines1 } from './inlines.js';
+import { lineBlock } from './line-blocks.js';
 import { bulletList, listStartInItem, orderedList } from './lists.js';
 
 const divCloserAhead = lookAhead(divFenceEnd);
@@ -96,7 +97,8 @@ export function block(ctx) {
     header,
     // lhsCodeBlock, htmlBlock, table,
     codeBlockIndented,
-    // rawTeXBlock, lineBlock,
+    // rawTeXBlock,
+    lineBlock,
     blockQuote,
     hrule,
     orderedList,
