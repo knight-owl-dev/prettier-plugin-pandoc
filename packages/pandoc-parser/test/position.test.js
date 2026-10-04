@@ -1,5 +1,5 @@
-// Line and column of an offset, as Parsec counts them: from 1, a column per
-// code point, a tab to the next multiple of 8.
+// Line and column of an offset, as Pandoc's input stream counts them: from
+// 1, a column per code point, a tab to the next stop at 1 plus a multiple of 4.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -14,11 +14,11 @@ test('lines from 1, columns from 1', () => {
   assert.deepEqual(locate(6), { line: 3, column: 1 });
 });
 
-test('a tab moves to the next multiple of 8, plus one', () => {
+test('a tab moves to the next multiple of 4, plus one', () => {
   const { locate } = positions('\tx\nab\tx\nabcdefgh\tx');
-  assert.deepEqual(locate(1), { line: 1, column: 9 });
-  assert.deepEqual(locate(6), { line: 2, column: 9 });
-  assert.deepEqual(locate(17), { line: 3, column: 17 });
+  assert.deepEqual(locate(1), { line: 1, column: 5 });
+  assert.deepEqual(locate(6), { line: 2, column: 5 });
+  assert.deepEqual(locate(17), { line: 3, column: 13 });
 });
 
 test('a character outside the BMP is one column', () => {
@@ -26,7 +26,7 @@ test('a character outside the BMP is one column', () => {
   assert.deepEqual(locate(2), { line: 1, column: 2 });
 });
 
-test('a carriage return is a column, as Parsec counts it', () => {
+test('a carriage return is a column', () => {
   const { locate } = positions('a\r\nb');
   assert.deepEqual(locate(2), { line: 1, column: 3 });
   assert.deepEqual(locate(3), { line: 2, column: 1 });

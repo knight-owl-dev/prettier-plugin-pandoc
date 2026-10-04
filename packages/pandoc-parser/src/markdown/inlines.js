@@ -46,11 +46,12 @@ import {
   whenEnabled,
   withQuoteContext,
 } from '../parsing/state.js';
-import { trim } from '../shared.js';
+import { NBSP, trim } from '../shared.js';
 import { attributes, rawAttribute } from './attributes.js';
 import { codeBlockFenced } from './code.js';
-import { escapedCharacter } from './common.js';
+import { escapedCharacter, unescaped } from './common.js';
 import { mark, strikeout, strongOrEmph } from './emphasis.js';
+import { subscript, superscript } from './scripts.js';
 
 const manyInline = many((ctx) => inline(ctx));
 const many1Inline = many1((ctx) => inline(ctx));
@@ -149,7 +150,7 @@ export function str(ctx) {
   if (after === FAIL) return FAIL;
   if (after === null) return word;
   const space = after.length === 1 && after[0].t === 'Space';
-  return B.join(word, space ? B.str(' ', end, ctx.pos) : after);
+  return B.join(word, space ? B.str(NBSP, end, ctx.pos) : after);
 }
 
 // Not ported yet: a backslash only where no raw TeX block opens.
@@ -310,13 +311,13 @@ export function escapedChar(ctx) {
   const start = ctx.pos;
   const c = escapedCharacter(ctx);
   if (c === FAIL) return FAIL;
-  return B.str(c === ' ' ? '\u00a0' : c, start, ctx.pos);
+  return B.str(unescaped(c), start, ctx.pos);
 }
 
 // `inline`'s dispatch: a parser by the character it starts with, then a
 // word, then a symbol. Pandoc's choices not ported yet stay as comments.
-// `emphasis.js`'s parsers are read when called: it imports this module, so
-// whichever loads first, they may not exist yet here.
+// The parsers of `emphasis.js` and `scripts.js` are read when called: each
+// imports this module, so whichever loads first, they may not exist yet here.
 const WORD_OR_SYMBOL = alt(/* bareURL, */ str, symbol);
 const then = (p) => alt(p, WORD_OR_SYMBOL);
 const BY_CHAR = new Map([
@@ -326,9 +327,17 @@ const BY_CHAR = new Map([
   ['`', then(code)],
   ['_', then((ctx) => strongOrEmph(ctx))],
   ['*', then((ctx) => strongOrEmph(ctx))],
-  // '^': inlineNote, superscript;
+  ['^', then((ctx) => /* inlineNote, */ superscript(ctx))],
   // '[': note, cite, bracketedSpan, wikilink, link; '!': image; '$': math;
-  ['~', then((ctx) => strikeout(ctx) /* , subscript */)],
+  [
+    '~',
+    then(
+      alt(
+        (ctx) => strikeout(ctx),
+        (ctx) => subscript(ctx),
+      ),
+    ),
+  ],
   ['=', then((ctx) => mark(ctx))],
   [
     '\\',

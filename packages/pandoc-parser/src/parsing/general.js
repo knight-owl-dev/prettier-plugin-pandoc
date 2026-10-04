@@ -3,6 +3,7 @@
 // Ported from Pandoc 3.11's `Text.Pandoc.Parsing.General`.
 
 import * as B from '../ast/builder.js';
+import { mapSpans } from '../ast/spans.js';
 import { char, newline, satisfy, space } from '../char.js';
 import {
   attempt,
@@ -244,4 +245,54 @@ export function registerHeader(ctx, [ident, classes, pairs], inlines) {
 export function lineEnd(text, pos) {
   const end = text.indexOf('\n', pos);
   return end === -1 ? text.length : end;
+}
+
+/**
+ * `parser` run on `source`, text extracted to be parsed again, in its own
+ * offsets; the nodes it returns spanning the text `source` was extracted
+ * from, carriage returns left out of it as Pandoc's `toSources` leaves them.
+ * A failure leaves the position where the extraction left it. The chunk is
+ * one level deeper: Parsec's source name, which positions compare by.
+ *
+ * @see Text.Pandoc.Parsing.General.parseFromString
+ * @template T
+ * @param {Context} ctx
+ * @param {Parser<T>} parser
+ * @param {import('../source-text.js').SourceText} extracted
+ * @returns {T | typeof FAIL}
+ */
+export function parseFromString(ctx, parser, extracted) {
+  const source = extracted.withoutCarriageReturns();
+  const { text, pos, depth = 0 } = ctx;
+  ctx.text = source.text;
+  ctx.pos = 0;
+  ctx.depth = depth + 1;
+  const x = parser(ctx);
+  ctx.text = text;
+  ctx.pos = pos;
+  ctx.depth = depth;
+  if (x === FAIL) return FAIL;
+  return mapSpans(
+    x,
+    (offset) => source.toOuterStart(offset),
+    (offset) => source.toOuterEnd(offset),
+  );
+}
+
+/**
+ * `parseFromString` with no `str` before it, the one outside kept for after.
+ *
+ * @see Text.Pandoc.Parsing.General.parseFromString'
+ * @template T
+ * @param {Context} ctx
+ * @param {Parser<T>} parser
+ * @param {import('../source-text.js').SourceText} source
+ * @returns {T | typeof FAIL}
+ */
+export function parseFromStringFresh(ctx, parser, source) {
+  const outer = ctx.state.lastStrPos;
+  updateState(ctx, { lastStrPos: null });
+  const x = parseFromString(ctx, parser, source);
+  updateState(ctx, { lastStrPos: outer });
+  return x;
 }

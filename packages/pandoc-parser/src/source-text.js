@@ -1,0 +1,149 @@
+// Text a reader extracts to parse again, and the way back from offsets in it
+// to offsets in the text it was extracted from.
+//
+// Pandoc's `parseFromString` parses text built from pieces of the input:
+// markers stripped, lines joined, escapes decoded. A `SourceText` is that
+// text with a piecewise map: a copied slice maps linearly; synthesized text
+// (a decoded escape, an inserted join) maps to the span it stands for, and
+// whatever the extractor dropped falls between pieces. A node starting at a
+// boundary maps past the drop, one ending there maps before it.
+
+/**
+ * @typedef {object} Piece
+ * @property {number} at Where it starts in the text.
+ * @property {number} length Its length in the text.
+ * @property {number} from Where what it stands for starts outside.
+ * @property {number} to Where that ends.
+ * @property {boolean} copy Whether it is a copy, mapping offset for offset.
+ */
+
+export class SourceText {
+  /**
+   * @param {string} text
+   * @param {Piece[]} pieces In order, covering `text`.
+   */
+  constructor(text, pieces) {
+    this.text = text;
+    this.pieces = pieces;
+  }
+
+  /**
+   * `outer`'s text from `start` to `end`, copied.
+   *
+   * @param {string} outer
+   * @param {number} start
+   * @param {number} end
+   */
+  static slice(outer, start, end) {
+    const length = end - start;
+    if (length === 0) return EMPTY;
+    const piece = { at: 0, length, from: start, to: end, copy: true };
+    return new SourceText(outer.slice(start, end), [piece]);
+  }
+
+  /**
+   * `text` standing for the span `from` to `to` outside, which it need not
+   * spell: a decoded escape, an inserted join.
+   *
+   * @param {string} text
+   * @param {number} from
+   * @param {number} to
+   */
+  static synth(text, from, to) {
+    if (text === '') return EMPTY;
+    const piece = { at: 0, length: text.length, from, to, copy: false };
+    return new SourceText(text, [piece]);
+  }
+
+  /**
+   * The texts one after another, a copy merged into the copy before it
+   * where they meet outside too.
+   *
+   * @param {SourceText[]} parts
+   */
+  static concat(parts) {
+    const pieces = [];
+    let text = '';
+    for (const part of parts) {
+      for (const p of part.pieces) {
+        const last = pieces.at(-1);
+        if (last?.copy && p.copy && last.to === p.from) {
+          pieces[pieces.length - 1] = {
+            ...last,
+            length: last.length + p.length,
+            to: p.to,
+          };
+        } else {
+          pieces.push({ ...p, at: p.at + text.length });
+        }
+      }
+      text += part.text;
+    }
+    return new SourceText(text, pieces);
+  }
+
+  /**
+   * This text with its carriage returns left out, as Pandoc's `toSources`
+   * leaves them out of what it parses: each one dropped text in the map.
+   * Only synthesized text holds one: what a reader copies is read already,
+   * carriage returns gone.
+   *
+   * @see Text.Pandoc.Sources.toSources
+   * @returns {SourceText}
+   */
+  withoutCarriageReturns() {
+    if (!this.text.includes('\r')) return this;
+    return SourceText.concat(
+      this.pieces.map((p) => {
+        const text = this.text.slice(p.at, p.at + p.length);
+        return p.copy
+          ? new SourceText(text, [{ ...p, at: 0 }])
+          : SourceText.synth(text.replaceAll('\r', ''), p.from, p.to);
+      }),
+    );
+  }
+
+  /**
+   * The outside offset a node starting at `offset` starts at.
+   *
+   * @param {number} offset
+   */
+  toOuterStart(offset) {
+    const piece = this.pieces[lastStarting(this.pieces, offset, true)];
+    if (piece === undefined || offset >= piece.at + piece.length) {
+      return this.pieces.at(-1)?.to ?? 0;
+    }
+    return piece.copy ? piece.from + (offset - piece.at) : piece.from;
+  }
+
+  /**
+   * The outside offset a node ending at `offset` ends at.
+   *
+   * @param {number} offset
+   */
+  toOuterEnd(offset) {
+    const piece = this.pieces[lastStarting(this.pieces, offset, false)];
+    if (piece === undefined) return this.pieces[0]?.from ?? 0;
+    return piece.copy ? piece.from + (offset - piece.at) : piece.to;
+  }
+}
+
+// The index of the last piece starting before `offset`, or at it where
+// `inclusive`; -1 for none.
+function lastStarting(pieces, offset, inclusive) {
+  let [lo, hi] = [0, pieces.length - 1];
+  let found = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const at = pieces[mid].at;
+    if (at < offset || (inclusive && at === offset)) {
+      found = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return found;
+}
+
+const EMPTY = new SourceText('', []);

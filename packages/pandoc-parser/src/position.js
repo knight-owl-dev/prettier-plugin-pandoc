@@ -1,16 +1,35 @@
 // Line and column of an offset, on demand: parsers carry offsets only.
 //
-// Columns count as parsec 3.1.17's `updatePosChar` does — from 1, a code
-// point each, a tab to the next tab stop at 1 plus a multiple of 8 — which is
-// what Pandoc's logic reads where it reads one. Only a line feed starts a
-// line.
+// Columns count as Pandoc's input stream counts them — from 1, a code point
+// each, a tab to the next tab stop at 1 plus a multiple of 4 — which is what
+// Pandoc's logic reads where it reads one. Only a line feed starts a line.
 
 import { codePointLength } from './code-points.js';
 
+const TAB = 4;
+
+// Each offset's column: offsets inside a surrogate pair share the pair's.
+function columnsOf(text) {
+  const columns = new Int32Array(text.length + 1);
+  let column = 1;
+  for (let i = 0; i < text.length; ) {
+    const length = codePointLength(text, i);
+    for (let k = 0; k < length; k++) columns[i + k] = column;
+    const c = text.charCodeAt(i);
+    if (c === 0x0a) column = 1;
+    else if (c === 0x09) column += TAB - ((column - 1) % TAB);
+    else column++;
+    i += length;
+  }
+  columns[text.length] = column;
+  return columns;
+}
+
 /**
- * The positions in `text`, indexed once.
+ * The positions in `text`, indexed once: lines at once, columns on first
+ * asking.
  *
- * @see Text.Parsec.Pos.updatePosChar
+ * @see Text.Pandoc.Sources.updateSourcePos
  * @param {string} text
  */
 export function positions(text) {
@@ -18,6 +37,8 @@ export function positions(text) {
   for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) {
     starts.push(i + 1);
   }
+  /** @type {Int32Array | undefined} */
+  let columns;
 
   // The index of the line holding `offset`.
   const lineOf = (offset) => {
@@ -39,13 +60,8 @@ export function positions(text) {
      * @returns {{line: number, column: number}} Both from 1.
      */
     locate(offset) {
-      const line = lineOf(offset);
-      let column = 1;
-      for (let i = starts[line]; i < offset; i += codePointLength(text, i)) {
-        column =
-          text[i] === '\t' ? column + 8 - ((column - 1) % 8) : column + 1;
-      }
-      return { line: line + 1, column };
+      columns ??= columnsOf(text);
+      return { line: lineOf(offset) + 1, column: columns[offset] };
     },
 
     /**

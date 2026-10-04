@@ -7,6 +7,9 @@ import { isAlpha, isAlphaNum, isSpace } from './char.js';
 
 /** @typedef {import('./ast/nodes.js').Node} Node */
 
+/** A non-breaking space, U+00A0: a formatter writes the escape as the character. */
+export const NBSP = String.fromCodePoint(0xa0);
+
 /**
  * `s` lowercased a code point at a time, as Haskell's `T.toLower`: unlike
  * `toLowerCase`, with no regard to context (a final sigma stays `σ`).
