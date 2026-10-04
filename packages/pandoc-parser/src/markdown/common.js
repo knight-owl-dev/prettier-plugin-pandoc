@@ -7,7 +7,9 @@ import { alt, attempt, FAIL, notFollowedBy, optional } from '../core.js';
 import {
   blankline,
   characterReference,
+  gobbleAtMostSpaces,
   skipSpaces,
+  spaceChar,
 } from '../parsing/general.js';
 import { whenEnabled } from '../parsing/state.js';
 
@@ -65,3 +67,32 @@ export const litChar = alt(
   noneOf('\n'),
   lineJoin,
 );
+
+const noSpaceChar = notFollowedBy(spaceChar);
+
+/**
+ * Up to one less than a tab stop of spaces, no more after them: how many.
+ *
+ * @see Text.Pandoc.Readers.Markdown.skipNonindentSpaces
+ * @type {import('../core.js').Parser<number>}
+ */
+export function skipNonindentSpaces(ctx) {
+  const n = gobbleAtMostSpaces(ctx, ctx.state.options.tabStop - 1);
+  return noSpaceChar(ctx) === FAIL ? FAIL : n;
+}
+
+/**
+ * A tab stop of spaces: an indented line's indentation. Pandoc takes a tab
+ * here too; the reader's input holds none.
+ *
+ * @see Text.Pandoc.Readers.Markdown.indentSpaces
+ * @type {import('../core.js').Parser<undefined>}
+ */
+export function indentSpaces(ctx) {
+  const { tabStop } = ctx.state.options;
+  for (let k = 0; k < tabStop; k++) {
+    if (ctx.text[ctx.pos + k] !== ' ') return FAIL;
+  }
+  ctx.pos += tabStop;
+  return undefined;
+}

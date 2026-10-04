@@ -10,10 +10,14 @@ import {
   many1,
   manyTill,
   notFollowedBy,
+  optional,
   skipMany,
 } from '../core.js';
 import { lookupEntity } from '../entities.js';
+import { uniqueIdent } from '../shared.js';
+import { enabled, updateState } from './state.js';
 
+/** @typedef {import('../core.js').Context} Context */
 /** @template T @typedef {import('../core.js').Parser<T>} Parser */
 
 /**
@@ -61,6 +65,9 @@ export const blankline = attempt((ctx) =>
  * @see Text.Pandoc.Parsing.General.blanklines
  */
 export const blanklines = many1(blankline);
+
+/** Blank lines, or none: Haskell's `optional blanklines`. */
+export const optionalBlanklines = optional(blanklines);
 
 /**
  * Succeed where `p` fails, reading nothing. Unlike Parsec's `notFollowedBy`,
@@ -159,4 +166,82 @@ export function textOf(p) {
     const start = ctx.pos;
     return p(ctx) === FAIL ? FAIL : ctx.text.slice(start, ctx.pos);
   };
+}
+
+/**
+ * A line, its newline read and left out.
+ *
+ * @see Text.Pandoc.Parsing.General.anyLine
+ * @type {Parser<string>}
+ */
+export function anyLine(ctx) {
+  const { text, pos } = ctx;
+  const end = text.indexOf('\n', pos);
+  if (end === -1) return FAIL;
+  ctx.pos = end + 1;
+  return text.slice(pos, end);
+}
+
+/**
+ * A line, its newline kept.
+ *
+ * @see Text.Pandoc.Parsing.General.anyLineNewline
+ * @type {Parser<string>}
+ */
+export function anyLineNewline(ctx) {
+  const line = anyLine(ctx);
+  return line === FAIL ? FAIL : `${line}\n`;
+}
+
+/**
+ * Up to `n` spaces: how many. Pandoc expands a tab here; the reader's input
+ * holds none.
+ *
+ * @see Text.Pandoc.Parsing.General.gobbleAtMostSpaces
+ * @param {Context} ctx
+ * @param {number} n
+ * @returns {number}
+ */
+export function gobbleAtMostSpaces(ctx, n) {
+  let k = 0;
+  while (k < n && ctx.text[ctx.pos] === ' ') {
+    ctx.pos++;
+    k++;
+  }
+  return k;
+}
+
+/**
+ * The attributes of a heading of `inlines`: with `auto_identifiers`, an
+ * identifier made from its text where it has none; either way recorded as
+ * used.
+ *
+ * Not ported yet: `ascii_identifiers`, off by default, and the warning of a
+ * duplicate identifier.
+ *
+ * @see Text.Pandoc.Parsing.General.registerHeader
+ * @param {Context} ctx
+ * @param {import('./state.js').Attr} attr
+ * @param {import('../ast/nodes.js').Node[]} inlines
+ * @returns {import('./state.js').Attr}
+ */
+export function registerHeader(ctx, [ident, classes, pairs], inlines) {
+  const used = ctx.state.identifiers;
+  const id =
+    ident === '' && enabled(ctx, 'auto_identifiers')
+      ? uniqueIdent(inlines, used)
+      : ident;
+  if (id !== '') updateState(ctx, { identifiers: used.set(id, true) });
+  return [id, classes, pairs];
+}
+
+/**
+ * Where the line holding `pos` ends: its newline, or the text's end.
+ *
+ * @param {string} text
+ * @param {number} pos
+ */
+export function lineEnd(text, pos) {
+  const end = text.indexOf('\n', pos);
+  return end === -1 ? text.length : end;
 }

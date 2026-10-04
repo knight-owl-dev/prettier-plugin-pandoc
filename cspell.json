@@ -29,6 +29,7 @@
     "Monoid",
     "newcommand",
     "newpage",
+    "nonindent",
     "nonspace",
     "nullary",
     "Pandoc",
