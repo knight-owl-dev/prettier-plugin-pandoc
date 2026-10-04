@@ -6,7 +6,7 @@
 
 import * as B from '../ast/builder.js';
 import { doc } from '../ast/document.js';
-import { Node, nullAttr } from '../ast/nodes.js';
+import { DefaultDelim, DefaultStyle, Node, nullAttr } from '../ast/nodes.js';
 import { mapSpans } from '../ast/spans.js';
 import { walk, walkInlines } from '../ast/walk.js';
 import { renderLang } from '../collate/lang.js';
@@ -23,12 +23,15 @@ import {
   notFollowedBy,
   option,
   optional,
+  parse,
   sepBy,
   skipMany,
 } from '../core.js';
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
 import { readerInput } from '../input.js';
 import { readerOptions } from '../options.js';
+import { anyOrderedListMarker } from '../parsing/lists.js';
+import { defaultParserState } from '../parsing/state.js';
 import {
   blocksToInlines,
   extractSpaces,
@@ -45,6 +48,7 @@ import {
   acronymCommands,
   biblatexInlineCommands,
   charCommands,
+  listingsLanguage,
   miscCommands,
   nameCommands,
   rawInlineOr,
@@ -86,10 +90,13 @@ import {
   egroup,
   endline,
   env,
+  getNextNumber,
   getRawCommand,
   grouped,
   incrementDottedNum,
   isNewlineTok,
+  keyvals,
+  label,
   lpContext,
   overlaySpecification,
   peekTok,
@@ -98,6 +105,7 @@ import {
   rawopt,
   registerHeader,
   renderDottedNum,
+  resetCaption,
   satisfyTok,
   setCaption,
   setInput,
@@ -117,6 +125,7 @@ import {
   withVerbatimMode,
 } from './parsing.js';
 import { siunitxCommands } from './siunitx.js';
+import { tableEnvironments } from './table.js';
 
 /** @typedef {import('../tex.js').Tok} Tok */
 /** @typedef {import('../ast/builder.js').Inlines} Inlines */
@@ -1201,10 +1210,77 @@ const BLOCK_COMMANDS = new Map([
  * @type {Map<string, (ctx: object, start: number) => Blocks | typeof FAIL>}
  */
 const ENVIRONMENTS = new Map([
+  ['document', documentEnv],
+  ['abstract', abstractEnv],
+  ['sloppypar', envOf('sloppypar', (ils) => ils)],
+  ['letter', (ctx) => env('letter', letterContents)(ctx)],
+  ['minipage', minipage],
+  ['figure', (ctx, start) => figureEnv('figure', false)(ctx, start)],
+  ['figure*', (ctx, start) => figureEnv('figure*', false)(ctx, start)],
+  ['subfigure', (ctx, start) => figureEnv('subfigure', true)(ctx, start)],
+  [
+    'center',
+    envOf('center', (bs, start, end) =>
+      B.divWith(['', ['center'], []], bs, start, end),
+    ),
+  ],
+  ['quote', envOf('quote', B.blockQuote)],
+  ['quotation', envOf('quotation', B.blockQuote)],
+  ['verse', envOf('verse', B.blockQuote)],
+  [
+    'itemize',
+    (ctx, start) => listOf('itemize', B.bulletList, item)(ctx, start),
+  ],
+  [
+    'description',
+    (ctx, start) =>
+      listOf('description', B.definitionList, descItem)(ctx, start),
+  ],
+  ['enumerate', (ctx, start) => orderedListEnv(ctx, start)],
+  ['alltt', envOf('alltt', (bs) => alltt(bs))],
+  [
+    'code',
+    (ctx, start) => {
+      if (!enabled(ctx, 'literate_haskell')) return FAIL;
+      const code = verbEnv('code')(ctx);
+      if (code === FAIL) return FAIL;
+      const attr = ['', ['haskell', 'literate'], []];
+      return B.codeBlockWith(attr, code, start, ctx.state.at);
+    },
+  ],
+  ['comment', (ctx) => (verbEnv('comment')(ctx) === FAIL ? FAIL : [])],
+  [
+    'verbatim',
+    (ctx, start) => {
+      const code = verbEnv('verbatim')(ctx);
+      return code === FAIL ? FAIL : B.codeBlock(code, start, ctx.state.at);
+    },
+  ],
+  ['Verbatim', (ctx, start) => fancyverbEnv('Verbatim')(ctx, start)],
+  ['BVerbatim', (ctx, start) => fancyverbEnv('BVerbatim')(ctx, start)],
+  ['lstlisting', (ctx, start) => lstlisting(ctx, start)],
+  ['minted', (ctx, start) => minted(ctx, start)],
+  ['obeylines', (ctx, start) => obeylines(ctx, start)],
+  ['tikzpicture', (ctx, start) => rawVerbEnv('tikzpicture', start)(ctx)],
+  ['tikzcd', (ctx, start) => rawVerbEnv('tikzcd', start)(ctx)],
+  ['lilypond', (ctx, start) => rawVerbEnv('lilypond', start)(ctx)],
+  ['ly', (ctx, start) => rawVerbEnv('ly', start)(ctx)],
   // amsthm
   ['proof', proof(blocks, opt)],
   // other
+  [
+    'CSLReferences',
+    (ctx) =>
+      braced(ctx) === FAIL || braced(ctx) === FAIL
+        ? FAIL
+        : env('CSLReferences', blocks)(ctx),
+  ],
   ['otherlanguage', otherlanguageEnv],
+  // Haskell's `M.union` keeps the table environments' entries.
+  ...tableEnvironments(
+    (ctx) => block(ctx),
+    (ctx) => inline(ctx),
+  ),
 ]);
 
 /**
@@ -1804,6 +1880,395 @@ export const environment = attempt((ctx) => {
         : alt(attempt(rawEnv(name, start)), rawVerbEnv(name, start))(c),
   )(ctx);
 });
+
+// An environment's blocks made into others by `f`, spanning it all.
+function envOf(name, f) {
+  return (ctx, start) => {
+    const bs = env(name, blocks)(ctx);
+    return bs === FAIL ? FAIL : f(bs, start, ctx.state.at);
+  };
+}
+
+/**
+ * `document`: its blocks; what follows it skipped.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.environments
+ * @param {object} ctx
+ */
+function documentEnv(ctx) {
+  const bs = env('document', blocks)(ctx);
+  return bs === FAIL || skipMany(anyTok)(ctx) === FAIL ? FAIL : bs;
+}
+
+/**
+ * `abstract`: its blocks into the metadata.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.environments
+ * @param {object} ctx
+ */
+function abstractEnv(ctx) {
+  const bs = env('abstract', blocks)(ctx);
+  if (bs === FAIL) return FAIL;
+  addMeta(ctx, 'abstract', B.metaBlocks(bs));
+  return [];
+}
+
+/**
+ * `minipage[pos]{width}`: a div of its blocks.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.environments
+ * @param {object} ctx
+ * @param {number} start
+ */
+function minipage(ctx, start) {
+  const bs = env('minipage', (c) => {
+    if (skipopts(c) === FAIL || spaces(c) === FAIL) return FAIL;
+    if (optional(braced)(c) === FAIL || spaces(c) === FAIL) return FAIL;
+    return blocks(c);
+  })(ctx);
+  if (bs === FAIL) return FAIL;
+  return B.divWith(['', ['minipage'], []], bs, start, ctx.state.at);
+}
+
+/**
+ * A letter's blocks, its address before them; the signature comes with
+ * `\closing`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.letterContents
+ * @param {object} ctx
+ */
+function letterContents(ctx) {
+  const start = ctx.state.at;
+  const bs = blocks(ctx);
+  if (bs === FAIL) return FAIL;
+  // add signature (author) and address (title)
+  const address = ctx.state.s.meta.address;
+  const [b] = address?.t === 'MetaBlocks' ? address.c : [];
+  const addr =
+    address?.c.length === 1 && b?.t === 'Plain'
+      ? mapSpans(
+          B.para(B.trimInlines(b.c)),
+          () => start,
+          () => start,
+        )
+      : [];
+  return [...addr, ...bs];
+}
+
+// The caption's image placeholder dropped: the figure has the caption.
+const dropImageCaption = (x) => {
+  if (x.t !== 'Para' || x.c.length !== 1) return x;
+  const [img] = x.c;
+  if (img.t !== 'Image') return x;
+  const [attr, alt, target] = img.c;
+  if (alt.length !== 1 || alt[0].t !== 'Str' || alt[0].c !== 'image') return x;
+  const image = new Node('Image', [attr, [], target], img.start, img.end);
+  return new Node('Plain', [image], x.start, x.end);
+};
+
+const figureContent = many(
+  alt(
+    attempt((ctx) => (label(ctx) === FAIL ? FAIL : null)),
+    (ctx) => block(ctx),
+  ),
+);
+
+/**
+ * A figure environment: its blocks, the caption and label they set, the
+ * label numbered; a subfigure after its options and width.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.figure'
+ * @param {string} name
+ * @param {boolean} sub
+ */
+function figureEnv(name, sub) {
+  const figure = attempt((ctx) => {
+    if (sp(ctx) === FAIL) return FAIL;
+    const hint = option('', (c) => {
+      const t = bracketedToks(c);
+      return t === FAIL ? FAIL : untokenize(t);
+    })(ctx);
+    if (hint === FAIL || sp(ctx) === FAIL) return FAIL;
+    resetCaption(ctx);
+    const inner = figureContent(ctx);
+    if (inner === FAIL) return FAIL;
+    const content = walk(
+      { block: dropImageCaption },
+      inner.filter((x) => x !== null).flat(),
+    );
+    const { caption, lastLabel, labels } = ctx.state.s;
+    if (lastLabel !== null) {
+      const num = getNextNumber((s) => s.lastFigureNum)(ctx);
+      const at = ctx.state.at;
+      updateLaTeXState(ctx, {
+        lastFigureNum: num,
+        labels: new Map(labels).set(
+          lastLabel,
+          B.str(renderDottedNum(num), at, at),
+        ),
+      });
+    }
+    const kvs = hint === '' ? [] : [['latex-placement', hint]];
+    return [[lastLabel ?? '', [], kvs], caption ?? B.emptyCaption, content];
+  });
+  const body = sub
+    ? (ctx) =>
+        skipopts(ctx) === FAIL || tok(ctx) === FAIL ? FAIL : figure(ctx)
+    : figure;
+  return (ctx, start) => {
+    const r = env(name, body)(ctx);
+    if (r === FAIL) return FAIL;
+    const [attr, capt, content] = r;
+    return B.figureWith(attr, capt, content, start, ctx.state.at);
+  };
+}
+
+/**
+ * The `alltt` environment's text as code: spaces raw, line breaks hard.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.alltt
+ * @param {Blocks} bs
+ */
+function alltt(bs) {
+  return walk(
+    {
+      inline: (x) => {
+        if (x.t === 'Str')
+          return new Node('Code', [nullAttr, x.c], x.start, x.end);
+        if (x.t === 'Space') {
+          return new Node('RawInline', ['latex', '\\ '], x.start, x.end);
+        }
+        if (x.t === 'SoftBreak')
+          return new Node('LineBreak', undefined, x.start, x.end);
+        return x;
+      },
+    },
+    bs,
+  );
+}
+
+// Options as attributes: `firstnumber` as `startFrom`.
+const renamedKvs = (options) =>
+  options.map(([k, v]) => [k === 'firstnumber' ? 'startFrom' : k, v]);
+const optionalKeyvals = option([], keyvals);
+
+/**
+ * fancyvrb's verbatim: code, its lines numbered on the left where asked.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.fancyverbEnv
+ * @param {string} name
+ */
+function fancyverbEnv(name) {
+  return (ctx, start) => {
+    const options = optionalKeyvals(ctx);
+    if (options === FAIL) return FAIL;
+    const numbered = options.find(([k]) => k === 'numbers')?.[1] === 'left';
+    const attr = ['', numbered ? ['numberLines'] : [], renamedKvs(options)];
+    const code = verbEnv(name)(ctx);
+    return code === FAIL
+      ? FAIL
+      : B.codeBlockWith(attr, code, start, ctx.state.at);
+  };
+}
+
+/**
+ * listings' options as attributes: its label, line numbers and language.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.parseListingsOptions
+ * @param {[string, string][]} options
+ */
+function parseListingsOptions(options) {
+  const classes = [];
+  if (options.find(([k]) => k === 'numbers')?.[1] === 'left') {
+    classes.push('numberLines');
+  }
+  const language = listingsLanguage(options);
+  if (language !== null) classes.push(language);
+  const ident = options.find(([k]) => k === 'label')?.[1] ?? '';
+  return [ident, classes, renamedKvs(options)];
+}
+
+// `lstlisting`: code with listings' options.
+function lstlisting(ctx, start) {
+  const options = optionalKeyvals(ctx);
+  if (options === FAIL) return FAIL;
+  const code = verbEnv('lstlisting')(ctx);
+  if (code === FAIL) return FAIL;
+  return B.codeBlockWith(
+    parseListingsOptions(options),
+    code,
+    start,
+    ctx.state.at,
+  );
+}
+
+/**
+ * minted's options and language as attributes.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.mintedAttr
+ * @param {object} ctx
+ */
+function mintedAttr(ctx) {
+  const options = optionalKeyvals(ctx);
+  if (options === FAIL) return FAIL;
+  const lang = braced(ctx);
+  if (lang === FAIL) return FAIL;
+  const l = untokenize(lang);
+  const classes = l === '' ? [] : [l];
+  if (options.find(([k]) => k === 'linenos')?.[1] === 'true') {
+    classes.push('numberLines');
+  }
+  return ['', classes, renamedKvs(options)];
+}
+
+/** @see Text.Pandoc.Readers.LaTeX.minted */
+function minted(ctx, start) {
+  const attr = mintedAttr(ctx);
+  if (attr === FAIL) return FAIL;
+  const code = verbEnv('minted')(ctx);
+  return code === FAIL
+    ? FAIL
+    : B.codeBlockWith(attr, code, start, ctx.state.at);
+}
+
+/**
+ * `obeylines`: a paragraph, its line breaks hard, none at either end.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.obeylines
+ * @param {object} ctx
+ * @param {number} start
+ */
+function obeylines(ctx, start) {
+  const ils = env('obeylines', inlines)(ctx);
+  if (ils === FAIL) return FAIL;
+  const hard = walkInlines(
+    {
+      inline: (x) =>
+        x.t === 'SoftBreak'
+          ? new Node('LineBreak', undefined, x.start, x.end)
+          : x,
+    },
+    ils,
+  );
+  let [from, to] = [0, hard.length];
+  while (from < to && hard[from].t === 'LineBreak') from++;
+  while (to > from && hard[to - 1].t === 'LineBreak') to--;
+  return B.para(hard.slice(from, to), start, ctx.state.at);
+}
+
+/**
+ * An item of a list: what precedes `\item` dropped.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.item
+ * @param {object} ctx
+ */
+function item(ctx) {
+  if (blocks(ctx) === FAIL || controlSeq('item')(ctx) === FAIL) return FAIL;
+  return skipopts(ctx) === FAIL ? FAIL : blocks(ctx);
+}
+
+/**
+ * An item of a description: its term in brackets, its blocks.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.descItem
+ * @param {object} ctx
+ */
+function descItem(ctx) {
+  if (optional(spaces1)(ctx) === FAIL) return FAIL;
+  if (controlSeq('item')(ctx) === FAIL || sp(ctx) === FAIL) return FAIL;
+  const ils = opt(ctx);
+  if (ils === FAIL) return FAIL;
+  const bs = blocks(ctx);
+  return bs === FAIL ? FAIL : [ils, [bs]];
+}
+
+/**
+ * A list environment, its items read as in a list item.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.listenv
+ * @param {string} name
+ * @param {Parser<unknown>} p
+ */
+function listenv(name, p) {
+  return attempt((ctx) => {
+    const old = ctx.state.s.inListItem;
+    updateLaTeXState(ctx, { inListItem: true });
+    const res = env(name, p)(ctx);
+    if (res === FAIL) return FAIL;
+    updateLaTeXState(ctx, { inListItem: old });
+    return res;
+  });
+}
+
+// A list of `item`s made by `f`.
+function listOf(name, f, itemParser) {
+  const items = listenv(name, many(itemParser));
+  return (ctx, start) => {
+    const xs = items(ctx);
+    return xs === FAIL ? FAIL : f(xs, start, ctx.state.at);
+  };
+}
+
+const markerSpec = (ctx) => {
+  if (symbol('[')(ctx) === FAIL) return FAIL;
+  const ts = manyTill(anyTok, symbol(']'))(ctx);
+  if (ts === FAIL) return FAIL;
+  const text = untokenize(ts);
+  const state = defaultParserState(readerOptions());
+  const { value } = parse(anyOrderedListMarker, text, state);
+  // Pandoc warns of the option it skips (`SkippedContent`).
+  return value === FAIL ? [1, DefaultStyle, DefaultDelim] : value;
+};
+const itemindent = optional(
+  attempt((ctx) => {
+    if (controlSeq('setlength')(ctx) === FAIL) return FAIL;
+    const g = grouped(count(1, controlSeq('itemindent')), (xs) => xs.flat())(
+      ctx,
+    );
+    return g === FAIL ? FAIL : braced(ctx);
+  }),
+);
+const setcounter = option(
+  1,
+  attempt((ctx) => {
+    if (controlSeq('setcounter')(ctx) === FAIL) return FAIL;
+    const ctrToks = braced(ctx);
+    if (ctrToks === FAIL) return FAIL;
+    const ctr = untokenize(ctrToks);
+    if (!ctr.startsWith('enum')) return FAIL;
+    if (![...ctr.slice(4)].every((c) => c === 'i' || c === 'v')) return FAIL;
+    if (sp(ctx) === FAIL) return FAIL;
+    const num = braced(ctx);
+    if (num === FAIL) return FAIL;
+    // Haskell's `read` of an `Int`; Pandoc warns of one it skips.
+    const t = untokenize(num).trim();
+    return /^-?[0-9]+$/.test(t) ? Number(BigInt.asIntN(64, BigInt(t))) + 1 : 1;
+  }),
+);
+const enumerateItems = listenv('enumerate', many(item));
+
+/**
+ * `enumerate`: its marker's style from an option, its start from
+ * `\setcounter`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.orderedList'
+ * @param {object} ctx
+ * @param {number} start
+ */
+function orderedListEnv(ctx, start) {
+  return attempt((c) => {
+    if (spaces(c) === FAIL) return FAIL;
+    const marker = option([1, DefaultStyle, DefaultDelim], markerSpec)(c);
+    if (marker === FAIL || spaces(c) === FAIL) return FAIL;
+    if (itemindent(c) === FAIL || spaces(c) === FAIL) return FAIL;
+    const first = setcounter(c);
+    if (first === FAIL) return FAIL;
+    const bs = enumerateItems(c);
+    if (bs === FAIL) return FAIL;
+    const [, style, delim] = marker;
+    return B.orderedListWith([first, style, delim], bs, start, c.state.at);
+  })(ctx);
+}
 
 const langAttr = (l) => ['', [], [['lang', renderLang(l)]]];
 
