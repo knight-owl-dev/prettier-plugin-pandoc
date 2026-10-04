@@ -5,6 +5,8 @@
   "ignorePaths": ["package-lock.json", "packages/*/test/corpus/**"],
   "words": [
     "Aeson",
+    "attoparsec",
+    "attoparsec's",
     "autolinks",
     "blanklines",
     "combinators",
@@ -45,7 +47,10 @@
     "startnum",
     "subsuperscripts",
     "textbf",
+    "trimr",
+    "unwords",
     "vadjust",
-    "wikilink"
+    "wikilink",
+    "wikilinks"
   ]
 }

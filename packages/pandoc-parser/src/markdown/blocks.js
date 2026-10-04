@@ -17,7 +17,7 @@ import {
   manyTill,
 } from '../core.js';
 import { blanklines, blockEnd, notAhead } from '../parsing/general.js';
-import { whenEnabled } from '../parsing/state.js';
+import { enabled, whenEnabled } from '../parsing/state.js';
 import { blockQuote } from './blockquote.js';
 import { codeBlockFenced, codeBlockIndented } from './code.js';
 import { definitionList } from './definition-lists.js';
@@ -26,6 +26,7 @@ import { header } from './headers.js';
 import { hrule } from './hrule.js';
 import { inlines1 } from './inlines.js';
 import { lineBlock } from './line-blocks.js';
+import { implicitFigure } from './links.js';
 import { bulletList, listStartInItem, orderedList } from './lists.js';
 import { table } from './tables.js';
 
@@ -51,8 +52,8 @@ const paragraphBreak = attempt((ctx) =>
 
 /**
  * Inlines a blank line ends: a paragraph; ended otherwise, a plain block.
- *
- * Not ported yet: an image alone, read as an implicit figure.
+ * With `implicit_figures`, an image alone with a description is a figure
+ * either way.
  *
  * @see Text.Pandoc.Readers.Markdown.para
  */
@@ -63,7 +64,13 @@ export const para = attempt((ctx) => {
   const ils = B.trimInlines(read);
   const end = blockEnd(ctx.text, start, ctx.pos, ils);
   const build = paragraphBreak(ctx) === FAIL ? B.plain : B.para;
-  return build(ils, start, end);
+  const [only] = ils;
+  const isFigure =
+    ils.length === 1 &&
+    only.t === 'Image' &&
+    only.c[1].length > 0 &&
+    enabled(ctx, 'implicit_figures');
+  return isFigure ? implicitFigure(only, start, end) : build(ils, start, end);
 });
 
 /**

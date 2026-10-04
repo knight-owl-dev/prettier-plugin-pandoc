@@ -19,6 +19,8 @@ import { toLower, words } from '../shared.js';
  * @property {'NullState' | 'ListItemState'} parserContext
  * @property {'NoQuote' | 'InSingleQuote' | 'InDoubleQuote'} quoteContext
  * @property {boolean} allowLineBreaks
+ * @property {boolean} allowLinks Whether a link may open: not in a link's
+ *   text.
  * @property {StrEnd | null} lastStrPos Where the last `str` ended.
  * @property {PersistentMap<true>} identifiers Header identifiers used.
  * @property {PersistentMap<[[string, string], Attr]>} headerKeys Each
@@ -50,6 +52,7 @@ export const defaultParserState = (options) => ({
   parserContext: 'NullState',
   quoteContext: 'NoQuote',
   allowLineBreaks: true,
+  allowLinks: true,
   lastStrPos: null,
   identifiers: EMPTY_MAP,
   headerKeys: EMPTY_MAP,

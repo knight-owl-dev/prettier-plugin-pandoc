@@ -1,7 +1,8 @@
 // Checks on spans: each node's within its parent's, in order. A table's
 // rows are spanned too; a cell's contents are in order within its row, but
 // not after another cell's, which in a multiline table share its lines. A
-// table's caption may follow its rows, which pandoc-types puts it before.
+// caption is checked apart from what it captions: a table's may follow its
+// rows, and an implicit figure's is its image's description.
 
 import assert from 'node:assert/strict';
 import { Node, Row } from '../../src/index.js';
@@ -35,7 +36,7 @@ export function assertNested(nodes, start, end, path) {
       for (const cell of node.cells) {
         assertNested(collect(cell), node.start, node.end, `${at} > Cell`);
       }
-    } else if (node.t === 'Table') {
+    } else if (node.t === 'Table' || node.t === 'Figure') {
       const [, caption, ...parts] = node.c;
       assertNested(collect(caption), node.start, node.end, `${at} > Caption`);
       assertNested(collect(parts), node.start, node.end, at);
