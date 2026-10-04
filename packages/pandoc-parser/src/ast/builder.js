@@ -5,8 +5,7 @@
 // Ported from pandoc-types 1.23.1.2's `Text.Pandoc.Builder`. Each takes the
 // node's content as Haskell's does, then its source span `start, end`, which
 // the reader knows where it parses the node; a container's span holds its
-// markup, which its content's spans cannot give. Table builders come with the
-// table parser, their normalization with them.
+// markup, which its content's spans cannot give.
 
 import {
   DefaultDelim,
@@ -20,6 +19,7 @@ import {
 } from './nodes.js';
 
 export { concat, join, text, trimInlines } from './inlines.js';
+export { cell, tableWith } from './tables.js';
 
 /** @typedef {import('./inlines.js').Inlines} Inlines */
 /** @typedef {Node[]} Blocks */

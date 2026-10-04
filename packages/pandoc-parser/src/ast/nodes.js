@@ -32,6 +32,33 @@ export class Node {
   }
 }
 
+/**
+ * A table's row, its cells as pandoc-types' `Cell`s, and the source span of
+ * its lines. A row's lines are text of their own, its cells' not: a cell of
+ * a multiline table is a column of the row's lines. Serializes as Pandoc's
+ * `[attr, cells]`.
+ *
+ * @see Text.Pandoc.Definition.Row
+ */
+export class Row {
+  /**
+   * @param {unknown} attr
+   * @param {unknown[]} cells
+   * @param {number} [start]
+   * @param {number} [end]
+   */
+  constructor(attr, cells, start, end) {
+    this.attr = attr;
+    this.cells = cells;
+    this.start = start;
+    this.end = end;
+  }
+
+  toJSON() {
+    return [this.attr, this.cells];
+  }
+}
+
 // A nullary constructor of an enumeration, as Aeson tags it.
 const tag = (t) => Object.freeze({ t });
 
@@ -63,6 +90,24 @@ export const LowerRoman = tag('LowerRoman');
 export const UpperRoman = tag('UpperRoman');
 export const LowerAlpha = tag('LowerAlpha');
 export const UpperAlpha = tag('UpperAlpha');
+
+/** @see Text.Pandoc.Definition.Alignment */
+export const AlignLeft = tag('AlignLeft');
+export const AlignRight = tag('AlignRight');
+export const AlignCenter = tag('AlignCenter');
+export const AlignDefault = tag('AlignDefault');
+
+/** @see Text.Pandoc.Definition.ColWidth */
+export const ColWidthDefault = tag('ColWidthDefault');
+
+/**
+ * A column's width, a fraction of the text's.
+ *
+ * @see Text.Pandoc.Definition.ColWidth
+ * @param {number} fraction
+ */
+export const colWidth = (fraction) =>
+  Object.freeze({ t: 'ColWidth', c: fraction });
 
 /** @see Text.Pandoc.Definition.ListNumberDelim */
 export const DefaultDelim = tag('DefaultDelim');

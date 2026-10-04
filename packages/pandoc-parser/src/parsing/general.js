@@ -402,6 +402,7 @@ export function lastLineEnd(text, from, to) {
   let end = to;
   for (;;) {
     while (end > from && text[end - 1] === '\n') end--;
+    if (end === from) return end;
     const lineStart = text.lastIndexOf('\n', end - 1) + 1;
     if (lineStart <= from || !BLANK.test(text.slice(lineStart, end))) {
       return end;

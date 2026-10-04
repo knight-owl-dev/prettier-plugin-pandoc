@@ -57,6 +57,8 @@ const EXTENSIONS = [
 /**
  * @typedef {object} ReaderOptions
  * @property {number} tabStop
+ * @property {number} columns The text's width, which tables' columns are
+ *   fractions of: the CLI's `--columns`, 72.
  * @property {ReadonlySet<string>} extensions
  * @property {ReadonlySet<string>} abbreviations
  */
@@ -70,6 +72,7 @@ const EXTENSIONS = [
  */
 export const readerOptions = ({ tabStop = 4 } = {}) => ({
   tabStop,
+  columns: 72,
   extensions: new Set(EXTENSIONS),
   abbreviations: ABBREVIATIONS,
 });
