@@ -12,6 +12,7 @@ import {
   spaceChar,
 } from '../parsing/general.js';
 import { whenEnabled } from '../parsing/state.js';
+import { NBSP } from '../shared.js';
 
 const noNewline = notFollowedBy(char('\n'));
 const maybeNewline = optional(newline);
@@ -48,6 +49,15 @@ const escapable = alt(
 export const escapedCharacter = attempt((ctx) =>
   backslash(ctx) === FAIL ? FAIL : escapable(ctx),
 );
+
+/**
+ * What an escaped character stands for: itself, an escaped space a
+ * non-breaking one.
+ *
+ * @see Text.Pandoc.Readers.Markdown.escapedChar
+ * @param {string} c
+ */
+export const unescaped = (c) => (c === ' ' ? NBSP : c);
 
 const noBlankLine = notFollowedBy(blankline);
 const lineJoin = attempt((ctx) =>

@@ -22,6 +22,7 @@ import {
   skipSpaces,
 } from '../parsing/general.js';
 import { whenEnabled } from '../parsing/state.js';
+import { blockQuote } from './blockquote.js';
 import { codeBlockFenced, codeBlockIndented } from './code.js';
 import { header } from './headers.js';
 import { inlines1 } from './inlines.js';
@@ -105,7 +106,8 @@ export const block = choice([
   header,
   // lhsCodeBlock, htmlBlock, table,
   codeBlockIndented,
-  // rawTeXBlock, lineBlock, blockQuote,
+  // rawTeXBlock, lineBlock,
+  blockQuote,
   hrule,
   // orderedList, definitionList, noteBlock, referenceKey, abbrevKey,
   para,

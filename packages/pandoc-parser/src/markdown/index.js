@@ -5,7 +5,7 @@
 // reading what Pandoc's CLI hands it: `input.js`.
 
 import { doc } from '../ast/document.js';
-import { Node } from '../ast/nodes.js';
+import { mapSpans } from '../ast/spans.js';
 import { FAIL, parse } from '../core.js';
 import { readerInput } from '../input.js';
 import { readerOptions } from '../options.js';
@@ -27,21 +27,5 @@ export function readMarkdown(source, options) {
   const { text, toSource } = readerInput(source, opts.tabStop);
   const { value } = parse(parseBlocks, text, defaultParserState(opts));
   if (value === FAIL) throw new Error('the markdown reader failed');
-  return doc(toSourceSpans(value, toSource));
-}
-
-// `value` rebuilt with each node's span an offset into the source, not into
-// the text read: built values are never mutated. Frozen ones hold no nodes.
-function toSourceSpans(value, toSource) {
-  if (value instanceof Node) {
-    const c = toSourceSpans(value.c, toSource);
-    return new Node(value.t, c, toSource(value.start), toSource(value.end));
-  }
-  if (value === null || typeof value !== 'object' || Object.isFrozen(value)) {
-    return value;
-  }
-  if (Array.isArray(value)) return value.map((v) => toSourceSpans(v, toSource));
-  return Object.fromEntries(
-    Object.entries(value).map(([k, v]) => [k, toSourceSpans(v, toSource)]),
-  );
+  return doc(mapSpans(value, toSource, toSource));
 }

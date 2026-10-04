@@ -7,6 +7,7 @@
 
 import { FAIL } from '../core.js';
 import { EMPTY_MAP } from '../persistent-map.js';
+import { positions } from '../position.js';
 import { toLower, words } from '../shared.js';
 
 /** @typedef {import('../core.js').Context} Context */
@@ -18,13 +19,20 @@ import { toLower, words } from '../shared.js';
  * @property {'NullState' | 'ListItemState'} parserContext
  * @property {'NoQuote' | 'InSingleQuote' | 'InDoubleQuote'} quoteContext
  * @property {boolean} allowLineBreaks
- * @property {number | null} lastStrPos Where the last `str` ended.
+ * @property {StrEnd | null} lastStrPos Where the last `str` ended.
  * @property {PersistentMap<true>} identifiers Header identifiers used.
  * @property {PersistentMap<[[string, string], Attr]>} headerKeys Each
  *   header's reference key: its target and attributes.
  */
 
 /** @typedef {[string, string[], [string, string][]]} Attr */
+
+/**
+ * A place in text read: its depth in text parsed again, the text, and an
+ * offset into it.
+ *
+ * @typedef {{depth: number, text: string, offset: number}} StrEnd
+ */
 /** @template V @typedef {import('../persistent-map.js').PersistentMap<V>} PersistentMap */
 
 /**
@@ -83,15 +91,50 @@ export const whenEnabled = (name, p) => (ctx) =>
  * @param {Context} ctx
  */
 export const updateLastStrPos = (ctx) =>
-  updateState(ctx, { lastStrPos: ctx.pos });
+  updateState(ctx, {
+    lastStrPos: { depth: ctx.depth ?? 0, text: ctx.text, offset: ctx.pos },
+  });
 
 /**
- * Whether the position is not right after a `str`.
+ * Whether the position is not right after a `str`. Positions compare as
+ * Parsec's do: text parsed again at the same depth shares a source name and
+ * starts at line 1, so a `str` ending in one such text can stand right
+ * before a place in another, at the same line and column.
  *
  * @see Text.Pandoc.Parsing.Capabilities.notAfterString
  * @param {Context} ctx
  */
-export const notAfterString = (ctx) => ctx.state.lastStrPos !== ctx.pos;
+export function notAfterString(ctx) {
+  const last = ctx.state.lastStrPos;
+  if (last === null || last.depth !== (ctx.depth ?? 0)) return true;
+  if (last.text === ctx.text) return last.offset !== ctx.pos;
+  const [a, b] = [placeOf(last), placeHere(ctx)];
+  return a.line !== b.line || a.column !== b.column;
+}
+
+// Each `str` end's line and column, worked out once, and each parse's
+// positions of the text it reads now: weakly held, so none outlives what
+// it belongs to.
+const places = new WeakMap();
+const reading = new WeakMap();
+
+function placeOf(end) {
+  let place = places.get(end);
+  if (place === undefined) {
+    place = positions(end.text).locate(end.offset);
+    places.set(end, place);
+  }
+  return place;
+}
+
+function placeHere(ctx) {
+  let now = reading.get(ctx);
+  if (now?.text !== ctx.text) {
+    now = { text: ctx.text, positions: positions(ctx.text) };
+    reading.set(ctx, now);
+  }
+  return now.positions.locate(ctx.pos);
+}
 
 /**
  * `p` in quote context `context`, the old context put back after it.

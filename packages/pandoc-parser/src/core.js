@@ -22,6 +22,9 @@ export const FAIL = Symbol('FAIL');
  * @property {string} text
  * @property {number} pos An offset into `text`, in UTF-16 code units.
  * @property {unknown} state Parsec's user state.
+ * @property {number} [depth] How deep in text parsed again `text` is: what
+ *   Parsec's source name tells apart, a chunk's being its parent's and
+ *   `_chunk`.
  */
 
 /**
