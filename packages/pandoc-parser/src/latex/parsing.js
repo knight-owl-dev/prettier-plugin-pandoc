@@ -4,6 +4,7 @@
 // Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX.Parsing`.
 
 import * as B from '../ast/builder.js';
+import { Node } from '../ast/nodes.js';
 import { walk } from '../ast/walk.js';
 import {
   alt,
@@ -22,7 +23,7 @@ import {
 } from '../core.js';
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
 import { readInt } from '../parsing/lists.js';
-import { addMetaField } from '../shared.js';
+import { addMetaField, uniqueIdent } from '../shared.js';
 
 /** @typedef {import('../tex.js').Tok} Tok */
 
@@ -1612,6 +1613,53 @@ export const env = (name, p) => {
  */
 export function addMeta(ctx, field, val) {
   updateLaTeXState(ctx, { meta: addMetaField(field, val, ctx.state.s.meta) });
+}
+
+/**
+ * A caption, its short form in brackets, then a label it may have.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.setCaption
+ * @param {import('../core.js').Parser<B.Inlines>} inline
+ * @returns {import('../core.js').Parser<undefined>}
+ */
+export function setCaption(inline) {
+  const short = option(null, bracketed(inline, B.concat));
+  const long = tokWith(inline);
+  const trailingLabel = optional(
+    attempt((ctx) => (spaces(ctx) === FAIL ? FAIL : label(ctx))),
+  );
+  return attempt((ctx) => {
+    const mbshort = short(ctx);
+    if (mbshort === FAIL) return FAIL;
+    const from = ctx.state.at;
+    const ils = long(ctx);
+    if (ils === FAIL) return FAIL;
+    // Pandoc's `Plain` itself, not the builder's: a plain of nothing too.
+    const plain = new Node('Plain', ils, from, ctx.state.at);
+    if (trailingLabel(ctx) === FAIL) return FAIL;
+    updateLaTeXState(ctx, { caption: B.caption(mbshort, [plain]) });
+    return undefined;
+  });
+}
+
+/**
+ * The attributes of a heading of `inlines`: with `auto_identifiers`, an
+ * identifier made from its text where it has none; either way recorded as
+ * used. The LaTeX state's instance of `HasIdentifierList`.
+ *
+ * Not ported yet: `ascii_identifiers`, and the warning of a duplicate.
+ *
+ * @see Text.Pandoc.Parsing.General.registerHeader
+ * @param {{state: LPState}} ctx
+ * @param {[string, string[], [string, string][]]} attr
+ * @param {B.Inlines} inlines
+ */
+export function registerHeader(ctx, [ident, classes, kvs], inlines) {
+  const used = ctx.state.s.identifiers;
+  const auto = ctx.state.s.options.extensions.has('auto_identifiers');
+  const id = ident === '' && auto ? uniqueIdent(inlines, used) : ident;
+  if (id !== '') updateLaTeXState(ctx, { identifiers: new Set(used).add(id) });
+  return [id, classes, kvs];
 }
 
 /**

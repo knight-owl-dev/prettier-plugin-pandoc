@@ -13,7 +13,10 @@ import { API_VERSION, Node } from './nodes.js';
  */
 export const doc = (blocks, meta = {}) => ({
   'pandoc-api-version': API_VERSION,
-  meta,
+  // A `Map`: Aeson writes its keys in order.
+  meta: Object.fromEntries(
+    Object.entries(meta).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  ),
   blocks,
 });
 

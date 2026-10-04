@@ -214,6 +214,120 @@ export function addMetaField(key, val, meta) {
 }
 
 /**
+ * `t` split at runs of characters `isSep` holds of; none for no text.
+ *
+ * @see Text.Pandoc.Shared.splitTextBy
+ * @param {(c: string) => boolean} isSep
+ * @param {string} t
+ * @returns {string[]}
+ */
+export function splitTextBy(isSep, t) {
+  const out = [];
+  const cs = [...t];
+  for (let k = 0; k < cs.length; ) {
+    let piece = '';
+    while (k < cs.length && !isSep(cs[k])) piece += cs[k++];
+    out.push(piece);
+    while (k < cs.length && isSep(cs[k])) k++;
+  }
+  return out;
+}
+
+// A line break between blocks squashed into inlines, spanning nothing at
+// the end of the block before it.
+const separatorAfter = (b) => [new Node('LineBreak', undefined, b.end, b.end)];
+
+/**
+ * A block's inlines: its own, or its blocks', squashed.
+ *
+ * @see Text.Pandoc.Shared.blockToInlines
+ * @param {Node} b
+ * @returns {Node[]}
+ */
+function blockToInlines(b) {
+  const { t, c } = b;
+  switch (t) {
+    case 'Plain':
+    case 'Para':
+    case 'Header':
+      return t === 'Header' ? c[2] : c;
+    case 'LineBlock':
+      return c.flatMap((line, k) =>
+        k === 0
+          ? line
+          : [new Node('LineBreak', undefined, b.start, b.start), ...line],
+      );
+    case 'CodeBlock':
+      return [new Node('Code', c, b.start, b.end)];
+    case 'RawBlock':
+      return [new Node('RawInline', c, b.start, b.end)];
+    case 'BlockQuote':
+      return blocksToInlines(c);
+    case 'OrderedList':
+      return concat(c[1].map(blocksToInlines));
+    case 'BulletList':
+      return concat(c.map(blocksToInlines));
+    case 'DefinitionList':
+      return concat(
+        c.map(([term, defs]) => {
+          const at = term.at(-1)?.end ?? b.start;
+          return concat([
+            term,
+            [
+              new Node('Str', ':', at, at),
+              new Node('Space', undefined, at, at),
+            ],
+            ...defs.map(blocksToInlines),
+          ]);
+        }),
+      );
+    case 'Table': {
+      const [, , , head, bodies, foot] = c;
+      const rows = [
+        ...head[1],
+        ...bodies.flatMap(([, , hd, bd]) => [...hd, ...bd]),
+        ...foot[1],
+      ];
+      return concat(
+        rows.flatMap((row, k) => {
+          const line = concat(
+            row.cells.map((cell) => blocksToInlines(cell[4])),
+          );
+          if (k === 0) return [line];
+          return [
+            [new Node('LineBreak', undefined, row.start, row.start)],
+            line,
+          ];
+        }),
+      );
+    }
+    case 'Div':
+      return blocksToInlines(c[1]);
+    case 'Figure':
+      return blocksToInlines(c[2]);
+    default:
+      return [];
+  }
+}
+
+/**
+ * Blocks squashed into inlines, a line break between each two.
+ *
+ * @see Text.Pandoc.Shared.blocksToInlines'
+ * @param {Node[]} bs
+ * @returns {Node[]}
+ */
+export function blocksToInlines(bs) {
+  return concat(
+    bs.flatMap((b, k) =>
+      k === 0
+        ? [blockToInlines(b)]
+        : [separatorAfter(bs[k - 1]), blockToInlines(b)],
+    ),
+  );
+}
+
+/**
  * `s` without line breaks at its end.
  *
  * @see Text.Pandoc.Shared.stripTrailingNewlines

@@ -25,6 +25,7 @@ acro
 acrshort
 acsp
 addabbrvspace
+addbibresource
 addcontentsline
 adddot
 adddotspace
@@ -98,6 +99,7 @@ dimenarg
 displaymath
 divehi
 dmath
+documentclass
 doinlinecode
 dolabel
 dolstinline
@@ -119,6 +121,7 @@ enclname
 endcontents
 endenvname
 endgroup
+endinput
 enquote
 ensuremath
 envname
@@ -126,8 +129,11 @@ eqnarray
 eqref
 etoolbox
 expandafter
+extratitle
+fancybreak
 femto
 figurename
+filecontents
 flalign
 flqq
 fmol
@@ -145,6 +151,8 @@ foreignblockcquote
 foreignblockquote
 foreignlanguage
 foreignquote
+framesubtitle
+frametitle
 friulan
 frqq
 fshyp
@@ -156,6 +164,7 @@ glqq
 glsdesc
 glsdescplural
 glspl
+graphicspath
 grqq
 guillemetleft
 guillemetright
@@ -175,6 +184,7 @@ hungarumlaut
 hyperdef
 hyperref
 hypertarget
+hypertargets
 hyphenat
 hyphenblockcquote
 hyphenblockquote
@@ -188,12 +198,14 @@ iftoggle
 iftrue
 includegraphics
 includesvg
+inputminted
 itshape
 katal
 keyval
 keyvals
 kmol
 kohm
+koma
 kurmanji
 ldots
 letmacro
@@ -205,8 +217,10 @@ listoftables
 listtablename
 literalline
 lowersorbian
+lowertitleback
 lsorbian
 lstinline
+lstinputlisting
 lstlistingname
 makeatletter
 makeatother
@@ -220,9 +234,11 @@ mathop
 mathrm
 mblabel
 mblang
+mbshort
 mdots
 milli
 minipage
+minisec
 mintinline
 mkbibbold
 mkbibbrackets
@@ -272,6 +288,7 @@ optarg
 otherlanguage
 pagebreak
 pandocbounded
+parbox
 parencite
 parencites
 paropt
@@ -279,8 +296,11 @@ partname
 pdfannot
 pdfstringdef
 peta
+pfbreak
 phonebk
 pico
+plainbreak
+plainfancybreak
 planckbar
 pmol
 polutonikogreek
@@ -300,6 +320,7 @@ qtylist
 qtyrange
 quotedblbase
 quotesinglbase
+raggedright
 raisetothe
 rawcommand
 rawcontents
@@ -337,6 +358,7 @@ stopvalueprefix
 straße
 stylename
 subequations
+subsubsection
 subtag
 subtags
 supercite
@@ -407,6 +429,7 @@ texttwosuperior
 textyen
 theoremstyle
 titleformat
+titlehead
 tname
 togglefalse
 toggletrue
@@ -421,6 +444,8 @@ umol
 untoken
 untokenize
 uppersorbian
+uppertitleback
+usepackage
 usorbian
 vadjust
 valueprefix
