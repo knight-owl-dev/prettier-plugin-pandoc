@@ -8,6 +8,7 @@
     "attoparsec",
     "attoparsec's",
     "autolinks",
+    "bareloc",
     "blanklines",
     "combinators",
     "COMMONMARK",

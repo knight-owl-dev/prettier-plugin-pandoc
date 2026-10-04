@@ -24,6 +24,8 @@ import { EMPTY_MAP } from '../persistent-map.js';
  *   Each heading's implicit reference key, its target and attributes.
  * @property {import('../persistent-map.js').PersistentMap<unknown>} notes
  *   Each note's contents, by its label.
+ * @property {import('../persistent-map.js').PersistentMap<number>} examples
+ *   Each example's number, by its label.
  */
 
 /**
@@ -35,6 +37,7 @@ const EMPTY_TABLES = Object.freeze({
   keys: EMPTY_MAP,
   headerKeys: EMPTY_MAP,
   notes: EMPTY_MAP,
+  examples: EMPTY_MAP,
 });
 
 /**
@@ -112,11 +115,46 @@ export function withoutNotes(ctx, p) {
 }
 
 /**
- * A note whose contents the read fills once it ends: its label.
+ * A note whose contents the read fills once it ends: its label, and the
+ * note number its citations take.
  *
  * @param {string} label
+ * @param {number} noteNum
  */
-export const pendingNote = (label) => Object.freeze({ pendingNote: label });
+export const pendingNote = (label, noteNum) =>
+  Object.freeze({ pendingNote: label, noteNum });
+
+/**
+ * `value` with each citation in it numbered `noteNum`: a note's, where
+ * its reference is.
+ *
+ * @see Text.Pandoc.Readers.Markdown.note
+ * @param {unknown} value
+ * @param {number} noteNum
+ * @returns {unknown}
+ */
+function numberCitations(value, noteNum) {
+  if (value instanceof Node) {
+    const c = numberCitations(value.c, noteNum);
+    const numbered =
+      value.t === 'Cite'
+        ? [c[0].map((cit) => ({ ...cit, citationNoteNum: noteNum })), c[1]]
+        : c;
+    return new Node(value.t, numbered, value.start, value.end);
+  }
+  if (value instanceof Row) {
+    const cells = numberCitations(value.cells, noteNum);
+    return new Row(value.attr, cells, value.start, value.end);
+  }
+  if (Array.isArray(value))
+    return value.map((v) => numberCitations(v, noteNum));
+  if (value === null || typeof value !== 'object' || Object.isFrozen(value)) {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([k, v]) => [k, numberCitations(v, noteNum)]),
+  );
+}
 
 /**
  * `value` with each pending note's contents filled from `notes`.
@@ -127,9 +165,11 @@ export const pendingNote = (label) => Object.freeze({ pendingNote: label });
  */
 function fillNotes(value, notes) {
   if (value instanceof Node) {
-    const label = value.c?.pendingNote;
+    const pending = value.c?.pendingNote === undefined ? undefined : value.c;
     const c =
-      label === undefined ? fillNotes(value.c, notes) : notes.get(label);
+      pending === undefined
+        ? fillNotes(value.c, notes)
+        : numberCitations(notes.get(pending.pendingNote), pending.noteNum);
     return c === value.c ? value : new Node(value.t, c, value.start, value.end);
   }
   if (value instanceof Row) {
@@ -154,10 +194,10 @@ function fillNotes(value, notes) {
 export function readResolved(read) {
   const first = { tables: null, lookups: 0 };
   const { value, state } = read(first);
-  const { keys, headerKeys, notes } = state;
-  if (first.lookups === 0 || keys.size + headerKeys.size + notes.size === 0) {
-    return value;
-  }
-  const second = read({ tables: { keys, headerKeys, notes }, lookups: 0 });
+  const { keys, headerKeys, notes, examples } = state;
+  const tables = { keys, headerKeys, notes, examples };
+  const entries = keys.size + headerKeys.size + notes.size + examples.size;
+  if (first.lookups === 0 || entries === 0) return value;
+  const second = read({ tables, lookups: 0 });
   return /** @type {T} */ (fillNotes(second.value, second.state.notes));
 }
