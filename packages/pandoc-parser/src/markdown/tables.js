@@ -1,6 +1,7 @@
-// Simple and multiline tables: columns marked by lines of dashes, each
-// row's lines split into cells at the display widths the dashes end at,
-// each cell read again as plain blocks; a caption before or after.
+// Pipe, simple and multiline tables: a pipe table's cells between pipes,
+// the others' columns marked by lines of dashes, each row's lines split
+// into cells at the display widths the dashes end at; each cell read again
+// as plain blocks; a caption before or after.
 //
 // Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. `blocks.js`
 // imports this module, which imports modules that import `blocks.js`: what
@@ -15,7 +16,7 @@ import {
   AlignRight,
   nullAttr,
 } from '../ast/nodes.js';
-import { char, newline, oneOf, satisfy, string } from '../char.js';
+import { char, newline, noneOf, oneOf, satisfy, string } from '../char.js';
 import {
   alt,
   attempt,
@@ -25,6 +26,7 @@ import {
   many1,
   notFollowedBy,
   option,
+  sepBy1,
 } from '../core.js';
 import {
   anyLine,
@@ -32,6 +34,7 @@ import {
   blanklines,
   blockEnd,
   gobbleSpaces,
+  nonspaceChar,
   notAhead,
   optionalBlanklines,
   parseFromStringFresh,
@@ -41,6 +44,7 @@ import { whenEnabled } from '../parsing/state.js';
 import {
   gridTableWith,
   tableWith,
+  toTableComponents,
   withDefaultWidths,
 } from '../parsing/tables.js';
 import { splitTextByIndices } from '../shared.js';
@@ -50,7 +54,9 @@ import { attributes } from './attributes.js';
 import { parseBlocks, plain } from './blocks.js';
 import { skipNonindentSpaces } from './common.js';
 import { divFenceEnd, inDiv } from './divs.js';
-import { inline } from './inlines.js';
+import { code, escapedChar, inline, inlines1, math } from './inlines.js';
+import { rawHtmlInline } from './raw-html.js';
+import { rawLaTeXInlinePrime } from './raw-tex.js';
 
 /** @typedef {import('../core.js').Context} Context */
 /** @typedef {import('../parsing/tables.js').RawRow} RawRow */
@@ -412,6 +418,186 @@ const multilineTable = (headless) =>
     tableFooter,
   );
 
+// A pipe or plus between header parts, no blank line after it.
+// @see Text.Pandoc.Readers.Markdown.sepPipe
+const sepPipe = attempt((ctx) => {
+  if (alt(char('|'), char('+'))(ctx) === FAIL) return FAIL;
+  return notFollowedBy(blankline)(ctx);
+});
+
+const pipe = char('|');
+const openOrClose = option(false, (ctx) => (pipe(ctx) === FAIL ? FAIL : true));
+const colonMark = option(false, (ctx) =>
+  char(':')(ctx) === FAIL ? FAIL : true,
+);
+const dashes = many1(char('-'));
+
+/**
+ * A header part: dashes, colons marking its alignment; and its length.
+ *
+ * @see Text.Pandoc.Readers.Markdown.pipeTableHeaderPart
+ * @type {import('../core.js').Parser<[{t: string}, number]>}
+ */
+const pipeTableHeaderPart = attempt((ctx) => {
+  if (spaceChars(ctx) === FAIL) return FAIL;
+  const left = colonMark(ctx);
+  const ds = dashes(ctx);
+  if (ds === FAIL) return FAIL;
+  const right = colonMark(ctx);
+  if (spaceChars(ctx) === FAIL) return FAIL;
+  const len = ds.length + (left ? 1 : 0) + (right ? 1 : 0);
+  const align =
+    left && right
+      ? AlignCenter
+      : left
+        ? AlignLeft
+        : right
+          ? AlignRight
+          : AlignDefault;
+  return [align, len];
+});
+const moreHeaderParts = many((ctx) =>
+  sepPipe(ctx) === FAIL ? FAIL : pipeTableHeaderPart(ctx),
+);
+
+/**
+ * The line under a pipe table's header: each column's alignment and the
+ * length of its dashes.
+ *
+ * @see Text.Pandoc.Readers.Markdown.pipeBreak
+ * @type {import('../core.js').Parser<[{t: string}[], number[]]>}
+ */
+const pipeBreak = attempt((ctx) => {
+  if (skipNonindentSpaces(ctx) === FAIL) return FAIL;
+  const openPipe = openOrClose(ctx);
+  const first = pipeTableHeaderPart(ctx);
+  if (first === FAIL) return FAIL;
+  const rest = moreHeaderParts(ctx);
+  if (rest === FAIL) return FAIL;
+  const closePipe = openOrClose(ctx);
+  // at least one pipe needed for a one-column table:
+  if (rest.length === 0 && !(openPipe || closePipe)) return FAIL;
+  if (blankline(ctx) === FAIL) return FAIL;
+  const parts = [first, ...rest];
+  return [parts.map(([a]) => a), parts.map(([, n]) => n)];
+});
+
+const chunk = alt(
+  (ctx) => code(ctx),
+  (ctx) => math(ctx),
+  (ctx) => rawHtmlInline(ctx),
+  (ctx) => escapedChar(ctx),
+  (ctx) => rawLaTeXInlinePrime(ctx),
+  noneOf('|\n\r'),
+);
+const cellText = (ctx) => {
+  const start = ctx.pos;
+  return many(chunk)(ctx) === FAIL ? FAIL : [start, ctx.pos];
+};
+const cellTexts = sepBy1(cellText, pipe);
+
+/**
+ * A pipe table's row: its cells' spans, as written; its line's.
+ *
+ * @see Text.Pandoc.Readers.Markdown.pipeTableRow
+ * @type {import('../core.js').Parser<{cells: [number, number][], start: number, end: number}>}
+ */
+const pipeTableRow = attempt((ctx) => {
+  if (scanForPipe(ctx) === FAIL) return FAIL;
+  const start = ctx.pos;
+  if (spaceChars(ctx) === FAIL) return FAIL;
+  const openPipe = openOrClose(ctx);
+  const cells = cellTexts(ctx);
+  if (cells === FAIL) return FAIL;
+  const closePipe = openOrClose(ctx);
+  // at least one pipe needed for a one-column table:
+  if (cells.length === 1 && !(openPipe || closePipe)) return FAIL;
+  const end = ctx.pos;
+  if (blankline(ctx) === FAIL) return FAIL;
+  return { cells, start, end };
+});
+const pipeTableRows = many(pipeTableRow);
+
+/**
+ * A cell's inlines as plain text; nothing for none.
+ *
+ * @see Text.Pandoc.Readers.Markdown.pipeTableCell
+ * @param {Context} ctx
+ */
+function pipeTableCell(ctx) {
+  const ils = inlines1(ctx);
+  if (ils === FAIL) return [];
+  return B.plain(ils, ils[0]?.start, ils.at(-1)?.end);
+}
+
+/**
+ * Whether the line holds a pipe before it ends.
+ *
+ * @see Text.Pandoc.Readers.Markdown.scanForPipe
+ * @param {Context} ctx
+ */
+function scanForPipe(ctx) {
+  for (let i = ctx.pos; i < ctx.text.length; i++) {
+    const c = ctx.text[i];
+    if (c === '|') return undefined;
+    if (c === '\n') return FAIL;
+  }
+  return FAIL;
+}
+
+/**
+ * A pipe table: a header row, the line of dashes under it, and rows; its
+ * columns' widths those of the dashes where a line is wider than the text.
+ *
+ * @see Text.Pandoc.Readers.Markdown.pipeTable
+ * @type {import('../core.js').Parser<import('../parsing/tables.js').TableComponents>}
+ */
+const pipeTable = attempt((ctx) => {
+  if (skipNonindentSpaces(ctx) === FAIL) return FAIL;
+  if (lookAhead(nonspaceChar)(ctx) === FAIL) return FAIL;
+  const heads = pipeTableRow(ctx);
+  if (heads === FAIL) return FAIL;
+  const brk = pipeBreak(ctx);
+  if (brk === FAIL) return FAIL;
+  const [aligns, seplengths] = brk;
+  const numcols = aligns.length;
+  const lines = pipeTableRows(ctx);
+  if (lines === FAIL) return FAIL;
+  const rows = [heads, ...lines].map((r) => ({
+    ...r,
+    cells: r.cells.slice(0, numcols),
+  }));
+  const text = ctx.text;
+  const lineWidths = rows.map((r) =>
+    r.cells.reduce((sum, [s, e]) => sum + realLength(text.slice(s, e)), 0),
+  );
+  const total = seplengths.reduce((sum, n) => sum + n, 0);
+  // add numcols + 1 for the pipes themselves
+  const wide =
+    Math.max(total, ...lineWidths) + (numcols + 1) > ctx.state.options.columns;
+  const widths = wide ? seplengths.map((n) => n / total) : aligns.map(() => 0);
+  const cellContents = ([s, e]) => {
+    const [from, to] = trimmed(text, s, e);
+    return parseFromStringFresh(
+      ctx,
+      pipeTableCell,
+      SourceText.slice(text, from, to),
+    );
+  };
+  const parsed = [];
+  for (const r of rows) {
+    const cells = [];
+    for (const span of r.cells) {
+      const bs = cellContents(span);
+      if (bs === FAIL) return FAIL;
+      cells.push(bs);
+    }
+    parsed.push({ cells, start: r.start, end: r.end });
+  }
+  const [head, ...body] = parsed;
+  return toTableComponents(aligns, widths, [head], body);
+});
+
 const colon = char(':');
 const notPunctuation = notFollowedBy(satisfy((c) => /^\p{P}$/u.test(c)));
 const initial = oneOf('Tt');
@@ -489,8 +675,11 @@ const gridTable = attempt((ctx) => {
   return parseFromStringFresh(ctx, gridTableAt, SourceText.concat(lines));
 });
 
-// Not ported yet: pipe tables, tried first.
 const tableKinds = alt(
+  whenEnabled(
+    'pipe_tables',
+    attempt((ctx) => (scanForPipe(ctx) === FAIL ? FAIL : pipeTable(ctx))),
+  ),
   whenEnabled('multiline_tables', multilineTable(false)),
   whenEnabled('simple_tables', alt(simpleTable(true), simpleTable(false))),
   whenEnabled('multiline_tables', multilineTable(true)),
