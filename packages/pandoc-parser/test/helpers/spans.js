@@ -4,7 +4,8 @@
 // a cell spanning rows within the table, past its own row. A
 // caption is checked apart from what it captions: a table's may follow its
 // rows, and an implicit figure's is its image's description. A note's
-// contents span its definition, wherever that is.
+// contents span its definition, wherever that is; so does a block quote's
+// citation (csquotes'), read before the quote and placed after it.
 
 import assert from 'node:assert/strict';
 import { Node, Row } from '../../src/index.js';
@@ -42,6 +43,13 @@ export function assertNested(nodes, start, end, path) {
       }
     } else if (node.t === 'Note') {
       assertNested(childrenOf(node), 0, Number.POSITIVE_INFINITY, at);
+    } else if (node.t === 'BlockQuote' || node.t === 'Div') {
+      const children = childrenOf(node);
+      const [before, last] = [children.at(-2), children.at(-1)];
+      const moved = last?.t === 'Para' && before && last.start < before.end;
+      const body = moved ? children.slice(0, -1) : children;
+      assertNested(body, node.start, node.end, at);
+      if (moved) assertNested([last], node.start, node.end, `${at} > Citation`);
     } else if (node.t === 'Table' || node.t === 'Figure') {
       const [, caption, ...parts] = node.c;
       assertNested(collect(caption), node.start, node.end, `${at} > Caption`);

@@ -28,6 +28,7 @@ import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
 import { readerInput } from '../input.js';
 import { readerOptions } from '../options.js';
 import { extractSpaces, formatCode, NBSP, toLower } from '../shared.js';
+import { citationCommands, cites } from './citation.js';
 import {
   accentCommands,
   acronymCommands,
@@ -64,6 +65,7 @@ import {
   blankline,
   braced,
   bracedUrl,
+  bracketed,
   bracketedToks,
   controlSeq,
   defaultLaTeXState,
@@ -86,6 +88,7 @@ import {
   spaces1,
   streamOf,
   symbol,
+  symbolIn,
   tokenize,
   tokWith,
   untokenize,
@@ -1036,7 +1039,8 @@ const INLINE_COMMANDS = new Map([
   ...nameCommands,
   ...refCommands,
   ...acronymCommands,
-  // Not ported yet: citations and siunitx.
+  // Not ported yet: siunitx.
+  ...citationCommands(inline),
   ...miscCommands,
   ...accentCommands(tok),
 ]);
@@ -1062,6 +1066,13 @@ const BLOCK_COMMANDS = new Map([
   // polyglossia
   ['setdefaultlanguage', setDefaultLanguage],
   ['setmainlanguage', setDefaultLanguage],
+  // csquotes
+  ['blockquote', blockquote(false, null)],
+  ['blockcquote', blockquote(true, null)],
+  ['foreignblockquote', foreignBlockquote(false)],
+  ['foreignblockcquote', foreignBlockquote(true)],
+  ['hyphenblockquote', foreignBlockquote(false)],
+  ['hyphenblockcquote', foreignBlockquote(true)],
   // etoolbox
   ['newtoggle', newToggle],
   ['toggletrue', setToggle(true)],
@@ -1082,6 +1093,56 @@ const ENVIRONMENTS = new Map([
   // other
   ['otherlanguage', otherlanguageEnv],
 ]);
+
+const bracketedInlines = bracketed((ctx) => inline(ctx), B.concat);
+const closingPunct = optional(symbolIn('.:;?!'));
+
+/**
+ * csquotes' block quote: its blocks, then its citation; in the language
+ * `mblang` names where babel knows it.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.blockquote
+ * @param {boolean} cvariant Whether its citation is a cite, not text.
+ * @param {string | null} mblang
+ * @returns {(ctx: object, start: number) => Blocks | typeof FAIL}
+ */
+function blockquote(cvariant, mblang) {
+  const citation = cites((ctx) => inline(ctx), { t: 'NormalCitation' }, false);
+  const optionalText = option(null, (c) => bracketedInlines(c));
+  return (ctx, start) => {
+    const from = ctx.state.at;
+    let citepar = [];
+    if (cvariant) {
+      const xs = citation(ctx);
+      if (xs === FAIL) return FAIL;
+      const to = ctx.state.at;
+      citepar = B.para(B.cite(xs, [], from, to), from, to);
+    } else {
+      const ils = optionalText(ctx);
+      if (ils === FAIL) return FAIL;
+      if (ils !== null) citepar = B.para(ils, from, ctx.state.at);
+    }
+    const l = mblang === null ? null : babelLangToBCP47(mblang);
+    // The closing punctuation is read and ignored, as Pandoc does.
+    if (optionalText(ctx) === FAIL) return FAIL;
+    const bs = groupedBlock(ctx);
+    if (bs === FAIL || closingPunct(ctx) === FAIL) return FAIL;
+    const end = ctx.state.at;
+    const inner = [...bs, ...citepar];
+    const quoted =
+      l === null ? inner : B.divWith(langAttr(l), inner, start, end);
+    return B.blockQuote(quoted, start, end);
+  };
+}
+
+// A block quote in the language its braced argument names.
+function foreignBlockquote(cvariant) {
+  return (ctx, start) => {
+    const name = braced(ctx);
+    if (name === FAIL) return FAIL;
+    return blockquote(cvariant, untokenize(name))(ctx, start);
+  };
+}
 
 /** @see Text.Pandoc.Readers.LaTeX.isBlockCommand */
 const isBlockCommand = (s) => BLOCK_COMMANDS.has(s) || TREAT_AS_BLOCK.has(s);
