@@ -2,7 +2,7 @@
   "name": "@knight-owl-dev/pandoc-parser",
   "version": "0.0.0",
   "description": "Pandoc's markdown reader, ported: Pandoc's AST with source positions",
-  "license": "MIT",
+  "license": "GPL-2.0-or-later",
   "type": "module",
   "exports": "./src/index.js",
   "files": [
