@@ -6,6 +6,10 @@
 
 import { spawnSync } from 'node:child_process';
 
+// The tab stops every comparison runs at: below, at and above Pandoc's
+// default, since each indentation rule moves with it.
+export const TAB_STOPS = [2, 4, 8];
+
 const READER = 'markdown-latex_macros';
 
 /**

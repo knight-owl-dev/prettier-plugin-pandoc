@@ -7,4 +7,5 @@ export * from './ast/document.js';
 export * from './ast/nodes.js';
 export * from './char.js';
 export * from './core.js';
+export { readMarkdown } from './markdown/index.js';
 export * from './position.js';
