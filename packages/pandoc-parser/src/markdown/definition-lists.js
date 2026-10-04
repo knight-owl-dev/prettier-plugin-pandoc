@@ -8,7 +8,14 @@
 
 import * as B from '../ast/builder.js';
 import { Node } from '../ast/nodes.js';
-import { attempt, FAIL, lookAhead, many1, optional } from '../core.js';
+import {
+  attempt,
+  FAIL,
+  lookAhead,
+  many1,
+  notFollowedBy,
+  optional,
+} from '../core.js';
 import {
   anyLine,
   blankline,
@@ -21,6 +28,7 @@ import { enabled } from '../parsing/state.js';
 import { SourceText } from '../source-text.js';
 import { inlines } from './inlines.js';
 import { defListStart, listItem } from './lists.js';
+import { table } from './tables.js';
 
 /** @typedef {import('../core.js').Context} Context */
 /** @typedef {import('../ast/nodes.js').Node} Node */
@@ -69,9 +77,11 @@ const definitionListItem = attempt((ctx) => {
 });
 
 const definitionItems = many1(definitionListItem);
-const maybeBlankline = optional(blankline);
-// Not ported yet: no table, caption first, after the blank line, which
-// would make the marker its caption.
+const notTable = notFollowedBy(table);
+// A blank line, then no table: the marker would be a caption's, before it.
+const maybeBlankline = optional((ctx) =>
+  blankline(ctx) === FAIL ? FAIL : notTable(ctx),
+);
 const opens = lookAhead((ctx) =>
   anyLine(ctx) === FAIL || maybeBlankline(ctx) === FAIL
     ? FAIL

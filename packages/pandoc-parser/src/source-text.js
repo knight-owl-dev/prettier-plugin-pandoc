@@ -83,6 +83,38 @@ export class SourceText {
   }
 
   /**
+   * This text from `start` to `end`, its map cut with it: a copy keeps the
+   * offsets it holds, synthesized text what it stands for.
+   *
+   * @param {number} start
+   * @param {number} end
+   * @returns {SourceText}
+   */
+  cut(start, end) {
+    const parts = [];
+    for (const p of this.pieces) {
+      const from = Math.max(start, p.at);
+      const to = Math.min(end, p.at + p.length);
+      if (from >= to) continue;
+      const text = this.text.slice(from, to);
+      parts.push(
+        p.copy
+          ? new SourceText(text, [
+              {
+                ...p,
+                at: 0,
+                length: to - from,
+                from: p.from + (from - p.at),
+                to: p.from + (to - p.at),
+              },
+            ])
+          : SourceText.synth(text, p.from, p.to),
+      );
+    }
+    return SourceText.concat(parts);
+  }
+
+  /**
    * This text with its carriage returns left out, as Pandoc's `toSources`
    * leaves them out of what it parses: each one dropped text in the map.
    * Only synthesized text holds one: what a reader copies is read already,
