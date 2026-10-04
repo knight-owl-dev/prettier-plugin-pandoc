@@ -43,6 +43,7 @@ import { SourceText } from '../source-text.js';
 import { parseBlocks } from './blocks.js';
 import { codeBlockFenced } from './code.js';
 import { skipNonindentSpaces } from './common.js';
+import { notFollowedByDivCloser } from './divs.js';
 import { hrule } from './hrule.js';
 
 /** @typedef {import('../core.js').Context} Context */
@@ -212,10 +213,6 @@ export function listStartInItem(ctx) {
   return inList(ctx) ? listStart(ctx) : FAIL;
 }
 
-// Not ported yet: the closer of an open HTML block or fenced div, neither of
-// which opens yet.
-const notFollowedByCloser = () => undefined;
-
 // A line from `from`, newline and all, as extracted text.
 const lineFrom = (ctx, from) => SourceText.slice(ctx.text, from, ctx.pos);
 
@@ -240,7 +237,8 @@ const notFence = notFollowedBy(codeBlockFenced);
 const notBlank = notFollowedBy(blankline);
 
 // A list item's line after its first, `indent` spaces of indentation
-// dropped where it has them; not one opening a list item at that indentation.
+// dropped where it has them; not one opening a list item at that indentation,
+// nor an open div's closing fence. Not ported yet: an HTML block's closer.
 // @see Text.Pandoc.Readers.Markdown.listLine
 function listLine(indent) {
   const opensItem = notAhead((ctx) => {
@@ -249,7 +247,7 @@ function listLine(indent) {
     return listStart(ctx);
   });
   return attempt((ctx) => {
-    if (opensItem(ctx) === FAIL || notFollowedByCloser(ctx) === FAIL) {
+    if (opensItem(ctx) === FAIL || notFollowedByDivCloser(ctx) === FAIL) {
       return FAIL;
     }
     gobbleSpaces(ctx, indent);
@@ -309,7 +307,7 @@ function rawListItem(fourSpaceRule, start) {
 /**
  * A list item's continuation: lines indented by `indent`, the first after
  * a blank line, the rest also lazy where they open no item; blank lines
- * after.
+ * after. None is an open div's closing fence.
  *
  * @see Text.Pandoc.Readers.Markdown.listContinuation
  * @param {number} indent
@@ -317,13 +315,13 @@ function rawListItem(fourSpaceRule, start) {
 function listContinuation(indent) {
   const indented = lineAfter(indent);
   const first = attempt((ctx) =>
-    notBlank(ctx) === FAIL || notFollowedByCloser(ctx) === FAIL
+    notBlank(ctx) === FAIL || notFollowedByDivCloser(ctx) === FAIL
       ? FAIL
       : indented(ctx),
   );
   const rest = many(
     attempt((ctx) => {
-      if (notBlank(ctx) === FAIL || notFollowedByCloser(ctx) === FAIL) {
+      if (notBlank(ctx) === FAIL || notFollowedByDivCloser(ctx) === FAIL) {
         return FAIL;
       }
       if (gobbleSpaces(ctx, indent) === FAIL && noListStart(ctx) === FAIL) {

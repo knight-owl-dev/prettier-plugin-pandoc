@@ -25,6 +25,7 @@ import { toLower, words } from '../shared.js';
  *   header's reference key: its target and attributes.
  * @property {number} nextExample The next example list item's number.
  * @property {PersistentMap<number>} examples Each example label's number.
+ * @property {number} fencedDivLevel How many fenced divs are open.
  */
 
 /** @typedef {[string, string[], [string, string][]]} Attr */
@@ -54,6 +55,7 @@ export const defaultParserState = (options) => ({
   headerKeys: EMPTY_MAP,
   nextExample: 1,
   examples: EMPTY_MAP,
+  fencedDivLevel: 0,
 });
 
 /**
