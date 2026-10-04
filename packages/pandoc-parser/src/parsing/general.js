@@ -6,6 +6,7 @@ import * as B from '../ast/builder.js';
 import { mapSpans } from '../ast/spans.js';
 import { char, newline, satisfy, space } from '../char.js';
 import {
+  alt,
   attempt,
   FAIL,
   many1,
@@ -15,7 +16,8 @@ import {
   skipMany,
 } from '../core.js';
 import { lookupEntity } from '../entities.js';
-import { uniqueIdent } from '../shared.js';
+import { NBSP, uniqueIdent } from '../shared.js';
+import { SourceText } from '../source-text.js';
 import { enabled, updateState } from './state.js';
 
 /** @typedef {import('../core.js').Context} Context */
@@ -228,6 +230,77 @@ export function gobbleAtMostSpaces(ctx, n) {
   }
   return k;
 }
+
+const bar = char('|');
+
+// A line block's continuation: a space, then a line. A space joins it to
+// the line before, standing for the newline and the space.
+function continuation(ctx) {
+  const at = ctx.pos;
+  if (ctx.text[at] !== ' ') return FAIL;
+  ctx.pos++;
+  const line = anyLine(ctx);
+  if (line === FAIL) {
+    ctx.pos = at;
+    return FAIL;
+  }
+  return SourceText.concat([
+    SourceText.synth(' ', at - 1, at + 1),
+    SourceText.slice(ctx.text, at + 1, at + 1 + line.length),
+  ]);
+}
+
+/**
+ * A line block's line: `| `, then a line not blank and the continuations
+ * after it. The spaces leading it are non-breaking.
+ *
+ * @see Text.Pandoc.Parsing.General.lineBlockLine
+ * @type {Parser<SourceText>}
+ */
+const lineBlockLine = attempt((ctx) => {
+  if (bar(ctx) === FAIL || ctx.text[ctx.pos] !== ' ') return FAIL;
+  ctx.pos++;
+  const parts = [];
+  for (let at = ctx.pos; spaceChar(ctx) !== FAIL; at = ctx.pos) {
+    parts.push(SourceText.synth(NBSP, at, ctx.pos));
+  }
+  const from = ctx.pos;
+  if (ctx.text[from] === '\n') return FAIL;
+  const line = anyLine(ctx);
+  if (line === FAIL) return FAIL;
+  parts.push(SourceText.slice(ctx.text, from, from + line.length));
+  for (let next = continuation(ctx); next !== FAIL; next = continuation(ctx)) {
+    parts.push(next);
+  }
+  return SourceText.concat(parts);
+});
+
+/**
+ * A line block's blank line, `|` alone: its newline.
+ *
+ * @see Text.Pandoc.Parsing.General.blankLineBlockLine
+ * @type {Parser<SourceText>}
+ */
+const blankLineBlockLine = attempt((ctx) =>
+  bar(ctx) === FAIL || blankline(ctx) === FAIL
+    ? FAIL
+    : SourceText.slice(ctx.text, ctx.pos - 1, ctx.pos),
+);
+
+const lineBlockLineOrBlank = many1(alt(lineBlockLine, blankLineBlockLine));
+const skipBlanklines = skipMany(blankline);
+
+/**
+ * A line block's lines, and the blank lines after them.
+ *
+ * @see Text.Pandoc.Parsing.General.lineBlockLines
+ * @type {Parser<SourceText[]>}
+ */
+export const lineBlockLines = (ctx) => {
+  const lines = lineBlockLineOrBlank(ctx);
+  if (lines !== FAIL) skipBlanklines(ctx);
+  return lines;
+};
 
 /**
  * The attributes of a heading of `inlines`: with `auto_identifiers`, an
