@@ -89,6 +89,23 @@ export function splitTextByIndices(indices, text) {
 }
 
 /**
+ * Math text without spaces, tabs or line breaks at either end, but the
+ * first after a backslash ending it: an escaped space.
+ *
+ * @see Text.Pandoc.Shared.trimMath
+ * @param {string} s
+ */
+export function trimMath(s) {
+  const isWS = (c) => c === ' ' || c === '\t' || c === '\r' || c === '\n';
+  let end = s.length;
+  while (end > 0 && isWS(s[end - 1])) end--;
+  if (end < s.length && s[end - 1] === '\\') end++;
+  let start = 0;
+  while (start < end && isWS(s[start])) start++;
+  return s.slice(start, end);
+}
+
+/**
  * `s` without line breaks at its end.
  *
  * @see Text.Pandoc.Shared.stripTrailingNewlines
