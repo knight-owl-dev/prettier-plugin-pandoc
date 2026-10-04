@@ -21,8 +21,28 @@ const READER = 'markdown-latex_macros';
  */
 export function pandocAst(text, tabStop = 4) {
   const args = ['-f', READER, '-t', 'json', `--tab-stop=${tabStop}`];
-  const run = spawnSync('pandoc', args, { input: text, encoding: 'utf8' });
+  return JSON.parse(pandoc(args, text));
+}
+
+/**
+ * Pandoc's display width of each of `texts`, by doclayout as its Lua API
+ * exposes it.
+ *
+ * @param {string[]} texts
+ * @returns {number[]}
+ */
+export function pandocRealLength(texts) {
+  const script =
+    'for line in io.lines() do print(pandoc.layout.real_length(line)) end';
+  const out = pandoc(['lua', '-e', script], `${texts.join('\n')}\n`);
+  return out.trimEnd().split('\n').map(Number);
+}
+
+// What Pandoc writes, run with `args` on `input`.
+function pandoc(args, input) {
+  const options = { input, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 };
+  const run = spawnSync('pandoc', args, options);
   if (run.error) throw run.error;
   if (run.status !== 0) throw new Error(`pandoc failed: ${run.stderr}`);
-  return JSON.parse(run.stdout);
+  return run.stdout;
 }

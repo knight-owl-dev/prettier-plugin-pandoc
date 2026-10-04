@@ -5,6 +5,7 @@
 
 import { Node } from './ast/nodes.js';
 import { isAlpha, isAlphaNum, isSpace } from './char.js';
+import { charWidth } from './text-width.js';
 
 /** A non-breaking space, U+00A0: a formatter writes the escape as the character. */
 export const NBSP = String.fromCodePoint(0xa0);
@@ -46,6 +47,46 @@ export function words(s) {
  * @param {string} s
  */
 export const trim = (s) => s.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
+
+/**
+ * Where `text` from `from` reaches display width `n`: the offset after
+ * the characters it takes.
+ *
+ * @see Text.Pandoc.Shared.splitAtWidth
+ * @param {number} n
+ * @param {string} text
+ * @param {number} from
+ */
+function splitAtWidth(n, text, from) {
+  let [at, width] = [from, 0];
+  while (width < n && at < text.length) {
+    const c = String.fromCodePoint(text.codePointAt(at));
+    width += charWidth(c);
+    at += c.length;
+  }
+  return at;
+}
+
+/**
+ * `text` split at display widths `indices`, each from the line's start:
+ * each piece's `[start, end)`, one more than the indices.
+ *
+ * @see Text.Pandoc.Shared.splitTextByIndices
+ * @param {number[]} indices
+ * @param {string} text
+ * @returns {[number, number][]}
+ */
+export function splitTextByIndices(indices, text) {
+  const pieces = [];
+  let [start, previous] = [0, 0];
+  for (const index of indices) {
+    const end = splitAtWidth(index - previous, text, start);
+    pieces.push([start, end]);
+    [start, previous] = [end, index];
+  }
+  pieces.push([start, text.length]);
+  return pieces;
+}
 
 /**
  * `s` without line breaks at its end.
