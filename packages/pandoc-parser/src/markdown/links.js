@@ -31,10 +31,12 @@ import {
   notFollowedBy,
   option,
 } from '../core.js';
+import { fromEntities } from '../entities.js';
 import {
   blanklines,
   charsInBalanced,
   many1Till,
+  nonspaceChar,
   notAhead,
   parseFromString,
   parseFromStringFresh,
@@ -43,6 +45,7 @@ import {
   textOf,
 } from '../parsing/general.js';
 import { enabled, toKey, updateState, whenEnabled } from '../parsing/state.js';
+import { emailAddress, uri } from '../parsing/uris.js';
 import { toLower, words } from '../shared.js';
 import { SourceText } from '../source-text.js';
 import { base64DataURIEnd, escapeURI } from '../uri.js';
@@ -421,6 +424,49 @@ export function referenceLink(ctx, build, ref, start) {
     parsedRaw,
   ]);
 }
+
+const lessThan = char('<');
+const greaterThan = char('>');
+const extraChars = manyTill(nonspaceChar, greaterThan);
+const target = alt(
+  (ctx) => {
+    const u = uri(ctx);
+    return u === FAIL ? FAIL : { ...u, cls: 'uri' };
+  },
+  (ctx) => {
+    const e = emailAddress(ctx);
+    return e === FAIL ? FAIL : { ...e, cls: 'email' };
+  },
+);
+const autoLinkAttributes = attempt(whenEnabled('link_attributes', attributes));
+
+/**
+ * A URI or e-mail address in angle brackets: a link to it, classed `uri`
+ * or `email` unless attributes follow. What the URI parser leaves before
+ * the `>`, trailing punctuation it stops short of, stays in it.
+ *
+ * @see Text.Pandoc.Readers.Markdown.autoLink
+ * @param {Context} ctx
+ */
+export function autoLink(ctx) {
+  return ctx.state.allowLinks ? autoLinkAt(ctx) : FAIL;
+}
+
+const autoLinkAt = attempt((ctx) => {
+  const start = ctx.pos;
+  if (lessThan(ctx) === FAIL) return FAIL;
+  const found = target(ctx);
+  if (found === FAIL) return FAIL;
+  const chars = extraChars(ctx);
+  if (chars === FAIL) return FAIL;
+  const close = ctx.pos - 1;
+  const extra = fromEntities(chars.join(''));
+  const read = autoLinkAttributes(ctx);
+  const attr = read === FAIL ? ['', [found.cls], []] : read;
+  const text = B.str(found.orig + extra, start + 1, close);
+  const href = found.src + escapeURI(extra);
+  return B.linkWith(attr, href, '', text, start, ctx.pos);
+});
 
 const bang = char('!');
 
