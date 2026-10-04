@@ -31,6 +31,8 @@ import { toLower, words } from '../shared.js';
  *   label.
  * @property {number} noteNumber How many note references and inline notes
  *   were read: a citation's note number.
+ * @property {string | null} inHtmlBlock The tag of the HTML block being
+ *   read, whose closing tag ends what is inside it.
  * @property {boolean} inNote Whether a note's contents are being read,
  *   whose citations take its reference's number.
  * @property {number} nextExample The next example list item's number.
@@ -68,6 +70,7 @@ export const defaultParserState = (options) => ({
   notes: EMPTY_MAP,
   noteNumber: 0,
   inNote: false,
+  inHtmlBlock: null,
   nextExample: 1,
   examples: EMPTY_MAP,
   fencedDivLevel: 0,

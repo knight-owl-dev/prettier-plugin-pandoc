@@ -6,7 +6,6 @@
 // come on demand: a consumer of the first ones lexes no further, as
 // Haskell's laziness has it.
 
-import { codePointLength } from '../code-points.js';
 import { toLower, toUpper } from '../data-char.js';
 import { codePointText, lookupEntity } from './entity.js';
 import {
@@ -89,23 +88,23 @@ export const parseOptions = parseOptionsEntities(lookupEntity);
 const warning = (text) => ({ t: 'TagWarning', text });
 
 /**
- * The row and column of offsets in `text`, from `from`: a line feed starts
- * a row, a tab goes to the next column after a multiple of 8.
+ * The row and column of offsets in what `lexer` reads, from `from`: a line
+ * feed starts a row, a tab goes to the next column after a multiple of 8.
  *
  * @see Text.HTML.TagSoup.Type.positionChar
- * @param {string} text
+ * @param {Lexer} lexer
  * @param {number} from
  */
-function positionsOf(text, from) {
+function positionsOf(lexer, from) {
   let [at, row, column] = [from, 1, 1];
   return (offset) => {
     if (offset < at) [at, row, column] = [from, 1, 1];
     while (at < offset) {
-      const c = text[at];
+      const c = lexer.hd(at);
       if (c === '\n') [row, column] = [row + 1, 1];
       else if (c === '\t') column += 8 - ((column - 1) % 8);
       else column++;
-      at += codePointLength(text, at);
+      at = lexer.tl(at);
     }
     return { t: 'TagPosition', row, column, offset };
   };
@@ -125,16 +124,19 @@ function entityChr(hex, digits) {
 }
 
 /**
- * The tags of `text` from `from`, as `options` asks.
+ * The tags of `text` from `from`, `suffix` read after it, as `options`
+ * asks. A position past the text is in the suffix.
  *
  * @see Text.HTML.TagSoup.Parser.parseTagsOptions
  * @param {ParseOptions} options
  * @param {string} text
  * @param {number} [from]
+ * @param {string} [suffix]
  * @returns {Generator<Tag>}
  */
-export function* parseTagsOptions(options, text, from = 0) {
-  const tags = output(options, new Lexer(text, from), positionsOf(text, from));
+export function* parseTagsOptions(options, text, from = 0, suffix = '') {
+  const lexer = new Lexer(text, from, suffix);
+  const tags = output(options, lexer, positionsOf(lexer, from));
   yield* options.tagTextMerge ? tagTextMerge(tags) : tags;
 }
 
@@ -165,14 +167,12 @@ function* output(options, lexer, positionAt) {
   const advance = () => {
     token = lexer.next();
   };
-  // Past a token of `kind`, or the end, which the lexer always leaves there.
+  // Past the token that should be of `kind`. TagSoup asserts it is, which
+  // an optimized build such as Pandoc's leaves out: a tag left open at the
+  // input's end has a warning there, and that goes instead.
   // @see Text.HTML.TagSoup.Implementation.skip
-  const skip = (kind) => {
-    if (token !== undefined && token.t !== kind) {
-      throw new Error(`TagSoup: ${kind} wanted, ${token.t} found`);
-    }
-    advance();
-  };
+  // biome-ignore lint/correctness/noUnusedFunctionParameters: names the assertion
+  const skip = (kind) => advance();
   const kind = () => token?.t;
   const positioned = (at, tag) => (tagPosition ? [positionAt(at), tag] : [tag]);
   const addWarnings = (at, tags) => {
@@ -386,4 +386,40 @@ export function canonicalizeTag(tag) {
   }
   if (tag.t === 'TagClose') return { ...tag, name: lowerCase(tag.name) };
   return tag;
+}
+
+/**
+ * Whether `tag` matches `pattern`: of its kind, an empty name or text in
+ * the pattern matching any; each of the pattern's attributes among the
+ * tag's, one without a name matched by its value alone, one without a
+ * value by its name.
+ *
+ * @see Text.HTML.TagSoup.(~==)
+ * @param {Tag} tag
+ * @param {Tag} pattern
+ */
+export function tagMatches(tag, pattern) {
+  if (tag.t !== pattern.t) return false;
+  switch (tag.t) {
+    case 'TagText':
+    case 'TagComment':
+    case 'TagWarning':
+      return pattern.text === '' || pattern.text === tag.text;
+    case 'TagClose':
+      return pattern.name === '' || pattern.name === tag.name;
+    case 'TagOpen':
+      return (
+        (pattern.name === '' || pattern.name === tag.name) &&
+        pattern.attrs.every(([name, value]) =>
+          tag.attrs.some(([n, v]) => {
+            if (name === '') return v === value;
+            return n === name && (value === '' || v === value);
+          }),
+        )
+      );
+    case 'TagPosition':
+      return tag.row === pattern.row && tag.column === pattern.column;
+    default:
+      return false;
+  }
 }

@@ -53,6 +53,7 @@ import { attributes } from './attributes.js';
 import { cite, normalCite } from './citations.js';
 import { litChar, skipNonindentSpaces, spnl } from './common.js';
 import { code, endline, escapedChar, inlines, math } from './inlines.js';
+import { rawHtmlInline } from './raw-html.js';
 import { lookupTables } from './references.js';
 
 /** @typedef {import('../core.js').Context} Context */
@@ -97,12 +98,13 @@ export function noteMarker(ctx) {
 const noNoteAhead = notAhead(noteMarker);
 
 // In brackets, what `inBalancedBrackets` reads past whole: a bracket in it
-// is no bracket. Not ported yet: raw HTML and raw TeX.
+// is no bracket. Not ported yet: raw TeX.
 const bracketSkip = alt(
   escapedChar,
   (ctx) => code(ctx),
   (ctx) => math(ctx),
   (ctx) => endline(ctx),
+  (ctx) => rawHtmlInline(ctx),
 );
 const openBracket = char('[');
 
@@ -536,7 +538,7 @@ const WRAPPERS = new Map([
  * @param {number} start
  * @param {number} end
  */
-function wrapSpan([ident, classes, kvs], ils, start, end) {
+export function wrapSpan([ident, classes, kvs], ils, start, end) {
   const style = kvs.find(([k]) => k === 'style')?.[1];
   const smallcapsStyle = style !== undefined && isSmallCapsFontVariant(style);
   const pairs = smallcapsStyle ? kvs.filter(([k]) => k !== 'style') : kvs;
