@@ -13,16 +13,13 @@ import {
   notFollowedBy,
   option,
 } from '../core.js';
+import { toLower } from '../data-char.js';
 import { fromEntities } from '../entities.js';
 import { escapeURI } from '../uri.js';
 import { SCHEMES } from '../uri-schemes.js';
 import { characterReference, textOf } from './general.js';
 
 /** @typedef {import('../core.js').Context} Context */
-
-// Haskell's `toLower` of a character, as `oneOfStringsCI` applies it: one
-// code point, where JavaScript's full mapping may give two (`İ`).
-const lower = (c) => String.fromCodePoint(c.toLowerCase().codePointAt(0));
 
 /**
  * The longest of `strings` the text starts with, letter case aside, as
@@ -44,7 +41,7 @@ function oneOfStringsCI(strings) {
     let key = '';
     for (let at = from; at < ctx.text.length; ) {
       const c = String.fromCodePoint(ctx.text.codePointAt(at));
-      key += lower(c);
+      key += toLower(c);
       if (!prefixes.has(key)) break;
       at += c.length;
       if (whole.has(key)) matched = at;
