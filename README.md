@@ -89,4 +89,6 @@ that parse is the oracle.
 
 ## License
 
-[MIT](LICENSE)
+GPL-2.0-or-later, as Pandoc's: [LICENSE](LICENSE). The parser ports Pandoc's
+Markdown reader; [NOTICE.md](NOTICE.md) gives its provenance and the notices of
+the libraries ported with it.

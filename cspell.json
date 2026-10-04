@@ -2,7 +2,7 @@
   "version": "0.2",
   "language": "en-US",
   "dictionaries": ["docker", "node", "typescript"],
-  "ignorePaths": ["package-lock.json", "packages/*/test/corpus/**"],
+  "ignorePaths": ["LICENSE", "package-lock.json", "packages/*/test/corpus/**"],
   "words": [
     "Aeson",
     "attoparsec",
@@ -27,6 +27,7 @@
     "intraword",
     "literalline",
     "lstinline",
+    "MacFarlane",
     "mconcat",
     "mdast",
     "minipage",

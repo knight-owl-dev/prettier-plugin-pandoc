@@ -2,7 +2,7 @@
   "name": "@knight-owl-dev/prettier-plugin-pandoc",
   "version": "0.0.0",
   "description": "Format Pandoc markdown with prettier without breaking its block syntax",
-  "license": "MIT",
+  "license": "GPL-2.0-or-later",
   "type": "module",
   "exports": "./src/index.js",
   "files": [

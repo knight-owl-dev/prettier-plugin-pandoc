@@ -2,7 +2,7 @@
   "name": "@knight-owl-dev/pandoc-syntax",
   "version": "0.0.0",
   "description": "Where Pandoc's markdown constructs begin and end, by Pandoc's own rules",
-  "license": "MIT",
+  "license": "GPL-2.0-or-later",
   "type": "module",
   "exports": "./src/index.js",
   "files": [
