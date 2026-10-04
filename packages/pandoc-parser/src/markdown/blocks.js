@@ -20,6 +20,7 @@ import { blanklines, blockEnd, notAhead } from '../parsing/general.js';
 import { whenEnabled } from '../parsing/state.js';
 import { blockQuote } from './blockquote.js';
 import { codeBlockFenced, codeBlockIndented } from './code.js';
+import { definitionList } from './definition-lists.js';
 import { header } from './headers.js';
 import { hrule } from './hrule.js';
 import { inlines1 } from './inlines.js';
@@ -94,7 +95,8 @@ export function block(ctx) {
     blockQuote,
     hrule,
     orderedList,
-    // definitionList, noteBlock, referenceKey, abbrevKey,
+    definitionList,
+    // noteBlock, referenceKey, abbrevKey,
     para,
     plain,
   ]);

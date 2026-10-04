@@ -351,7 +351,7 @@ function listContinuation(indent) {
  * @param {Parser<unknown>} start
  * @returns {Parser<Node[]>}
  */
-function listItem(fourSpaceRule, start) {
+export function listItem(fourSpaceRule, start) {
   const raw = rawListItem(fourSpaceRule, start);
   return attempt((ctx) => {
     const outer = ctx.state.parserContext;
