@@ -3,6 +3,8 @@
 //
 // Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX.Parsing`.
 
+import * as B from '../ast/builder.js';
+import { walk } from '../ast/walk.js';
 import {
   alt,
   attempt,
@@ -371,17 +373,20 @@ export const defaultLaTeXState = (options) => ({
  * @property {number} line
  * @property {number} column
  * @property {number} at
+ * @property {number | undefined} end Where the input ends, for `at` there.
  * @property {[number, TokList][]} raws
  * @property {ReturnType<typeof defaultLaTeXState>} s
  */
 
 /**
- * A context reading `input` in state `s`, at its first token's position.
+ * A context reading `input` in state `s`, at its first token's position;
+ * `end` where the input ends, else its last token's end.
  *
  * @param {TokList} input
  * @param {ReturnType<typeof defaultLaTeXState>} s
+ * @param {number} [end]
  */
-export function lpContext(input, s) {
+export function lpContext(input, s, end) {
   const first = input?.tok;
   return {
     pos: 0,
@@ -390,7 +395,8 @@ export function lpContext(input, s) {
       expanded: false,
       line: first?.line ?? 1,
       column: first?.column ?? 1,
-      at: first?.start ?? 0,
+      at: first?.start ?? end ?? 0,
+      end,
       raws: [],
       s,
     },
@@ -438,7 +444,7 @@ export function satisfyTok(f) {
       column: after
         ? after.column
         : st.column + codePoints(tok.text, 0, tok.text.length),
-      at: after ? after.start : tok.end,
+      at: after ? after.start : (st.end ?? tok.end),
       raws: st.s.enableWithRaw
         ? st.raws.map(([key, list]) => [key, { tok, next: list }])
         : st.raws,
@@ -475,6 +481,7 @@ export const parseFromToks = (parser, toks) => (ctx) => {
     input: prepend(toks, null),
     expanded: false,
     ...(first && { line: first.line, column: first.column, at: first.start }),
+    end: toks.at(-1)?.end,
     raws: [],
   };
   const result = parser(ctx);
@@ -485,6 +492,7 @@ export const parseFromToks = (parser, toks) => (ctx) => {
     line: outer.line,
     column: outer.column,
     at: outer.at,
+    end: outer.end,
     raws: outer.raws,
   };
   return result;
@@ -562,13 +570,14 @@ export const withRaw = (parser) => (ctx) => {
  * @property {Tok[]} body
  */
 
-// A token at another's position: Pandoc's line and column, and its span.
+// A token at another's position, as Pandoc's line and column; its text no
+// text of the source, an empty span where the other starts.
 const setpos = (at, tok) => ({
   ...tok,
   line: at.line,
   column: at.column,
   start: at.start,
-  end: at.end,
+  end: at.start,
 });
 
 /**
@@ -1558,3 +1567,62 @@ export const env = (name, p) => {
     return end(ctx) === FAIL ? FAIL : result;
   };
 };
+
+/**
+ * The caption and last label forgotten.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.resetCaption
+ */
+export const resetCaption = (ctx) =>
+  updateLaTeXState(ctx, { caption: null, lastLabel: null });
+
+/**
+ * One argument read by `inlineParser`: a group, a command, or a single
+ * character.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.tokWith
+ * @param {import('../core.js').Parser<B.Inlines>} inlineParser
+ * @returns {import('../core.js').Parser<B.Inlines>}
+ */
+export function tokWith(inlineParser) {
+  const argument = alt(
+    grouped(inlineParser, B.concat),
+    (ctx) =>
+      lookAhead(anyControlSeq)(ctx) === FAIL ? FAIL : inlineParser(ctx),
+    (ctx) => {
+      const t = singleChar(ctx);
+      return t === FAIL ? FAIL : B.str(t.text, t.start, t.end);
+    },
+  );
+  return attempt((ctx) => (spaces(ctx) === FAIL ? FAIL : argument(ctx)));
+}
+
+const isSpaceOrSoftBreak = (x) => x.t === 'Space' || x.t === 'SoftBreak';
+
+/**
+ * `value` without the spans labeled `lbl`, nor the spaces after them.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.removeLabel
+ * @template T
+ * @param {string} lbl
+ * @param {T} value
+ * @returns {T}
+ */
+export function removeLabel(lbl, value) {
+  const go = (xs) => {
+    const out = [];
+    for (let k = 0; k < xs.length; k++) {
+      const x = xs[k];
+      if (
+        x.t === 'Span' &&
+        x.c[0][2].find(([key]) => key === 'label')?.[1] === lbl
+      ) {
+        while (k + 1 < xs.length && isSpaceOrSoftBreak(xs[k + 1])) k++;
+      } else {
+        out.push(x);
+      }
+    }
+    return out;
+  };
+  return walk({ inlines: go }, value);
+}

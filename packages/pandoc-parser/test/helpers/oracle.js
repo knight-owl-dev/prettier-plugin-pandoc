@@ -25,6 +25,18 @@ export function pandocAst(text, tabStop = 4) {
 }
 
 /**
+ * Pandoc's AST of `text` read as LaTeX, its extensions changed by `ext`
+ * (`+raw_tex`, …), as its JSON.
+ *
+ * @param {string} text
+ * @param {string} [ext]
+ * @returns {object}
+ */
+export function pandocLaTeXAst(text, ext = '') {
+  return JSON.parse(pandoc(['-f', `latex${ext}`, '-t', 'json'], text));
+}
+
+/**
  * Pandoc's display width of each of `texts`, by doclayout as its Lua API
  * exposes it.
  *

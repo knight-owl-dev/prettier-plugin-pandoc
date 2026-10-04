@@ -3,15 +3,15 @@
 //
 // Pandoc's CLI drops a byte order mark, deletes every carriage return, and
 // expands each tab to spaces up to the next tab stop, counting columns in
-// code points; then the reader ensures the text ends in three newlines. So
-// no parser sees a tab or a carriage return.
+// code points; then the markdown reader ensures the text ends in three
+// newlines. So no parser sees a tab or a carriage return.
 
 import { codePointLength } from './code-points.js';
 
 const NEWLINES = 3;
 
 /**
- * The text Pandoc's markdown reader parses, and for each offset between its
+ * The text a Pandoc reader parses, and for each offset between its
  * characters the source offset between theirs: a tab's spaces all end where
  * the tab does, a deleted carriage return goes with what follows it, and the
  * newlines added at the end sit at the source's end.
@@ -21,11 +21,12 @@ const NEWLINES = 3;
  * @see Text.Pandoc.Sources.ensureFinalNewlines
  * @param {string} source
  * @param {number} tabStop
+ * @param {number} [newlines] The newlines the text ends in at least.
  * @returns {{text: string, toSource: (offset: number) => number}}
  */
-export function readerInput(source, tabStop) {
+export function readerInput(source, tabStop, newlines = NEWLINES) {
   if (!/[\t\r﻿]/.test(source)) {
-    const text = withNewlines(source);
+    const text = withNewlines(source, newlines);
     return { text, toSource: (offset) => Math.min(offset, source.length) };
   }
   const parts = [];
@@ -55,17 +56,17 @@ export function readerInput(source, tabStop) {
   }
   if (bounds.length === 0) bounds.push(source.length);
   const read = parts.join('');
-  const text = withNewlines(read);
+  const text = withNewlines(read, newlines);
   for (let o = read.length; o < text.length; o++) bounds.push(source.length);
   return { text, toSource: (offset) => bounds[offset] };
 }
 
-// `text` ending in `NEWLINES` newlines; a line without one gets one, as
+// `text` ending in `newlines` newlines; a line without one gets one, as
 // Pandoc's tab filter writes every line.
-function withNewlines(text) {
+function withNewlines(text, newlines) {
   let trailing = 0;
   while (trailing < text.length && text[text.length - 1 - trailing] === '\n') {
     trailing++;
   }
-  return trailing >= NEWLINES ? text : text + '\n'.repeat(NEWLINES - trailing);
+  return trailing >= newlines ? text : text + '\n'.repeat(newlines - trailing);
 }
