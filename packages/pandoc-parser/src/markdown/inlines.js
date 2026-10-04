@@ -50,6 +50,7 @@ import { NBSP, trim } from '../shared.js';
 import { attributes, rawAttribute } from './attributes.js';
 import { codeBlockFenced } from './code.js';
 import { escapedCharacter, unescaped } from './common.js';
+import { notFollowedByDivCloser } from './divs.js';
 import { mark, strikeout, strongOrEmph } from './emphasis.js';
 import { listStart, listStartInItem } from './lists.js';
 import { subscript, superscript } from './scripts.js';
@@ -90,8 +91,9 @@ const backtickFence = whenEnabled(
  * interrupt a paragraph, after it.
  *
  * A list start interrupts in a list item, or anywhere with
- * `lists_without_preceding_blankline`; so does a backtick fence. Not ported
- * yet: the closer of an open HTML block or div. A block quote or ATX
+ * `lists_without_preceding_blankline`; so do a backtick fence and an open
+ * div's closing fence. Not ported yet: an open HTML block's closer. A block
+ * quote or ATX
  * heading interrupts only with `blank_before_blockquote` or
  * `blank_before_header` off.
  *
@@ -105,6 +107,7 @@ export const endline = attempt((ctx) => {
     if (noListStart(ctx) === FAIL) return FAIL;
   }
   if (backtickFence(ctx) !== FAIL) return FAIL;
+  if (notFollowedByDivCloser(ctx) === FAIL) return FAIL;
   if (eof(ctx) !== FAIL) return [];
   if (enabled(ctx, 'hard_line_breaks')) return B.linebreak(start, ctx.pos);
   if (enabled(ctx, 'ignore_line_breaks')) return [];

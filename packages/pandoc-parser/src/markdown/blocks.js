@@ -21,23 +21,27 @@ import { whenEnabled } from '../parsing/state.js';
 import { blockQuote } from './blockquote.js';
 import { codeBlockFenced, codeBlockIndented } from './code.js';
 import { definitionList } from './definition-lists.js';
+import { divFenced, divFenceEnd, inDiv } from './divs.js';
 import { header } from './headers.js';
 import { hrule } from './hrule.js';
 import { inlines1 } from './inlines.js';
 import { bulletList, listStartInItem, orderedList } from './lists.js';
 
+const divCloserAhead = lookAhead(divFenceEnd);
+
 // Blank lines, which make no block.
 const blank = (ctx) => (blanklines(ctx) === FAIL ? FAIL : []);
 
 // A paragraph's end after its last line: a newline, then blank lines, a
-// fence, or with `lists_without_preceding_blankline` anything but a list
-// start in a list item. Not ported yet, each needing a construct or a
-// non-default extension: a block quote, an ATX heading, the closer of an
-// open HTML block or div.
+// fence, with `lists_without_preceding_blankline` anything but a list start
+// in a list item, or an open div's closing fence. Not ported yet, each
+// needing a construct or a non-default extension: a block quote, an ATX
+// heading, the closer of an open HTML block.
 const paragraphEnd = alt(
   blanklines,
   whenEnabled('backtick_code_blocks', lookAhead(codeBlockFenced)),
   whenEnabled('lists_without_preceding_blankline', notAhead(listStartInItem)),
+  (ctx) => (inDiv(ctx) ? divCloserAhead(ctx) : FAIL),
 );
 const paragraphBreak = attempt((ctx) =>
   newline(ctx) === FAIL ? FAIL : paragraphEnd(ctx),
@@ -87,7 +91,8 @@ export function block(ctx) {
     codeBlockFenced,
     // yamlMetaBlock',
     bulletList,
-    // divHtml, divFenced,
+    // divHtml,
+    divFenced,
     header,
     // lhsCodeBlock, htmlBlock, table,
     codeBlockIndented,
