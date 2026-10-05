@@ -4,8 +4,8 @@ Pandoc reads blocks again right after raw TeX, so a block may open mid-line.
 
 \begin{center}
 x
-\end{center} > a block quote opening after the end of an environment, long enough to wrap,
-> which goes on here.
+\end{center} > a block quote opening after the end of an environment, long
+> enough to wrap, which goes on here.
 
 A paragraph whose environment \begin{x}y\end{x} - opens a list item
 - and another item after it
@@ -25,7 +25,8 @@ would wrap it.
 \newpage
         text that would be indented code, but is a paragraph after a command
 
-> \begin{x}y\end{x} > a block quote inside a block quote, opened after an environment.
+> \begin{x}y\end{x} > a block quote inside a block quote, opened after an
+> > environment.
 
 \begin{x}y\end{x} | a | b |
 |---|---|

@@ -46,6 +46,10 @@ const BLOCKS = [
   '```markdown\n*  item\n```',
   '```yaml\n: not yaml\n```',
   '``` lua\nlocal  x\n```',
+  '<!-- prettier-ignore -->\n*keep*   as  written',
+  '<!-- prettier-ignore-start -->\n* * *\n\n*x*\n<!-- prettier-ignore-end -->',
+  '- - -',
+  'line\t\nbreak',
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.
