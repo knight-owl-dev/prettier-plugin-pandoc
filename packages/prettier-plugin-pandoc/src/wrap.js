@@ -13,20 +13,27 @@ import { edited, markerEdits } from './emphasis.js';
 
 const BREAKS = new Set(['Space', 'SoftBreak', 'LineBreak']);
 
+// Where prettier breaks no line: inside a link.
+const SINGLE_LINE = new Set(['Link', 'Image']);
+
 // The break nodes under `value`, nested ones included, each within every
 // node around it: a note's contents, read from its definition elsewhere,
-// hold none of the paragraph's.
-function breaksIn(value, out, from = -Infinity, to = Infinity) {
+// hold none of the paragraph's. A break inside a link is glued.
+function breaksIn(value, out, from = -Infinity, to = Infinity, glued = false) {
   if (Array.isArray(value)) {
-    for (const v of value) breaksIn(v, out, from, to);
+    for (const v of value) breaksIn(v, out, from, to, glued);
   } else if (value !== null && typeof value === 'object') {
     const spanned =
       Number.isInteger(value.start) && Number.isInteger(value.end);
     if (spanned && (value.start < from || value.end > to)) return out;
-    if (BREAKS.has(value.t)) out.push(value);
-    else {
+    if (BREAKS.has(value.t)) {
+      out.push({ t: value.t, start: value.start, end: value.end, glued });
+    } else {
       const [inFrom, inTo] = spanned ? [value.start, value.end] : [from, to];
-      for (const v of Object.values(value)) breaksIn(v, out, inFrom, inTo);
+      const inside = glued || SINGLE_LINE.has(value.t);
+      for (const v of Object.values(value)) {
+        breaksIn(v, out, inFrom, inTo, inside);
+      }
     }
   }
   return out;
@@ -49,13 +56,14 @@ const HARD = /^([ \t]*|\\)\n[ \t]*$/;
 /**
  * A paragraph's words as written, emphasis markers prettier's
  * (`emphasis.js`), each with the break before it: `space`, `soft` for a
- * line break, or `hard` for a hard break, which keeps what ends its line.
+ * line break, or `hard` for a hard break, which keeps what ends its line;
+ * `glued` where that break is inside a link, which no line break splits.
  * Null where its breaks are not whitespace of its own text, in order — a
  * note's from elsewhere aside.
  *
  * @param {{c: unknown, start: number, end: number}} para
  * @param {View} view
- * @returns {{word: string, before: 'space' | 'soft' | 'hard' | null}[] | null}
+ * @returns {{word: string, before: 'space' | 'soft' | 'hard' | null, glued: boolean}[] | null}
  */
 function wordsOf(para, view) {
   const { text } = view;
@@ -64,12 +72,13 @@ function wordsOf(para, view) {
   const [start, end] = [view.start(para.start), view.end(para.end)];
   const breaks = breaksIn(para.c, [])
     .filter((b) => b.start >= para.start && b.end <= para.end)
-    .map((b) => ({ t: b.t, start: view.start(b.start), end: view.end(b.end) }))
+    .map((b) => ({ ...b, start: view.start(b.start), end: view.end(b.end) }))
     .sort((a, b) => a.start - b.start)
     .filter((b, k, bs) => k === 0 || bs[k - 1].start !== b.start);
   const words = [];
   let from = start;
   let before = null;
+  let glued = false;
   // After a break, spaces a break's span stops short of: part of a tab.
   const wordFrom = (word) => (before === null ? word : word.trimStart());
   for (const b of breaks) {
@@ -80,9 +89,10 @@ function wordsOf(para, view) {
     // A hard break of spaces or a tab is two spaces; a backslash stays.
     const ending = hard ? gap.slice(0, gap.indexOf('\n')) : '';
     const kept = /^[ \t]+$/.test(ending) ? '  ' : ending;
-    words.push({ word: wordFrom(slice(from, b.start) + kept), before });
+    words.push({ word: wordFrom(slice(from, b.start) + kept), before, glued });
     from = b.end;
     before = hard ? 'hard' : b.t === 'SoftBreak' ? 'soft' : 'space';
+    glued = b.glued && !hard;
   }
   // Spaces ending its line go; before a block on the same line they stay.
   const last = wordFrom(slice(from, end));
@@ -90,8 +100,22 @@ function wordsOf(para, view) {
     end === text.length || text[end] === '\n' || /\n[ \t]*$/.test(last);
   const word = endsLine ? last.trimEnd() : last;
   // A hard break ending the text breaks no line after it.
-  if (word !== '' || before !== 'hard') words.push({ word, before });
+  if (word !== '' || before !== 'hard') words.push({ word, before, glued });
   return words;
+}
+
+// Words, each glued one joined onto the word before it.
+function unitsOf(words) {
+  const out = [];
+  for (const w of words) {
+    if (w.glued && out.length > 0) {
+      const last = out.at(-1);
+      out[out.length - 1] = { ...last, word: `${last.word} ${w.word}` };
+    } else {
+      out.push({ ...w, glued: false });
+    }
+  }
+  return out;
 }
 
 // The width of a line's last row.
@@ -106,7 +130,7 @@ function lineFrom(words, at, width) {
   let k = at + 1;
   while (k < words.length && words[k].before !== 'hard') {
     const next = `${line} ${words[k].word}`;
-    if (widthOf(next) > width) break;
+    if (!words[k].glued && widthOf(next) > width) break;
     line = next;
     k++;
   }
@@ -150,8 +174,8 @@ function isPara(text, read) {
  * @returns {string | null}
  */
 export function reflow(para, view, options, context) {
-  const words = wordsOf(para, view);
-  if (words === null) return null;
+  const written = wordsOf(para, view);
+  if (written === null) return null;
   const read = { tabStop: options.pandocTabStop };
   const where = {
     ...read,
@@ -161,6 +185,8 @@ export function reflow(para, view, options, context) {
   };
   const always = options.proseWrap === 'always';
   const preserve = options.proseWrap === 'preserve';
+  // A link fills as one word; `preserve` keeps line breaks in it.
+  const words = preserve ? written : unitsOf(written);
   const { width } = context;
   // Whether a line may start at word `at`, the lines so far `lines`.
   const breaksBefore = (lines, line, at) => {
@@ -179,7 +205,7 @@ export function reflow(para, view, options, context) {
   let line = words[0].word;
   let used = context.column;
   for (let k = 1; k < words.length; k++) {
-    const { word, before } = words[k];
+    const { word, before, glued } = words[k];
     if (before === 'hard' || (preserve && before === 'soft')) {
       lines.push(line);
       line = word;
@@ -188,7 +214,7 @@ export function reflow(para, view, options, context) {
     }
     const joined = `${line} ${word}`;
     const indent = joined.includes('\n') ? 0 : used;
-    if (!always || indent + widthOf(joined) <= width) {
+    if (!always || glued || indent + widthOf(joined) <= width) {
       line = joined;
     } else if (breaksBefore(lines, line, k)) {
       lines.push(line);
