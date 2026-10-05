@@ -352,12 +352,20 @@ const SCALARS = [
 const KEYS = ['a', 'b', 'title', 'k_', '<<', '"q"', '1', 'author', 'a b', 'x'];
 
 /**
- * A YAML metadata block of keys and values in many scalar forms, and a
- * paragraph after it.
+ * A YAML metadata block of keys and values in many scalar forms, or a root
+ * block scalar, and a paragraph after it.
  *
  * @param {ReturnType<typeof import('../lib/run.mjs').random>} r
  */
 export function yaml({ below, pick }) {
+  if (below(6) === 0) {
+    // A root block scalar, its content at column 0 or indented.
+    const header = pick(['>', '|', '>-', '|+', '|2']);
+    const content = Array.from({ length: 1 + below(3) }, () =>
+      pick(['x', ' x', '  x', '', '}', '- y', 'k: v']),
+    );
+    return `---\n${header}\n${content.join('\n')}\n...\n\nBody.\n`;
+  }
   const lines = Array.from(
     { length: 1 + below(5) },
     () => `${pick(KEYS)}: ${pick(SCALARS)}`,

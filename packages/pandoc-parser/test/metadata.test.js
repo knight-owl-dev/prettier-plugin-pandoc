@@ -57,10 +57,24 @@ for (const [name, text] of Object.entries(CASES)) {
   });
 }
 
-test('YAML that does not parse fails the read, as it does Pandoc', () => {
-  const text = '---\na: [b\n...\n\nBody.';
-  assert.throws(() => pandocAst(text), /pandoc failed/);
-  assert.throws(() => readMarkdown(text), /YAML/);
+// libyaml indents a block scalar at least one column, even at the root.
+const UNREADABLE = {
+  'an unclosed flow sequence': '---\na: [b\n...\n\nBody.',
+  'a root folded scalar at column 0': '---\n>\nx\n---\n\nBody.',
+  'a root literal scalar at column 0': '---\n|\n\nx\n---\n\nBody.',
+  'a root scalar at column 0 in a list item': '+ ---\n>\n  }\n  ---\n',
+};
+
+for (const [name, text] of Object.entries(UNREADABLE)) {
+  test(`${name} fails the read, as it does Pandoc's`, () => {
+    assert.throws(() => pandocAst(text), /pandoc failed/);
+    assert.throws(() => readMarkdown(text), /YAML/);
+  });
+}
+
+test('a root block scalar indented a column reads', () => {
+  const text = '---\n>\n x\n---\n\nBody.';
+  assert.deepEqual(withoutSpans(readMarkdown(text)), pandocAst(text));
 });
 
 test('spans: a title spans its text after the percent sign', () => {
