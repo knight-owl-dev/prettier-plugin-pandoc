@@ -177,7 +177,17 @@ function fillNotes(value, notes) {
     if (cells === value.cells) return value;
     return new Row(value.attr, cells, value.start, value.end);
   }
-  if (!Array.isArray(value)) return value;
+  if (value === null || typeof value !== 'object' || Object.isFrozen(value)) {
+    return value;
+  }
+  if (!Array.isArray(value)) {
+    // Metadata's values: plain objects.
+    const entries = Object.entries(value);
+    const filled = entries.map(([k, v]) => [k, fillNotes(v, notes)]);
+    return filled.every(([, v], i) => v === entries[i][1])
+      ? value
+      : Object.fromEntries(filled);
+  }
   const filled = value.map((v) => fillNotes(v, notes));
   return filled.every((v, i) => v === value[i]) ? value : filled;
 }
