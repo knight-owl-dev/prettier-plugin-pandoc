@@ -3,6 +3,7 @@
 A block command Pandoc does not read inline ends the paragraph where it opens, \section{Here} and the text after it is a paragraph of its own, long enough to wrap.
 
 A line ending with one \section{Ends}
+
 and the next line goes on in a paragraph after it.
 
 A paragraph line, long enough that the formatter would join the next one onto it,
@@ -14,6 +15,7 @@ A paragraph line before an inline command,
 Inline commands stay in the paragraph: \newpage, \vspace{1em}, \hspace{2em} and \input{x}, so this one wraps as prose.
 
 A run follows it \section{s} \label{l}
+
 after the run, a paragraph.
 
 - An item holding \section{x} in its text, then more of the item's prose to wrap.

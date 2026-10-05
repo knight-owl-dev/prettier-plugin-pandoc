@@ -12,34 +12,9 @@ const CORPUS = new URL('./corpus/', import.meta.url);
 const EXPECTED = new URL('./expected/', import.meta.url);
 
 const TODO = new Set([
-  'preserve/block-commands-mid-line.md',
-  'preserve/definition-bodies.md',
-  'preserve/example-lists.md',
-  'preserve/heading-misreads.md',
-  'preserve/inline-environments.md',
-  'preserve/lazy-containers.md',
-  'preserve/nesting.md',
-  'preserve/quote-lazy-lines.md',
+  // Table captions: table formatting.
   'preserve/simple-tables.md',
-  'preserve/stretch-div-fences.md',
-  'always/block-commands-mid-line.md',
-  'always/code-misreads.md',
-  'always/definition-bodies.md',
-  'always/example-lists.md',
-  'always/heading-misreads.md',
-  'always/inline-commands-alone.md',
-  'always/inline-constructs.md',
-  'always/inline-environments.md',
-  'always/lazy-containers.md',
-  'always/nesting.md',
-  'always/quote-lazy-lines.md',
-  'always/raw-tex.md',
   'always/simple-tables.md',
-  'always/stretch-div-fences.md',
-  'always/stretch-trailing-space.md',
-  'always/keystone/conditionals-chapter.md',
-  'always/keystone/elements-11-font.md',
-  'always/keystone/showcase-chapter-2.md',
 ]);
 
 const corpus = readdirSync(CORPUS, { recursive: true }).filter(

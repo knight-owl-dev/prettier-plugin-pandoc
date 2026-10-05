@@ -196,5 +196,5 @@ sentence.
 This paragraph is in italic Linux Libertine at a smaller size.
 :::
 
-Combined inline: [bold large Libertine]{.font family="libertine" style="bold"
-size="large"} in a sentence.
+Combined inline: [bold large
+Libertine]{.font family="libertine" style="bold" size="large"} in a sentence.

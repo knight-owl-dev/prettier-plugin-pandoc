@@ -23,7 +23,8 @@
 
 - An item with a fancy sublist:
 
-    a. First lettered item, long enough that the formatter wraps it at forty columns.
+    a. First lettered item, long enough that the formatter wraps it at forty
+       columns.
     b. Second.
 
 - An item with raw TeX:
@@ -63,9 +64,9 @@
 :::
 
 1. A fence deeper than the list item it sits in
-   - is code to Pandoc
-     - but indented code to CommonMark, whose items prettier re-indents
+    - is code to Pandoc
+        - but indented code to CommonMark, whose items prettier re-indents
 
-       ```
-       code
-       ```
+            ```
+            code
+            ```
