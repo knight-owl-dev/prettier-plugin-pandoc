@@ -5,6 +5,7 @@
 
 import { readMarkdown } from '@knight-owl-dev/pandoc-parser';
 import { printCode } from './code.js';
+import { withDefinitions } from './definitions.js';
 import { edited, markerEdits } from './emphasis.js';
 import { alignedPipeTable } from './tables.js';
 import { reflow } from './wrap.js';
@@ -22,6 +23,7 @@ export const sourceView = (text) => ({
   text,
   start: (offset) => offset,
   end: (offset) => offset,
+  contains: () => true,
 });
 
 // A container's contents as the parser read them.
@@ -29,6 +31,9 @@ export const contentsView = (contents) => ({
   text: contents.text,
   start: (offset) => contents.toInnerStart(offset),
   end: (offset) => contents.toInnerEnd(offset),
+  // A source offset this text holds maps in and back out to itself.
+  contains: (offset) =>
+    contents.toOuterStart(contents.toInnerStart(offset)) === offset,
 });
 
 // Where the line `offset` is on starts.
@@ -99,7 +104,8 @@ export function printIn(blocks, view, from, to, context, options) {
     if (ignored.has(k) || ignored.has(k - 1)) {
       out += view.text.slice(at, start);
     } else {
-      const gap = collapsed(view.text.slice(at, start), k === 0, false);
+      const text = withDefinitions(view, at, start, context, options);
+      const gap = collapsed(text, k === 0, false);
       const startsLine = k === 0 || gap.includes('\n');
       out +=
         block.t === 'CodeBlock' || !startsLine ? gap : unindented(gap, options);
@@ -117,7 +123,8 @@ export function printIn(blocks, view, from, to, context, options) {
     at = end;
   }
   if (at > to) return null;
-  return out + collapsed(view.text.slice(at, to), blocks.length === 0, true);
+  const rest = withDefinitions(view, at, to, context, options);
+  return out + collapsed(rest, blocks.length === 0, true);
 }
 
 /**
