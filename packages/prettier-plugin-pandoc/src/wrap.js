@@ -134,6 +134,7 @@ function isPara(text, read) {
  * @property {number} column
  * @property {boolean} inListItem
  * @property {number} divLevel
+ * @property {string | null} [inHtmlBlock] The HTML block it is in, `div`.
  * @property {boolean} [fresh] Whether a blank line, or nothing, precedes it.
  */
 
@@ -156,6 +157,7 @@ export function reflow(para, view, options, context) {
     ...read,
     inListItem: context.inListItem,
     divLevel: context.divLevel,
+    inHtmlBlock: context.inHtmlBlock ?? null,
   };
   const always = options.proseWrap === 'always';
   const preserve = options.proseWrap === 'preserve';

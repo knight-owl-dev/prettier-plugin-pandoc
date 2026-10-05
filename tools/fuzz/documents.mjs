@@ -50,6 +50,9 @@ const BLOCKS = [
   '<!-- prettier-ignore-start -->\n* * *\n\n*x*\n<!-- prettier-ignore-end -->',
   '- - -',
   'line\t\nbreak',
+  '<div class="x">\n\npara in a div\n\n</div>',
+  '<div>\ntight in a div\n</div>',
+  '<div>\n\nunclosed div',
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.
@@ -90,7 +93,7 @@ function nested(r, depth = 0) {
       return `Term\n${marker}${indent(inner, '    ').trimStart()}`;
     }
     case 3:
-      return `::: d\n${inner}\n:::`;
+      return below(2) ? `::: d\n${inner}\n:::` : `<div>\n\n${inner}\n\n</div>`;
     case 4:
       return `- ${prose(r)}\n\n  ${indent(inner, '  ').trimStart()}`;
     case 5:

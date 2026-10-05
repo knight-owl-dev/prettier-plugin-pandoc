@@ -45,7 +45,6 @@ const TODO = new Set([
   'always/simple-tables.md',
   'always/stretch-div-fences.md',
   'always/stretch-trailing-space.md',
-  'always/wrap-hazards.md',
   'always/keystone/conditionals-chapter.md',
   'always/keystone/elements-11-font.md',
   'always/keystone/showcase-chapter-2.md',
