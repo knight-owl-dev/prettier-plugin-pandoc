@@ -9,6 +9,7 @@ import {
   readMarkdown,
 } from '@knight-owl-dev/pandoc-parser';
 import { util } from 'prettier';
+import { edited, markerEdits } from './emphasis.js';
 
 const BREAKS = new Set(['Space', 'SoftBreak', 'LineBreak']);
 
@@ -46,17 +47,20 @@ const HARD = /^([ \t]*|\\)\n[ \t]*$/;
  */
 
 /**
- * A paragraph's words as written, each with the break before it: `space`,
- * or `hard` for a hard break, which keeps what ends its line. Null where its
- * breaks are not whitespace of its own text, in order — a note's from
- * elsewhere aside.
+ * A paragraph's words as written, emphasis markers prettier's
+ * (`emphasis.js`), each with the break before it: `space`, `soft` for a
+ * line break, or `hard` for a hard break, which keeps what ends its line.
+ * Null where its breaks are not whitespace of its own text, in order — a
+ * note's from elsewhere aside.
  *
  * @param {{c: unknown, start: number, end: number}} para
  * @param {View} view
- * @returns {{word: string, before: 'space' | 'hard' | null}[] | null}
+ * @returns {{word: string, before: 'space' | 'soft' | 'hard' | null}[] | null}
  */
 function wordsOf(para, view) {
   const { text } = view;
+  const edits = markerEdits(para.c, view).sort((a, b) => a.from - b.from);
+  const slice = (from, to) => edited(text, from, to, edits);
   const [start, end] = [view.start(para.start), view.end(para.end)];
   const breaks = breaksIn(para.c, [])
     .filter((b) => b.start >= para.start && b.end <= para.end)
@@ -74,12 +78,12 @@ function wordsOf(para, view) {
     const hard = b.t === 'LineBreak';
     if (!(hard ? HARD : SPACE).test(gap)) return null;
     const kept = hard ? gap.slice(0, gap.indexOf('\n')) : '';
-    words.push({ word: wordFrom(text.slice(from, b.start) + kept), before });
+    words.push({ word: wordFrom(slice(from, b.start) + kept), before });
     from = b.end;
-    before = hard ? 'hard' : 'space';
+    before = hard ? 'hard' : b.t === 'SoftBreak' ? 'soft' : 'space';
   }
   // Spaces ending its line go; before a block on the same line they stay.
-  const last = wordFrom(text.slice(from, end));
+  const last = wordFrom(slice(from, end));
   const endsLine =
     end === text.length || text[end] === '\n' || /\n[ \t]*$/.test(last);
   const word = endsLine ? last.trimEnd() : last;
@@ -98,7 +102,7 @@ const join = (words) => words.map(({ word }) => word).join(' ');
 function lineFrom(words, at, width) {
   let line = words[at].word;
   let k = at + 1;
-  while (k < words.length && words[k].before === 'space') {
+  while (k < words.length && words[k].before !== 'hard') {
     const next = `${line} ${words[k].word}`;
     if (widthOf(next) > width) break;
     line = next;
@@ -132,8 +136,8 @@ function isPara(text, read) {
 
 /**
  * A paragraph reflowed: filled to the context's width from its column with
- * `always`, on one line between hard breaks with `never`. Null where it
- * prints as written.
+ * `always`, on one line between hard breaks with `never`, its line breaks
+ * kept with `preserve`. Null where it prints as written.
  *
  * @param {{c: unknown, start: number, end: number}} para
  * @param {View} view
@@ -151,6 +155,7 @@ export function reflow(para, view, options, context) {
     divLevel: context.divLevel,
   };
   const always = options.proseWrap === 'always';
+  const preserve = options.proseWrap === 'preserve';
   const { width } = context;
   // Whether a line may start at word `at`, the lines so far `lines`.
   const breaksBefore = (lines, line, at) => {
@@ -161,7 +166,8 @@ export function reflow(para, view, options, context) {
     return lines.length > 0 || isPara(`${line}\n${after}`, read);
   };
   const text = view.text.slice(view.start(para.start), view.end(para.end));
-  if (!isPara(text, read)) {
+  // Line breaks moved are judged against the paragraph as one.
+  if (!preserve && !isPara(text, read)) {
     return null;
   }
   const lines = [];
@@ -169,7 +175,7 @@ export function reflow(para, view, options, context) {
   let used = context.column;
   for (let k = 1; k < words.length; k++) {
     const { word, before } = words[k];
-    if (before === 'hard') {
+    if (before === 'hard' || (preserve && before === 'soft')) {
       lines.push(line);
       line = word;
       used = 0;
