@@ -58,6 +58,9 @@ const BLOCKS = [
   '\\noindent\nA paragraph after a bare command, long enough to wrap.',
   'a line\n\\noindent  \nafter trailing spaces',
   '>   a quote indented past its marker',
+  'Interrupted text long enough to wrap at narrow widths\n\\begin{x}y\\end{x}',
+  '\\begin{x}y\\end{x}\n    an indented line after raw TeX',
+  'ends in a bare command, \\relax  \n\\begin{y}z\\end{y}',
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.
