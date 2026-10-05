@@ -109,7 +109,8 @@ export function printIn(blocks, view, from, to, context, options) {
       ? columnAfter(out)
       : context.column + out.length;
     const fresh = /\n[ \t]*\n[ \t]*$/.test(out);
-    const here = { ...context, column, fresh };
+    const siblings = siblingsBefore(blocks, k);
+    const here = { ...context, column, fresh, siblings };
     out += ignored.has(k)
       ? view.text.slice(start, end)
       : printBlock(block, view, here, options);
@@ -117,6 +118,19 @@ export function printIn(blocks, view, from, to, context, options) {
   }
   if (at > to) return null;
   return out + collapsed(view.text.slice(at, to), blocks.length === 0, true);
+}
+
+/**
+ * How many blocks of `blocks[k]`'s kind run right before it: prettier
+ * alternates a list's bullet after a sibling list.
+ *
+ * @param {{t: string}[]} blocks
+ * @param {number} k
+ */
+export function siblingsBefore(blocks, k) {
+  let n = 0;
+  while (k - n - 1 >= 0 && blocks[k - n - 1].t === blocks[k].t) n++;
+  return n;
 }
 
 const IGNORE = /^<!--\s*prettier-ignore\s*-->$/;
@@ -232,9 +246,18 @@ function indentAfter(marker, definition, tabStop) {
  *   first on the line after it.
  * @param {Context} context
  * @param {object} options
+ * @param {string[] | null} [markers] Each item's marker, where it changes.
  * @returns {{text: string, end: number} | null}
  */
-function printItems(items, view, after, definitions, context, options) {
+function printItems(
+  items,
+  view,
+  after,
+  definitions,
+  context,
+  options,
+  markers = null,
+) {
   const tabStop = options.pandocTabStop;
   let out = '';
   // A list's first marker is on the line the caller printed up to `after`.
@@ -250,7 +273,10 @@ function printItems(items, view, after, definitions, context, options) {
     // A list's first marker from where its block starts: Pandoc counts the
     // item's indent from there.
     const opening = out === '' && !definitions;
-    const first = opening ? view.text.slice(Math.max(line, after), at) : marker;
+    const written = opening
+      ? view.text.slice(Math.max(line, after), at)
+      : marker;
+    const first = markers?.[out === '' ? 0 : items.indexOf(item)] ?? written;
     const inner = contentsView(contents);
     // Spaces Pandoc left before the first line's text, five past the marker
     // or part of a tab, print as written.
@@ -260,7 +286,8 @@ function printItems(items, view, after, definitions, context, options) {
     const alone = /^[ \t]*\n/.test(inner.text)
       ? indentAfter(expandTabs(first, tabStop).trimEnd(), definitions, tabStop)
       : null;
-    const strip = alone ?? indent;
+    // A new marker's content starts after it, one space on.
+    const strip = alone ?? (first === written ? indent : first.length);
     const width = context.width - strip;
     // The first line's text starts where the marker as printed ends, past
     // the columns continuation lines strip.
@@ -293,7 +320,52 @@ function printItems(items, view, after, definitions, context, options) {
 function printList(block, view, context, options) {
   const items = block.t === 'OrderedList' ? block.c[1] : block.c;
   const start = extent(block, view)[0];
-  return printItems(items, view, start, false, context, options)?.text ?? null;
+  const markers = markersOf(block, items, view, context, options);
+  const printed = printItems(
+    items,
+    view,
+    start,
+    false,
+    context,
+    options,
+    markers,
+  );
+  return printed?.text ?? null;
+}
+
+/**
+ * Each item's marker as prettier prints it: a bullet `- `, or `* ` after
+ * a sibling bullet list; a decimal list's number counting on from its
+ * start, or 1 after the first where the source numbers the second 1, its
+ * delimiter as written: Pandoc reads it into the list's attributes. Null
+ * for any other marker, which prints as written.
+ *
+ * @see prettier's src/language-markdown/printer-markdown.js (printList)
+ * @param {object} block
+ * @param {object[][]} items
+ * @param {View} view
+ * @param {Context} context
+ * @param {{pandocTabStop: number}} options
+ * @returns {string[] | null}
+ */
+function markersOf(block, items, view, context, options) {
+  if (block.t === 'BulletList') {
+    return items.map(() => ((context.siblings ?? 0) % 2 === 0 ? '- ' : '* '));
+  }
+  const [start, { t: style }, { t: delim }] = block.c[0];
+  if (style !== 'Decimal' || (delim !== 'Period' && delim !== 'OneParen')) {
+    return null;
+  }
+  const numbers = items.map((item) => {
+    const found =
+      item.contents && markerOf(item.contents, view, options.pandocTabStop);
+    return Number(/\d+/.exec(found?.marker ?? '')?.[0] ?? Number.NaN);
+  });
+  const ones = numbers[1] === 1 && (numbers[0] !== 0 || numbers[2] === 1);
+  const mark = delim === 'Period' ? '.' : ')';
+  return items.map(
+    (_, k) => `${k === 0 ? start : ones ? 1 : start + k}${mark} `,
+  );
 }
 
 /**

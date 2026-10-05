@@ -35,5 +35,5 @@ y$ and \foo{a
 b} c.
 </div>
 
-1.  An item with a footnote \footnote{one
-    two} across its lines.
+1. An item with a footnote \footnote{one
+   two} across its lines.

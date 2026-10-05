@@ -8,6 +8,7 @@ import {
   extent,
   ignoredOf,
   printBlock,
+  siblingsBefore,
   sourceView,
 } from './blocks.js';
 import { heldBlocks } from './check.js';
@@ -133,7 +134,12 @@ function render(blocks, text, held, options, definitions = []) {
       : printBlock(
           blocks[k],
           view,
-          { ...context, column: columnAfter(out), fresh },
+          {
+            ...context,
+            column: columnAfter(out),
+            fresh,
+            siblings: siblingsBefore(blocks, k),
+          },
           options,
         );
   }
