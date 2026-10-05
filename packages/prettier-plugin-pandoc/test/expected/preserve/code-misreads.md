@@ -31,4 +31,4 @@ A fence never closed is paragraph text too:
 ```
 not code to Pandoc either
 
-and *emphasis* is read.
+and _emphasis_ is read.
