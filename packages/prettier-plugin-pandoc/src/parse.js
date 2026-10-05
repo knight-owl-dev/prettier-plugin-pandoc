@@ -10,5 +10,6 @@ import { readMarkdown } from '@knight-owl-dev/pandoc-parser';
  */
 export function parse(text, options) {
   const read = readMarkdown(text, { tabStop: options.pandocTabStop });
-  return { ...read, start: 0, end: text.length };
+  // A spread leaves out what the read keeps from Pandoc's JSON.
+  return { ...read, definitions: read.definitions, start: 0, end: text.length };
 }

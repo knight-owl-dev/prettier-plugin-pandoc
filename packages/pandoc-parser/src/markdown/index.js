@@ -26,17 +26,38 @@ import { readResolved } from './references.js';
 export function readMarkdown(source, options) {
   const opts = readerOptions(options);
   const { text, toSource, input } = readerInput(source, opts.tabStop);
-  const [blocks, meta] = readResolved((references) => {
+  const [blocks, meta, definitions] = readResolved((references) => {
     const ctx = { text, pos: 0, state: defaultParserState(opts), references };
     optional(titleBlock)(ctx);
     const value = parseBlocks(ctx);
     if (value === FAIL) throw new Error('the markdown reader failed');
-    return { value: [value, ctx.state.meta], state: ctx.state };
+    const read = [value, ctx.state.meta, inOrder(ctx.state.definitions)];
+    return { value: read, state: ctx.state };
   });
-  return doc(
+  const result = doc(
     mapSpans(blocks, toSource, toSource, input),
     mapSpans(meta, toSource, toSource, input),
   );
+  // The reference definitions read, in source order: no node, so out of
+  // Pandoc's JSON.
+  const span = (s) => (s === null ? null : [toSource(s[0]), toSource(s[1])]);
+  const located = definitions.map((d) => ({
+    start: toSource(d.start),
+    end: toSource(d.end),
+    label: span(d.label),
+    url: span(d.url),
+    title: span(d.title),
+    attributes: span(d.attributes),
+  }));
+  Object.defineProperty(result, 'definitions', { value: located });
+  return result;
+}
+
+// A list the last first, as an array in order.
+function inOrder(list) {
+  const out = [];
+  for (let at = list; at !== null; at = at.next) out.push(at.definition);
+  return out.reverse();
 }
 
 /**
