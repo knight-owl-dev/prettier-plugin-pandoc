@@ -1,0 +1,52 @@
+# The test image's Node and Pandoc, for the suite and the tools: `make` runs
+# every command through these services, never the host's.
+
+name: prettier-plugin-pandoc
+
+services:
+  node:
+    image: prettier-plugin-pandoc-test:local
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    build:
+      context: test
+
+    working_dir: /work
+
+    network_mode: none
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    tmpfs:
+      - /tmp
+    environment:
+      HOME: /tmp
+
+    volumes:
+      - .:/work
+
+  # No network_mode: none — npm fetches packages from the registry.
+  npm:
+    image: prettier-plugin-pandoc-test:local
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+
+    working_dir: /work
+    entrypoint: ["npm"]
+
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    tmpfs:
+      - /tmp
+    environment:
+      HOME: /tmp
+      NPM_CONFIG_FUND: "false"
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+
+    volumes:
+      - .:/work

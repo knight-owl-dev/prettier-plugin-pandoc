@@ -12,8 +12,22 @@ built on. See [README.md](README.md). The plan of record is
 ## Commands
 
 Always use `make` targets; run `make help` for the list. Node, npm and Pandoc
-come from the test image, the linters from the pinned `ci-tools` image — never
-the host.
+come from the compose services (`docker-compose.yaml`), the linters from the
+pinned `ci-tools` image — never the host.
+
+## Playbook
+
+Recipes live in [docs/playbook.md](docs/playbook.md); reach for one when:
+
+- **A printer or parser change is ready for a PR** → § Fuzz before a printer or
+  parser PR.
+- **A fuzz run fails, or a format changes on a second run** → § Shrink a
+  failure.
+- **Pandoc and `pandoc-parser` may read a document differently** → § Probe a
+  document.
+- **A change moves the plugin's output** → § Snapshots.
+- **A change may cost speed** → § Benchmark.
+- **A script is worth running again** → § Add a tool.
 
 ## Gotchas
 
