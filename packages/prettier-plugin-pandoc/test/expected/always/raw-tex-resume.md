@@ -33,8 +33,8 @@ A div opening after an environment, its body *long* enough that the formatter wo
 \begin{x}y\end{x} A setext heading after an environment
 =====
 
-\begin{x}y\end{x} a paragraph after an environment
-that goes on to the next line, long enough that the formatter would wrap it.
+\begin{x}y\end{x} a paragraph after an environment that goes on to the next
+line, long enough that the formatter would wrap it.
 
 A term holding \begin{x}y\end{x} an environment
 

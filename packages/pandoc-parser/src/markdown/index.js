@@ -11,6 +11,7 @@ import { readerInput } from '../input.js';
 import { readerOptions } from '../options.js';
 import { defaultParserState } from '../parsing/state.js';
 import { parseBlocks } from './blocks.js';
+import { endline, inline } from './inlines.js';
 import { titleBlock } from './metadata.js';
 import { readResolved } from './references.js';
 
@@ -36,4 +37,22 @@ export function readMarkdown(source, options) {
     mapSpans(blocks, toSource, toSource),
     mapSpans(meta, toSource, toSource),
   );
+}
+
+/**
+ * Whether a paragraph at the top level goes on past the end of a line
+ * when `next` follows it: Pandoc's `endline` there, and an inline after
+ * it — a block's closing tag or raw TeX is none.
+ *
+ * @see Text.Pandoc.Readers.Markdown.endline
+ * @see Text.Pandoc.Readers.Markdown.inlines1
+ * @param {string} next
+ * @param {{tabStop?: number}} [options]
+ */
+export function continuesParagraph(next, options) {
+  const opts = readerOptions(options);
+  const { text } = readerInput(`\n${next}`, opts.tabStop);
+  const ctx = { text, pos: 0, state: defaultParserState(opts) };
+  if (endline(ctx) === FAIL) return false;
+  return ctx.pos === text.length || inline(ctx) !== FAIL;
 }
