@@ -23,6 +23,6 @@ Raw TeX the two parsers cannot settle on prints as written: See [a](\foo{*x* y})
 and more words here to wrap.
 
 - An item holding a formula $p *q*$ r
-<script>
+  <script>
 
 p \foo{a *b* c} q

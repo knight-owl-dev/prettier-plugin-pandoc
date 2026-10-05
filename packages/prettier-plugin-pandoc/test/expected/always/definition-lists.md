@@ -2,7 +2,8 @@
 
 Term 1
 
-:   Definition 1, long enough that a formatter wrapping prose at eighty columns has to break it.
+:   Definition 1, long enough that a formatter wrapping prose at eighty columns
+    has to break it.
 
 Term 2 with *inline markup*
 
@@ -14,7 +15,8 @@ Term 2 with *inline markup*
 
 A paragraph long enough that a formatter wrapping prose at eighty columns breaks it
 
-: A table's caption, not a definition, long enough to wrap at eighty columns as well
+: A table's caption, not a definition, long enough to wrap at eighty columns as
+  well
 
 | a   | b   |
 | --- | --- |

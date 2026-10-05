@@ -1,11 +1,10 @@
-// Printing: each top-level block, one blank line between blocks; a paragraph
-// reflowed (wrap.js), any other block as written.
+// Printing: each top-level block (blocks.js), one blank line between them.
 // Source between blocks that is no node — reference and note definitions,
 // metadata — prints as written, its blank lines at either end dropped.
 
 import { doc } from 'prettier';
+import { columnAfter, extent, printBlock, sourceView } from './blocks.js';
 import { heldBlocks } from './check.js';
-import { reflow } from './wrap.js';
 
 const { literalline } = doc.builders;
 const { replaceEndOfLine } = doc.utils;
@@ -15,18 +14,21 @@ const isBlank = (line) => /^[ \t]*$/.test(line);
 /**
  * The source between two blocks, spaced: `first` before the first block,
  * `last` after the last. On the line a block ends, only what follows it
- * stays; on the line one starts, what precedes it.
+ * stays; on the line one starts, what precedes it, but for indentation
+ * short of a tab stop, which Pandoc reads no differently.
  *
  * @param {string} gap
  * @param {boolean} first
  * @param {boolean} last
+ * @param {number} tabStop
  */
-function spaced(gap, first, last) {
+function spaced(gap, first, last, tabStop) {
   // Blocks on one line stay on it.
   if (!first && !last && !gap.includes('\n')) return gap;
   const lines = gap.split('\n');
   const head = first ? '' : lines.shift();
-  const tail = last ? '' : lines.pop();
+  const indent = last ? '' : lines.pop();
+  const tail = /^ *$/.test(indent) && indent.length < tabStop ? '' : indent;
   while (lines.length > 0 && isBlank(lines[0])) lines.shift();
   while (lines.length > 0 && isBlank(lines.at(-1))) lines.pop();
   const body = lines.join('\n');
@@ -35,27 +37,6 @@ function spaced(gap, first, last) {
   const ended = `${isBlank(head) ? '' : head}\n`;
   if (last) return body === '' ? ended : `${ended}\n${body}\n`;
   return body === '' ? `${ended}\n${tail}` : `${ended}\n${body}\n\n${tail}`;
-}
-
-// Where the line `offset` is on starts.
-const lineStart = (text, offset) => text.lastIndexOf('\n', offset - 1) + 1;
-
-/**
- * A block printed: a paragraph reflowed, unless `proseWrap` preserves it;
- * any other as written.
- *
- * @param {{t: string, start: number, end: number}} block
- * @param {number} end
- * @param {string} text
- * @param {object} options
- */
-function printBlock(block, end, text, options) {
-  if (block.t === 'Para' && options.proseWrap !== 'preserve') {
-    const column = block.start - lineStart(text, block.start);
-    const out = reflow({ ...block, end }, text, column, options);
-    if (out !== null) return out;
-  }
-  return text.slice(block.start, end);
 }
 
 /**
@@ -67,12 +48,14 @@ function printBlock(block, end, text, options) {
  * @param {object} options
  */
 function render(blocks, text, held, options) {
-  // A block that reads to the end of its lines, a raw one's, spans the
-  // newline after them: it spaces as the gap's.
-  const ends = blocks.map(({ start, end }) => {
-    while (end > start && text[end - 1] === '\n') end--;
-    return end;
-  });
+  const view = sourceView(text);
+  const context = {
+    width: options.printWidth,
+    column: 0,
+    inListItem: false,
+    divLevel: 0,
+  };
+  const ends = blocks.map((block) => extent(block, view)[1]);
   let out = '';
   for (let k = 0; k <= blocks.length; k++) {
     const from = k === 0 ? 0 : ends[k - 1];
@@ -81,11 +64,16 @@ function render(blocks, text, held, options) {
     out +=
       held.has(k - 1) || held.has(k)
         ? gap
-        : spaced(gap, k === 0, k === blocks.length);
+        : spaced(gap, k === 0, k === blocks.length, options.pandocTabStop);
     if (k === blocks.length) break;
     out += held.has(k)
       ? text.slice(blocks[k].start, ends[k])
-      : printBlock(blocks[k], ends[k], text, options);
+      : printBlock(
+          blocks[k],
+          view,
+          { ...context, column: columnAfter(out) },
+          options,
+        );
   }
   return out;
 }

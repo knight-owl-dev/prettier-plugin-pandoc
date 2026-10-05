@@ -7,9 +7,10 @@ The plugin reads a document with a port of Pandoc's own Markdown reader, and
 prints structure from that read and text as the source wrote it. It then reads
 its output again: what reads differently prints as written.
 
-Status: pre-release. Nothing is published yet. Formatting so far is one blank
-line between blocks and top-level paragraphs reflowed; each other block prints
-as written until its construct gains formatting.
+Status: pre-release. Nothing is published yet. Formatting so far: one blank line
+between top-level blocks, paragraphs reflowed, and block quotes, lists,
+definition lists and fenced divs printed from their structure. Other blocks
+print as written until their construct gains formatting.
 
 ## Packages
 
@@ -30,10 +31,10 @@ For documents built with `pandoc --tab-stop=8`, in `.prettierrc`:
 { "plugins": ["@knight-owl-dev/prettier-plugin-pandoc"], "pandocTabStop": 8 }
 ```
 
-Prettier's `proseWrap` reflows top-level paragraphs: `preserve` (the default)
-keeps every line break where the author put it, `always` fills to `printWidth`,
-`never` joins each paragraph into one line. `embeddedLanguageFormatting` has no
-effect yet.
+Prettier's `proseWrap` reflows paragraphs: `preserve` (the default) keeps every
+line break where the author put it, `always` fills to `printWidth`, `never`
+joins each paragraph into one line. `embeddedLanguageFormatting` has no effect
+yet.
 
 ## Preserve, never repair
 
