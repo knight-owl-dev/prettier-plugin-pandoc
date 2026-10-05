@@ -318,10 +318,12 @@ function printDefinitionList(block, view, context, options) {
 
 const FENCE = /^[ \t]*:{3,}/;
 const CLOSER = /^[ \t]*:{3,}[ \t]*$/;
+const HTML_OPEN = /^[ \t]*<div(\s[^>]*)?>[ \t]*$/i;
+const HTML_CLOSE = /^[ \t]*<\/div\s*>[ \t]*$/i;
 
 /**
- * A fenced div: its fences as written, its blocks printed in a div. Null for
- * one from HTML.
+ * A div, fenced or from HTML: its fences or tags as written, its blocks
+ * printed in the div. Null where a tag shares its line with other text.
  *
  * @param {object} block
  * @param {View} view
@@ -334,14 +336,27 @@ function printDiv(block, view, context, options) {
   const openEnd = text.indexOf('\n', start);
   if (openEnd < 0 || openEnd >= end) return null;
   const open = text.slice(start, openEnd);
-  if (!FENCE.test(open)) return null;
+  const html = HTML_OPEN.test(open);
+  if (!html && !FENCE.test(open)) return null;
   const closeStart = lineStart(text, end);
   const close = text.slice(closeStart, end);
-  const closed = closeStart > openEnd && CLOSER.test(close);
-  const within = { ...context, divLevel: context.divLevel + 1, column: 0 };
+  const closed =
+    closeStart > openEnd && (html ? HTML_CLOSE : CLOSER).test(close);
+  // A closing tag sharing its line with text.
+  if (html && !closed && /<\/div\s*>[ \t]*$/i.test(close)) return null;
+  const within = html
+    ? { ...context, inHtmlBlock: 'div', column: 0 }
+    : { ...context, divLevel: context.divLevel + 1, column: 0 };
   const to = closed ? closeStart : end;
-  const body = printIn(block.c[1], view, openEnd + 1, to, within, options);
-  if (body === null) return null;
+  const printed = printIn(block.c[1], view, openEnd + 1, to, within, options);
+  if (printed === null) return null;
+  // An HTML block keeps a blank line written next to a tag.
+  const blank = (line) => html && /^[ \t]*$/.test(line ?? 'x');
+  const inner = text.slice(openEnd + 1, to).split('\n');
+  const body =
+    printed === ''
+      ? ''
+      : `${blank(inner[0]) ? '\n' : ''}${printed}${closed && blank(inner.at(-2)) ? '\n' : ''}`;
   const lines = [
     open,
     ...(body === '' ? [] : [body]),

@@ -10,8 +10,8 @@ its output again: what reads differently prints as written.
 Status: pre-release. Nothing is published yet. Formatting so far: one blank line
 between top-level blocks, paragraphs reflowed with prettier's emphasis markers,
 fenced code with a fence fit for its content, and block quotes, lists,
-definition lists and fenced divs printed from their structure. Other blocks
-print as written until their construct gains formatting.
+definition lists and divs printed from their structure. Other blocks print as
+written until their construct gains formatting.
 
 ## Packages
 
