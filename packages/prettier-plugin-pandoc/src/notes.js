@@ -66,11 +66,11 @@ export function printDefinition(definition, context, options) {
   const { blocks, marker } = definition;
   const inner = contentsView(blocks.contents);
   const indent = options.pandocTabStop;
-  // The first line's text follows the marker.
+  // The first line's text follows the marker and a space.
   const within = {
     ...context,
     width: context.width - indent,
-    column: Math.max(0, marker.length - indent),
+    column: Math.max(0, marker.length + 1 - indent),
   };
   const body = printIn(blocks, inner, 0, inner.text.length, within, options);
   if (body === null) return null;
