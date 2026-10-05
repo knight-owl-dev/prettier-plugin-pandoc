@@ -54,6 +54,8 @@ const HARD = /^([ \t]*|\\)\n[ \t]*$/;
  * @property {string} text
  * @property {(offset: number) => number} start
  * @property {(offset: number) => number} end
+ * @property {(offset: number) => boolean} contains Whether its text holds
+ *   a source offset.
  */
 
 /**

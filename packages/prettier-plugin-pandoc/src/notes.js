@@ -8,13 +8,13 @@ import { contentsView, lineStart, prefixed, printIn } from './blocks.js';
 
 /**
  * @typedef {object} Definition
- * @property {number} start Where its marker line starts in the source.
+ * @property {number} start Where its marker starts in the source.
  * @property {number} end Where its contents end.
  * @property {string} marker `[^label]:`, as written.
  * @property {object[]} blocks Its blocks, carrying their `contents`.
  */
 
-const MARKER = /^ {0,3}\[\^[^\]\s]+\]:$/;
+const MARKER = /^\[\^[^\]\s]+\]:$/;
 
 // Each Note under `value` whose blocks carry their contents: a definition's,
 // where an inline note's carry none.
@@ -43,21 +43,27 @@ export function definitionsOf(blocks, text) {
     const { contents } = note.c;
     const first = contents.pieces[0];
     if (first === undefined || note.c.length === 0) continue;
-    const start = lineStart(text, first.from);
+    // The marker, back from its contents on their line: past a container's
+    // prefix there.
+    const start = text.lastIndexOf('[^', first.from);
     const marker = text.slice(start, first.from);
-    if (!MARKER.test(marker) || /^[ \t]*\n/.test(contents.text)) continue;
-    // Where its contents end, past text no block of it spans.
-    const end = contents.toOuterEnd(contents.text.trimEnd().length);
-    if (note.c.some((b) => b.end > end)) continue;
+    if (start < lineStart(text, first.from) || !MARKER.test(marker)) continue;
+    if (/^[ \t]*\n/.test(contents.text)) continue;
+    // Where its contents end, past text no block of it spans, or where its
+    // last block does, past spaces its contents end in.
+    const end = Math.max(
+      contents.toOuterEnd(contents.text.trimEnd().length),
+      ...note.c.map((b) => b.end),
+    );
     found.set(start, { start, end, marker, blocks: note.c });
   }
   return [...found.values()].sort((a, b) => a.start - b.start);
 }
 
 /**
- * A definition printed: its marker as written, its first block on that
+ * A definition printed: its marker as written, its first paragraph on that
  * line, every other line indented one tab stop, as far as Pandoc strips.
- * Null where it prints as written.
+ * Null where it prints as written, as where it starts with another block.
  *
  * @param {Definition} definition
  * @param {Context} context
@@ -66,6 +72,8 @@ export function definitionsOf(blocks, text) {
  */
 export function printDefinition(definition, context, options) {
   const { blocks, marker } = definition;
+  // Only a paragraph goes on the marker's line.
+  if (blocks[0].t !== 'Para' && blocks[0].t !== 'Plain') return null;
   const inner = contentsView(blocks.contents);
   const indent = options.pandocTabStop;
   // The first line's text follows the marker and a space.

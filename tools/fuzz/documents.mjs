@@ -74,6 +74,8 @@ const BLOCKS = [
   '1. one\n\n   * * *\n\n2. two',
   "see [r1] [r2] [r3]\n\n[r1]:   /u   'single title'\n[r2]:\n  <spaced url>\n  (paren)  {.c}\n[r3]: /x 'it\\'s'",
   '> [rq]: /q  "in a quote"\n> [rq]',
+  '> q[^nq]\n>\n> [^nq]: A note defined in a quote, long enough to wrap at narrow widths.',
+  "- [ri]:  /i  'in an item'\n\n  use [ri]",
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.

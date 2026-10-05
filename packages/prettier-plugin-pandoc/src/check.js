@@ -59,7 +59,10 @@ function differing(source, output, readAs) {
 }
 
 // Rounds of holding what reads differently before the source is the output.
-const ROUNDS = 4;
+const ROUNDS = 5;
+
+/** Held: every definition between blocks prints as written. */
+export const DEFINITIONS = 'definitions';
 
 /**
  * What `render` prints holding the blocks that read differently, or the
@@ -88,7 +91,11 @@ export function heldBlocks(root, options, render) {
     if (diff === null) return out;
     const size = held.size;
     for (const k of diff) held.add(k);
-    if (held.size === size) {
+    // Holding the blocks that differ settled nothing: the definitions
+    // between them next, which a note's contents read from, then the
+    // neighbors.
+    if (held.size === size && !held.has(DEFINITIONS)) held.add(DEFINITIONS);
+    else if (held.size === size) {
       for (const k of diff) held.add(k - 1).add(k + 1);
     }
   }

@@ -11,10 +11,9 @@ import {
   siblingsBefore,
   sourceView,
 } from './blocks.js';
-import { heldBlocks } from './check.js';
+import { DEFINITIONS, heldBlocks } from './check.js';
 import { languageOf, parserFor } from './code.js';
-import { definitionsOf, printDefinition } from './notes.js';
-import { printReference } from './references.js';
+import { definitionsIn, withDefinitions } from './definitions.js';
 
 const { literalline } = doc.builders;
 const { printDocToString } = doc.printer;
@@ -70,60 +69,6 @@ function tightBefore(block, gap, tabStop) {
 }
 
 /**
- * A definition between blocks: where it is, and its printer, null where it
- * prints as written.
- *
- * @typedef {object} Definition
- * @property {number} start
- * @property {number} end
- * @property {(context: import('./wrap.js').Context, options: object) => string | null} print
- */
-
-/**
- * The notes' and references' definitions in `root`, in source order.
- *
- * @param {{blocks: object[], definitions?: object[]}} root
- * @param {string} text
- * @returns {Definition[]}
- */
-function definitionsIn(root, text) {
-  const notes = definitionsOf(root.blocks, text).map((note) => ({
-    start: note.start,
-    end: note.end,
-    print: (context, options) => printDefinition(note, context, options),
-  }));
-  const references = (root.definitions ?? []).map((reference) => ({
-    start: reference.start,
-    end: reference.end,
-    print: () => printReference(reference, text),
-  }));
-  return [...notes, ...references].sort((a, b) => a.start - b.start);
-}
-
-/**
- * The source from `from` to `to`, each definition inside printed.
- *
- * @param {string} text
- * @param {number} from
- * @param {number} to
- * @param {Definition[]} definitions
- * @param {import('./wrap.js').Context} context
- * @param {object} options
- */
-function withDefinitions(text, from, to, definitions, context, options) {
-  let out = '';
-  let at = from;
-  for (const definition of definitions) {
-    if (definition.start < at || definition.end > to) continue;
-    const printed = definition.print(context, options);
-    if (printed === null) continue;
-    out += text.slice(at, definition.start) + printed;
-    at = definition.end;
-  }
-  return out + text.slice(at, to);
-}
-
-/**
  * The document printed, a held block and the gaps next to it as written.
  *
  * @param {{t: string, start: number, end: number}[]} blocks
@@ -131,7 +76,7 @@ function withDefinitions(text, from, to, definitions, context, options) {
  * @param {Set<number>} held
  * @param {object} options
  */
-function render(blocks, text, held, options, definitions = []) {
+function render(blocks, text, held, options) {
   const view = sourceView(text);
   const context = {
     width: options.printWidth,
@@ -144,20 +89,19 @@ function render(blocks, text, held, options, definitions = []) {
   for (let k = 0; k <= blocks.length; k++) {
     const from = k === 0 ? 0 : ends[k - 1];
     const to = k === blocks.length ? text.length : blocks[k].start;
-    // Where the self-check holds a block, definitions print as written.
-    const gap =
-      held.size > 0
-        ? text.slice(from, to)
-        : withDefinitions(text, from, to, definitions, context, options);
     out +=
       held.has(k - 1) || held.has(k)
-        ? gap
+        ? text.slice(from, to)
         : spaced(
-            gap,
+            withDefinitions(view, from, to, context, options),
             k === 0,
             k === blocks.length,
             options.pandocTabStop,
-            tightBefore(blocks[k - 1], gap, options.pandocTabStop),
+            tightBefore(
+              blocks[k - 1],
+              text.slice(from, to),
+              options.pandocTabStop,
+            ),
           );
     if (k === blocks.length) break;
     const fresh = out === '' || /\n[ \t]*\n[ \t]*$/.test(out);
@@ -207,8 +151,11 @@ function printRoot(root, options, samples) {
           root.blocks,
           text,
           new Set([...held, ...ignored]),
-          withSamples,
-          definitions,
+          // Held, definitions print as written (check.js).
+          {
+            ...withSamples,
+            pandocDefinitions: held.has(DEFINITIONS) ? [] : definitions,
+          },
         ),
       )
     : text;
