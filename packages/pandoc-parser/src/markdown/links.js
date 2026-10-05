@@ -691,21 +691,48 @@ const referenceKeyAt = attempt((ctx) => {
   if (skipNonindentSpaces(ctx) === FAIL || noCitation(ctx) === FAIL) {
     return FAIL;
   }
+  const start = ctx.pos;
   const ref = reference(ctx);
   if (ref === FAIL || colon(ctx) === FAIL) return FAIL;
+  const label = [start, ctx.pos];
   lineSpace(ctx);
   if (noBracket(ctx) === FAIL) return FAIL;
+  const urlStart = ctx.pos;
   const src = definitionURL(ctx);
   if (src === FAIL) return FAIL;
+  const url = spanOf(ctx.text, urlStart, ctx.pos);
+  const titleStart = ctx.pos;
   const title = maybeReferenceTitle(ctx);
   if (title === FAIL) return FAIL;
+  const titleSpan = spanOf(ctx.text, titleStart, ctx.pos);
+  const attrStart = ctx.pos;
   const attr = definitionAttributes(ctx);
-  if (attr === FAIL || blanklines(ctx) === FAIL) return FAIL;
+  if (attr === FAIL) return FAIL;
+  const attrSpan = spanOf(ctx.text, attrStart, ctx.pos);
+  const end = ctx.pos;
+  if (blanklines(ctx) === FAIL) return FAIL;
   const target = [escapeURI(trimEnd(src)), title];
   const keys = ctx.state.keys.set(toKey(ref.raw), [
     target,
     extractIdClass(attr),
   ]);
-  updateState(ctx, { keys });
+  const definition = {
+    start,
+    end: spanOf(ctx.text, start, end)[1],
+    label,
+    url,
+    title: titleSpan[0] === titleSpan[1] ? null : titleSpan,
+    attributes: attrSpan[0] === attrSpan[1] ? null : attrSpan,
+  };
+  const definitions = { definition, next: ctx.state.definitions };
+  updateState(ctx, { keys, definitions });
   return [];
 });
+
+// The span from `from` to `to` without the whitespace at either end.
+function spanOf(text, from, to) {
+  let [a, b] = [from, to];
+  while (a < b && /\s/.test(text[a])) a++;
+  while (b > a && /\s/.test(text[b - 1])) b--;
+  return [a, b];
+}

@@ -1,6 +1,6 @@
 // Printing: each top-level block (blocks.js), one blank line between them.
-// Source between blocks that is no node — reference and note definitions,
-// metadata — prints as written, its blank lines at either end dropped.
+// Source between blocks that is no node prints as written, its blank lines
+// at either end dropped: metadata, and a definition its printer leaves.
 
 import { doc } from 'prettier';
 import {
@@ -14,6 +14,7 @@ import {
 import { heldBlocks } from './check.js';
 import { languageOf, parserFor } from './code.js';
 import { definitionsOf, printDefinition } from './notes.js';
+import { printReference } from './references.js';
 
 const { literalline } = doc.builders;
 const { printDocToString } = doc.printer;
@@ -69,12 +70,43 @@ function tightBefore(block, gap, tabStop) {
 }
 
 /**
- * The source from `from` to `to`, each note definition inside printed.
+ * A definition between blocks: where it is, and its printer, null where it
+ * prints as written.
+ *
+ * @typedef {object} Definition
+ * @property {number} start
+ * @property {number} end
+ * @property {(context: import('./wrap.js').Context, options: object) => string | null} print
+ */
+
+/**
+ * The notes' and references' definitions in `root`, in source order.
+ *
+ * @param {{blocks: object[], definitions?: object[]}} root
+ * @param {string} text
+ * @returns {Definition[]}
+ */
+function definitionsIn(root, text) {
+  const notes = definitionsOf(root.blocks, text).map((note) => ({
+    start: note.start,
+    end: note.end,
+    print: (context, options) => printDefinition(note, context, options),
+  }));
+  const references = (root.definitions ?? []).map((reference) => ({
+    start: reference.start,
+    end: reference.end,
+    print: () => printReference(reference, text),
+  }));
+  return [...notes, ...references].sort((a, b) => a.start - b.start);
+}
+
+/**
+ * The source from `from` to `to`, each definition inside printed.
  *
  * @param {string} text
  * @param {number} from
  * @param {number} to
- * @param {import('./notes.js').Definition[]} definitions
+ * @param {Definition[]} definitions
  * @param {import('./wrap.js').Context} context
  * @param {object} options
  */
@@ -83,7 +115,7 @@ function withDefinitions(text, from, to, definitions, context, options) {
   let at = from;
   for (const definition of definitions) {
     if (definition.start < at || definition.end > to) continue;
-    const printed = printDefinition(definition, context, options);
+    const printed = definition.print(context, options);
     if (printed === null) continue;
     out += text.slice(at, definition.start) + printed;
     at = definition.end;
@@ -168,7 +200,7 @@ function printRoot(root, options, samples) {
   const withSamples = { ...options, pandocSamples: samples };
   // Blocks prettier-ignore leaves as written, the text around them too.
   const ignored = ignoredOf(root.blocks);
-  const definitions = definitionsOf(root.blocks, text);
+  const definitions = definitionsIn(root, text);
   const out = inOrder(root.blocks)
     ? heldBlocks(root, withSamples, (held) =>
         render(

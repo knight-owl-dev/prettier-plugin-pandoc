@@ -38,12 +38,30 @@ import { toLower, words } from '../shared.js';
  * @property {number} nextExample The next example list item's number.
  * @property {PersistentMap<number>} examples Each example label's number.
  * @property {number} fencedDivLevel How many fenced divs are open.
+ * @property {Definitions | null} definitions The reference definitions read
+ *   so far, the last first: where each part is, for a consumer to print or
+ *   check.
  * @property {Map<string, import('../latex/parsing.js').Macro>} macros The
  *   TeX macros defined so far.
  * @property {Record<string, unknown>} meta The document's metadata so far.
  */
 
 /** @typedef {[string, string[], [string, string][]]} Attr */
+
+/**
+ * A reference definition's spans: the whole, from its label's bracket to
+ * its last part, and each part; a title or attributes it lacks null.
+ *
+ * @typedef {object} Definition
+ * @property {number} start
+ * @property {number} end
+ * @property {[number, number]} label `[label]:`, its colon included.
+ * @property {[number, number]} url
+ * @property {[number, number] | null} title With its quotes.
+ * @property {[number, number] | null} attributes With their braces.
+ */
+
+/** @typedef {{definition: Definition, next: Definitions | null}} Definitions */
 
 /**
  * A place in text read: its depth in text parsed again, the text, and an
@@ -79,6 +97,7 @@ export const defaultParserState = (options) => ({
   nextExample: 1,
   examples: EMPTY_MAP,
   fencedDivLevel: 0,
+  definitions: null,
 });
 
 /**

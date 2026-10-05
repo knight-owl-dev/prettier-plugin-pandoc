@@ -387,6 +387,7 @@ export function lineEnd(text, pos) {
 export function parseFromString(ctx, parser, extracted) {
   const source = extracted.withoutCarriageReturns();
   const { text, pos, depth = 0, notesDefined } = ctx;
+  const { definitions } = ctx.state;
   ctx.text = source.text;
   ctx.pos = 0;
   ctx.depth = depth + 1;
@@ -401,8 +402,44 @@ export function parseFromString(ctx, parser, extracted) {
   const toStart = (offset) => source.toOuterStart(offset);
   const toEnd = (offset) => source.toOuterEnd(offset);
   mapNotes(ctx, defined, toStart, toEnd, source);
+  mapDefinitions(ctx, definitions, toStart, toEnd);
   const mapped = mapSpans(x, toStart, toEnd, source);
   return Array.isArray(mapped) ? withContents(mapped, source) : mapped;
+}
+
+/**
+ * The reference definitions a read of extracted text added, those before
+ * `since`, mapped out to the text it was extracted from.
+ *
+ * @param {Context} ctx
+ * @param {import('./state.js').Definitions | null} since
+ * @param {(offset: number) => number} toStart
+ * @param {(offset: number) => number} toEnd
+ */
+function mapDefinitions(ctx, since, toStart, toEnd) {
+  const added = [];
+  for (
+    let at = ctx.state.definitions;
+    at !== since && at !== null;
+    at = at.next
+  ) {
+    added.push(at.definition);
+  }
+  if (added.length === 0) return;
+  const span = (s) => (s === null ? null : [toStart(s[0]), toEnd(s[1])]);
+  let definitions = since;
+  for (const d of added.reverse()) {
+    const definition = {
+      start: toStart(d.start),
+      end: toEnd(d.end),
+      label: span(d.label),
+      url: span(d.url),
+      title: span(d.title),
+      attributes: span(d.attributes),
+    };
+    definitions = { definition, next: definitions };
+  }
+  updateState(ctx, { definitions });
 }
 
 /**
