@@ -142,8 +142,8 @@ export function notAfterString(ctx) {
 }
 
 // Each `str` end's line and column, worked out once, and each parse's
-// positions of the text it reads now: weakly held, so none outlives what
-// it belongs to.
+// positions of each text it reads, kept across a re-read that swaps its
+// text and back: weakly held, so none outlives what it belongs to.
 const places = new WeakMap();
 const reading = new WeakMap();
 
@@ -168,12 +168,17 @@ export const getPosition = (ctx, offset = ctx.pos) =>
   placeHere({ ...ctx, pos: offset }, ctx);
 
 function placeHere(ctx, key = ctx) {
-  let now = reading.get(key);
-  if (now?.text !== ctx.text) {
-    now = { text: ctx.text, positions: positions(ctx.text) };
-    reading.set(key, now);
+  let texts = reading.get(key);
+  if (texts === undefined) {
+    texts = new Map();
+    reading.set(key, texts);
   }
-  return now.positions.locate(ctx.pos);
+  let found = texts.get(ctx.text);
+  if (found === undefined) {
+    found = positions(ctx.text);
+    texts.set(ctx.text, found);
+  }
+  return found.locate(ctx.pos);
 }
 
 /**

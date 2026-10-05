@@ -86,6 +86,11 @@ documents, and the plugin's format at each `proseWrap`. `WHAT` is `parser`,
 and prints both with the change; results stay in `.scratch/bench/`. Runs vary by
 about 10% at `RUNS=3`; decide on `RUNS=7` or more.
 
+The budget: a read costs the same per character at any size, so `corpus x20`
+reads no slower per character than `corpus x10`; the plugin formats the corpus
+in under 200ms at every `proseWrap`. A case more than 10% slower than `main` at
+`RUNS=7` needs its reason in the PR.
+
 ## Add a tool
 
 A tool is a script under `tools/`. It takes positional arguments with defaults
