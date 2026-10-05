@@ -115,7 +115,8 @@ function wordsOf(para, view) {
   const last = wordFrom(slice(from, end));
   const endsLine =
     end === text.length || text[end] === '\n' || /\n[ \t]*$/.test(last);
-  const word = endsLine ? last.trimEnd() : last;
+  // Spaces after a bare command are the command's.
+  const word = endsLine && !BARE_COMMAND.test(last) ? last.trimEnd() : last;
   // A hard break ending the text breaks no line after it.
   if (word !== '' || before !== 'hard') words.push({ word, before, glued });
   return words;

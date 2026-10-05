@@ -38,10 +38,11 @@ a run
 
 z
 \end{x}
+
 text
-    lazy
+lazy
 - item
-  \begin{x}a\end{x} b
+\begin{x}a\end{x} b
 
 A raw command's group runs past a blank line, long enough to wrap, \foo{a
 

@@ -24,14 +24,17 @@ const isBlank = (line) => /^[ \t]*$/.test(line);
  * The source between two blocks, spaced: `first` before the first block,
  * `last` after the last. On the line a block ends, only what follows it
  * stays; on the line one starts, what precedes it, but for indentation
- * short of a tab stop, which Pandoc reads no differently.
+ * short of a tab stop, which Pandoc reads no differently. After `tight`
+ * text, a paragraph a block interrupts, no blank line: one would make it
+ * a paragraph of its own.
  *
  * @param {string} gap
  * @param {boolean} first
  * @param {boolean} last
  * @param {number} tabStop
+ * @param {boolean} [tight]
  */
-function spaced(gap, first, last, tabStop) {
+function spaced(gap, first, last, tabStop, tight = false) {
   // Blocks on one line stay on it.
   if (!first && !last && !gap.includes('\n')) return gap;
   const lines = gap.split('\n');
@@ -45,7 +48,23 @@ function spaced(gap, first, last, tabStop) {
     return (body === '' ? '' : `${body}${last ? '\n' : '\n\n'}`) + tail;
   const ended = `${isBlank(head) ? '' : head}\n`;
   if (last) return body === '' ? ended : `${ended}\n${body}\n`;
-  return body === '' ? `${ended}\n${tail}` : `${ended}\n${body}\n\n${tail}`;
+  if (body === '') return tight ? `${ended}${tail}` : `${ended}\n${tail}`;
+  return `${ended}\n${body}\n\n${tail}`;
+}
+
+/**
+ * Whether the gap after `block` keeps from a blank line: after a paragraph
+ * a block interrupts, which one would make a paragraph of its own, and
+ * before a line indented a tab stop, which one would make code.
+ *
+ * @param {{t: string} | undefined} block
+ * @param {string} gap
+ * @param {number} tabStop
+ */
+function tightBefore(block, gap, tabStop) {
+  if (block === undefined || /\n[ \t]*\n/.test(gap)) return false;
+  const indent = /(?:^|\n)( *)$/.exec(gap)[1];
+  return block.t === 'Plain' || indent.length >= tabStop;
 }
 
 /**
@@ -100,7 +119,13 @@ function render(blocks, text, held, options, definitions = []) {
     out +=
       held.has(k - 1) || held.has(k)
         ? gap
-        : spaced(gap, k === 0, k === blocks.length, options.pandocTabStop);
+        : spaced(
+            gap,
+            k === 0,
+            k === blocks.length,
+            options.pandocTabStop,
+            tightBefore(blocks[k - 1], gap, options.pandocTabStop),
+          );
     if (k === blocks.length) break;
     const fresh = out === '' || /\n[ \t]*\n[ \t]*$/.test(out);
     out += held.has(k)

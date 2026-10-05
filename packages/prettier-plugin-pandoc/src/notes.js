@@ -9,7 +9,7 @@ import { contentsView, lineStart, prefixed, printIn } from './blocks.js';
 /**
  * @typedef {object} Definition
  * @property {number} start Where its marker line starts in the source.
- * @property {number} end Where its last block ends.
+ * @property {number} end Where its contents end.
  * @property {string} marker `[^label]:`, as written.
  * @property {object[]} blocks Its blocks, carrying their `contents`.
  */
@@ -46,7 +46,9 @@ export function definitionsOf(blocks, text) {
     const start = lineStart(text, first.from);
     const marker = text.slice(start, first.from);
     if (!MARKER.test(marker) || /^[ \t]*\n/.test(contents.text)) continue;
-    const end = note.c.at(-1).end;
+    // Where its contents end, past text no block of it spans.
+    const end = contents.toOuterEnd(contents.text.trimEnd().length);
+    if (note.c.some((b) => b.end > end)) continue;
     found.set(start, { start, end, marker, blocks: note.c });
   }
   return [...found.values()].sort((a, b) => a.start - b.start);
