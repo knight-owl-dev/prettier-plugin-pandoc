@@ -61,6 +61,8 @@ const BLOCKS = [
   'Interrupted text long enough to wrap at narrow widths\n\\begin{x}y\\end{x}',
   '\\begin{x}y\\end{x}\n    an indented line after raw TeX',
   'ends in a bare command, \\relax  \n\\begin{y}z\\end{y}',
+  '| a | b |\n|---|--:|\n| 1 | 2 |\n\nTable:  a caption long enough to wrap at the narrow widths',
+  ':  before *it*\n\n  a  b\n  -- --\n  1  2',
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.
