@@ -19,5 +19,4 @@ Text straight after the verse, which Pandoc reads as a paragraph, long enough to
 
 A bar line over dashes is a heading:
 
-| not verse
----
+## | not verse

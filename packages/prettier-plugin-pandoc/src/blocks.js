@@ -5,6 +5,7 @@
 
 import { readMarkdown } from '@knight-owl-dev/pandoc-parser';
 import { printCode } from './code.js';
+import { edited, markerEdits } from './emphasis.js';
 import { alignedPipeTable } from './tables.js';
 import { reflow } from './wrap.js';
 
@@ -378,6 +379,42 @@ function printDiv(block, view, context, options) {
   return lines.join('\n');
 }
 
+const ATTRIBUTES = /^\{[^}]*\}$/;
+
+/**
+ * A heading in ATX form, as prettier prints one: `#` per level, one space,
+ * its text with prettier's emphasis markers, its attributes as written; no
+ * closing hashes, and a setext heading's underline gone. Null for an empty
+ * heading, one whose text spans lines, and one starting mid-line, after
+ * raw TeX: ATX starts a line.
+ *
+ * @param {object} block
+ * @param {View} view
+ * @param {Context} context
+ */
+function printHeader(block, view, context) {
+  const [level, , inlines] = block.c;
+  if (inlines.length === 0 || context.column > 0) return null;
+  const { text } = view;
+  const [start, end] = extent(block, view);
+  const from = view.start(inlines[0].start);
+  const to = view.end(inlines.at(-1).end);
+  if (from < start || to > end || text.slice(from, to).includes('\n')) {
+    return null;
+  }
+  const lineEnd = text.indexOf('\n', to);
+  let rest = text.slice(to, lineEnd < 0 || lineEnd > end ? end : lineEnd);
+  // An ATX heading's closing hashes, before its attributes.
+  if (/^ {0,3}#/.test(text.slice(start, from))) {
+    rest = rest.trim().replace(/^#+(?=\s|$)/, '');
+  }
+  rest = rest.trim();
+  if (rest !== '' && !ATTRIBUTES.test(rest)) return null;
+  const edits = markerEdits(inlines, view).sort((a, b) => a.from - b.from);
+  const content = edited(text, from, to, edits);
+  return `${'#'.repeat(level)} ${content}${rest === '' ? '' : ` ${rest}`}`;
+}
+
 const CAPTION_MARKER = /^ {0,3}([Tt]able:|:)[ \t]*$/;
 
 /**
@@ -460,6 +497,7 @@ const PRINTERS = {
   Div: printDiv,
   CodeBlock: printCode,
   Table: printTable,
+  Header: printHeader,
   // After a line of text, `---` would underline a setext heading.
   HorizontalRule: (_block, _view, context) => (context.fresh ? '---' : null),
 };

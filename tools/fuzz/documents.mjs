@@ -66,6 +66,10 @@ const BLOCKS = [
   'Right | Left | Mid\n--:|:--|:-:\n1 | `a|b` | x \\| y\n | | *e*',
   '| wide cell text here | b |\n|-|-|\n| c |',
   '|a|\n|-|\n|日本語|',
+  '##  Closed *heading* ## {#id .c}',
+  'Setext {.cls}\n---',
+  '\\begin{x}y\\end{x} setext after raw\n===',
+  '###### Six\n\n####### seven is text',
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.
