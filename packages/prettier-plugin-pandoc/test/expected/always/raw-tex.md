@@ -24,11 +24,13 @@ somewhere along the way.
 
 \begin{center}
 x
-\end{center} and text after the end, which Pandoc reads as a paragraph of its own.
+\end{center} and text after the end, which Pandoc reads as a paragraph of its
+own.
 
 \newpage \begin{center}
 a run
-\end{center} \vspace{1em} and text after the run, which Pandoc reads as a paragraph that the formatter may wrap.
+\end{center} \vspace{1em} and text after the run, which Pandoc reads as a
+paragraph that the formatter may wrap.
 
 \section*{Heading} text after a block command, a paragraph of its own.
 
@@ -39,10 +41,9 @@ a run
 
 z
 \end{x}
-text
-    lazy
-- item
-  \begin{x}a\end{x} b
+
+text lazy - item
+\begin{x}a\end{x} b
 
 A raw command's group runs past a blank line, long enough to wrap, \foo{a
 

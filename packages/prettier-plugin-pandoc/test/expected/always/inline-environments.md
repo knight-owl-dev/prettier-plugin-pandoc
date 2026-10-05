@@ -1,6 +1,7 @@
 # Inline environments
 
-An environment written mid-line is raw TeX to Pandoc, which ends the paragraph around it: \begin{center}kept *as* written,
+An environment written mid-line is raw TeX to Pandoc, which ends the paragraph
+around it: \begin{center}kept *as* written,
 across its lines\end{center} and the text after it opens a paragraph of its own.
 
 - An item \begin{x}y_z\end{x} with one inside.
@@ -22,8 +23,8 @@ that splits \end{x} the paragraph*.
 A fence inside one is its raw text: \begin{x} b
 ```
 \end{x}
-```
-and the text after it a paragraph.
+
+``` and the text after it a paragraph.
 
 - An item whose environment \begin{x} holds
 
@@ -35,5 +36,5 @@ two\end{x} each raw.
 Text after one \begin{x}ends\end{x} underlined
 ===
 
-Link text holds one [as *text* \begin{x}y\end{x}](https://example.com) without
+Link text holds one [as _text_ \begin{x}y\end{x}](https://example.com) without
 ending the paragraph, and so do [plain brackets \begin{x}y\end{x}] around it.

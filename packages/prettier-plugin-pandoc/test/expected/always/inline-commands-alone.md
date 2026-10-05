@@ -42,7 +42,8 @@ wrap the paragraph.
 
 A paragraph whose last line is one: \noindent
 
-\newpage \emph{emphasis} after a block command, the rest of the line a paragraph.
+\newpage \emph{emphasis} after a block command, the rest of the line a
+paragraph.
 
 \foo \emph{x} with a command of no known kind first, one paragraph.
 

@@ -55,8 +55,9 @@ A fence Pandoc refuses is the definition's text.
 
 Term
 : lazy text
-```{.x} trailing
-more text
+  ```{.x} trailing
+  more text
+
 ```
 
 A fence after a definition's first line ends it.
@@ -64,5 +65,6 @@ A fence after a definition's first line ends it.
 Term
 : lazy text
 ```
+
 code after the list
 ```

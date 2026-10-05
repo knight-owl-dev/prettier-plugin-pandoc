@@ -40,10 +40,10 @@ Text after both closing fences.
 
 \newpage
     - an item whose lazy lines hold raw TeX and a div
-\begin{x}y\end{x} ::: note
-body
-:::
-A lazy line after the closing fence, still in the item.
+  \begin{x}y\end{x} ::: note
+  body
+  :::
+  A lazy line after the closing fence, still in the item.
 
 ::: chapter
 A paragraph in an enclosing div, long enough that the formatter would wrap it past the width.

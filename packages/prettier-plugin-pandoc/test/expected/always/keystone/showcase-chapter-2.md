@@ -231,9 +231,9 @@ easy[\footnote{Via the XeLaTeX engine with full Unicode support.}]{.latex-only}.
 ### Markdown Snippet Using Inline LaTeX-Only
 
 ```markdown
-Pandoc[, powered by \LaTeX,]{.latex-only} makes publishing
-easy[\footnote{Via the
-XeLaTeX engine with full Unicode support.} ]{.latex-only}.
+Pandoc[, powered by \LaTeX,]{.latex-only} makes publishing easy[\footnote{Via the
+XeLaTeX engine with full Unicode support.}
+]{.latex-only}.
 ```
 
 Two spans are used here:
@@ -320,8 +320,9 @@ This is a new chapter that starts on a new page.
 ## Poem Dates
 
 If you want to include dates in your poems, you can use the `::: poem-date`
-directive after defining a shortcut for the `align`
-div. This is useful for indicating when a poem was written or published while maintaining consistent formatting.
+directive after defining a shortcut for the `align` div. This is useful for
+indicating when a poem was written or published while maintaining consistent
+formatting.
 
 For example, add this to your shortcuts file:
 
@@ -499,8 +500,8 @@ the same sentence.
 
 ## Multi-Column Layouts
 
-Keystone supports multi-column layouts using the `multicol`
-div. Content flows automatically across columns in both PDF and EPUB output.
+Keystone supports multi-column layouts using the `multicol` div. Content flows
+automatically across columns in both PDF and EPUB output.
 
 ### Example Output Using Default Two Columns
 
