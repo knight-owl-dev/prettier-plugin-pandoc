@@ -3,14 +3,33 @@
 import { Node, Row } from './nodes.js';
 
 /**
- * Give a list read again from extracted text that text, as it was read:
- * a property JSON leaves out.
+ * Give a list read again from extracted text that text, as it was read,
+ * and for a list item's or definition's the columns its continuation lines
+ * were stripped of: properties JSON leaves out.
  *
  * @param {unknown[]} list
  * @param {import('../source-text.js').SourceText} contents
+ * @param {number} [indent]
  */
-export function withContents(list, contents) {
+export function withContents(list, contents, indent) {
+  if (Object.isFrozen(list)) return list;
   Object.defineProperty(list, 'contents', { value: contents });
+  if (indent !== undefined) {
+    Object.defineProperty(list, 'indent', { value: indent });
+  }
+  return list;
+}
+
+/**
+ * Give a list item's blocks the columns its continuation lines were
+ * stripped of.
+ *
+ * @param {unknown[]} list
+ * @param {number} indent
+ */
+export function withIndent(list, indent) {
+  if (Object.isFrozen(list)) return list;
+  Object.defineProperty(list, 'indent', { value: indent });
   return list;
 }
 
@@ -23,7 +42,9 @@ export function withContents(list, contents) {
  * @returns {T}
  */
 export const keepContents = (from, to) =>
-  from.contents === undefined ? to : withContents(to, from.contents);
+  from.contents === undefined
+    ? to
+    : withContents(to, from.contents, from.indent);
 
 /**
  * `value` rebuilt with each node's and row's span mapped, built values never
@@ -56,7 +77,7 @@ export function mapSpans(value, toStart, toEnd, outer) {
     const list = value.map((v) => mapSpans(v, toStart, toEnd, outer));
     const { contents } = value;
     if (outer === undefined || contents === undefined) return list;
-    return withContents(list, contents.through(outer));
+    return withContents(list, contents.through(outer), value.indent);
   }
   return Object.fromEntries(
     Object.entries(value).map(([k, v]) => [

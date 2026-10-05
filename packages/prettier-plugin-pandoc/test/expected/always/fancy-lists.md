@@ -1,6 +1,7 @@
 # Fancy lists
 
-a. A lettered item, long enough that a formatter wrapping prose at forty columns has to break it.
+a. A lettered item, long enough that a formatter wrapping prose at forty columns
+   has to break it.
 b. A second lettered item.
 
 A paragraph between the lists, long enough that the formatter wraps it at forty

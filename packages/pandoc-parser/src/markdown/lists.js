@@ -8,6 +8,7 @@
 
 import * as B from '../ast/builder.js';
 import { DefaultDelim, DefaultStyle } from '../ast/nodes.js';
+import { withIndent } from '../ast/spans.js';
 import { char, digit, newline, string } from '../char.js';
 import {
   alt,
@@ -373,7 +374,8 @@ export function listItem(fourSpaceRule, start) {
     const contents = parseFromStringFresh(ctx, parseBlocks, text);
     if (contents === FAIL) return FAIL;
     updateState(ctx, { parserContext: outer });
-    return taskListItemFromAscii(enabled(ctx, 'task_lists'), contents);
+    const item = withIndent(contents, first.indent);
+    return taskListItemFromAscii(enabled(ctx, 'task_lists'), item);
   });
 }
 

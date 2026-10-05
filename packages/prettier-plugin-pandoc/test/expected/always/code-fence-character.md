@@ -10,8 +10,7 @@ A backtick fence after an item's text, with no backtick fence to close it, is
 the item's text. The tildes after it open code, which backticks would turn into
 its close.
 
-- an item
-```
+- an item ```
 
 ~~~
 code after the list

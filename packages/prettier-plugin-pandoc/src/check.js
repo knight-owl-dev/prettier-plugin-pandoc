@@ -14,36 +14,41 @@ const readAs = (node) =>
   );
 
 /**
- * The source's blocks to hold, by index, for the output to read as the
- * source does: those between the reads' common start and end, and one on
- * either side, whose gaps may have made the difference. Null where the
- * reads are the same.
+ * The source's blocks that read differently, by index: those between the
+ * reads' common start and end, or the one before and after where none is.
+ * Null where the reads are the same.
  *
  * @param {{meta: object, blocks: object[]}} source
  * @param {{meta: object, blocks: object[]} | null} output
  * @returns {number[] | null}
  */
 function differing(source, output) {
-  if (output === null) return source.blocks.map((_, k) => k);
+  const all = source.blocks.map((_, k) => k);
+  if (output === null) return all;
   const a = source.blocks.map(readAs);
   const b = output.blocks.map(readAs);
   const n = a.length;
-  if (readAs(source.meta) !== readAs(output.meta)) return a.map((_, k) => k);
+  if (readAs(source.meta) !== readAs(output.meta)) return all;
   let i = 0;
   while (i < n && i < b.length && a[i] === b[i]) i++;
   if (i === n && i === b.length) return null;
   let j = 0;
   while (j < n - i && j < b.length - i && a[n - 1 - j] === b[b.length - 1 - j])
     j++;
-  const out = [];
-  for (let k = Math.max(0, i - 1); k <= Math.min(n - 1, n - j); k++)
-    out.push(k);
-  return out;
+  // None of the source's differs where the output has one more: the gaps
+  // around it made it.
+  const [from, to] = i < n - j ? [i, n - j] : [i - 1, i + 1];
+  return all.slice(Math.max(0, from), Math.min(n, to));
 }
+
+// Rounds of holding what reads differently before the source is the output.
+const ROUNDS = 4;
 
 /**
  * What `render` prints holding the blocks that read differently, or the
- * source where that still does.
+ * source where that still does. Each round holds what the last left
+ * differing, and its neighbors where that was held already: holding no
+ * more than needs it, a second format holds the same.
  *
  * @param {{meta: object, blocks: object[]}} root The source's read.
  * @param {{originalText: string, pandocTabStop: number}} options
@@ -59,10 +64,15 @@ export function heldBlocks(root, options, render) {
     }
   };
   const held = new Set();
-  const out = render(held);
-  const diff = differing(root, read(out));
-  if (diff === null) return out;
-  for (const k of diff) held.add(k);
-  const again = render(held);
-  return differing(root, read(again)) === null ? again : options.originalText;
+  for (let round = 0; round < ROUNDS; round++) {
+    const out = render(held);
+    const diff = differing(root, read(out));
+    if (diff === null) return out;
+    const size = held.size;
+    for (const k of diff) held.add(k);
+    if (held.size === size) {
+      for (const k of diff) held.add(k - 1).add(k + 1);
+    }
+  }
+  return options.originalText;
 }

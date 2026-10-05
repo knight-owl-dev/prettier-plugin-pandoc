@@ -32,7 +32,6 @@ const TODO = new Set([
   'preserve/raw-tex.md',
   'preserve/simple-tables.md',
   'preserve/stretch-div-fences.md',
-  'preserve/stretch-unclosed-div.md',
   'preserve/keystone/dialog-chapter.md',
   'preserve/keystone/elements-18-shortcut-composition.md',
   'preserve/keystone/showcase-appendix-a.md',
@@ -60,18 +59,13 @@ const TODO = new Set([
   'always/simple-tables.md',
   'always/stretch-div-fences.md',
   'always/stretch-trailing-space.md',
-  'always/stretch-unclosed-div.md',
-  'always/verbatim-commands.md',
   'always/wrap-hazards.md',
   'always/keystone/conditionals-chapter.md',
   'always/keystone/dialog-chapter.md',
-  'always/keystone/elements-04-pullquote.md',
   'always/keystone/elements-11-font.md',
-  'always/keystone/elements-15-nesting.md',
   'always/keystone/elements-18-shortcut-composition.md',
   'always/keystone/showcase-appendix-a.md',
   'always/keystone/showcase-chapter-2.md',
-  'always/keystone/warnings-as-errors-unclosed-div.md',
 ]);
 
 const corpus = readdirSync(CORPUS, { recursive: true }).filter(

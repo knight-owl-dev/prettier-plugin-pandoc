@@ -40,19 +40,25 @@ export function readMarkdown(source, options) {
 }
 
 /**
- * Whether a paragraph at the top level goes on past the end of a line
- * when `next` follows it: Pandoc's `endline` there, and an inline after
- * it — a block's closing tag or raw TeX is none.
+ * Whether a paragraph goes on past the end of a line when `next` follows
+ * it: Pandoc's `endline` there, and an inline after it — a block's closing
+ * tag or raw TeX is none. `inListItem` and `divLevel` give the paragraph's
+ * context: in a list item, a list start ends it; in a div, a closing fence.
  *
  * @see Text.Pandoc.Readers.Markdown.endline
  * @see Text.Pandoc.Readers.Markdown.inlines1
  * @param {string} next
- * @param {{tabStop?: number}} [options]
+ * @param {{tabStop?: number, inListItem?: boolean, divLevel?: number}} [options]
  */
-export function continuesParagraph(next, options) {
+export function continuesParagraph(next, options = {}) {
   const opts = readerOptions(options);
   const { text } = readerInput(`\n${next}`, opts.tabStop);
-  const ctx = { text, pos: 0, state: defaultParserState(opts) };
+  const state = {
+    ...defaultParserState(opts),
+    parserContext: options.inListItem ? 'ListItemState' : 'NullState',
+    fencedDivLevel: options.divLevel ?? 0,
+  };
+  const ctx = { text, pos: 0, state };
   if (endline(ctx) === FAIL) return false;
   return ctx.pos === text.length || inline(ctx) !== FAIL;
 }

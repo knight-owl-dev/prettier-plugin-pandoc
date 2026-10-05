@@ -42,10 +42,13 @@ export function readerInput(source, tabStop, newlines = NEWLINES) {
   const parts = [];
   // bounds[o]: the source offset at text offset o.
   const bounds = [];
+  // units[o]: the source text offset o stands for.
+  const units = [];
   const emit = (unit, from, to) => {
     if (bounds.length === 0) bounds.push(from);
     parts.push(unit);
     bounds.push(to);
+    units.push([from, to]);
   };
   let column = 0;
   for (let i = source.charCodeAt(0) === 0xfeff ? 1 : 0; i < source.length; ) {
@@ -71,7 +74,7 @@ export function readerInput(source, tabStop, newlines = NEWLINES) {
   return {
     text,
     toSource: (offset) => bounds[offset],
-    input: inputOf(source, text, bounds),
+    input: inputOf(source, text, units),
   };
 }
 
@@ -85,21 +88,30 @@ function withNewlines(text, newlines) {
   return trailing >= newlines ? text : text + '\n'.repeat(newlines - trailing);
 }
 
-// `text` as a `SourceText` over `source`: runs it copies as copies, each
-// other character standing for its bounds — a tab's space, a newline after
-// a dropped carriage return.
-function inputOf(source, text, bounds) {
-  const copies = (o) =>
-    bounds[o + 1] - bounds[o] === 1 && source[bounds[o]] === text[o];
+// `text` as a `SourceText` over `source`, from what each of its characters
+// stands for: runs copied as copies, a tab's spaces each standing for the
+// tab, the newlines added at the end for nothing at the source's end.
+function inputOf(source, text, units) {
+  const copies = (o) => {
+    const [from, to] = units[o];
+    return to - from === 1 && source[from] === text[o];
+  };
   const parts = [];
   let run = 0;
-  for (let o = 0; o <= text.length; o++) {
-    if (o < text.length && copies(o)) continue;
-    if (run < o) parts.push(SourceText.slice(source, bounds[run], bounds[o]));
-    if (o < text.length) {
-      parts.push(SourceText.synth(text[o], bounds[o], bounds[o + 1]));
+  for (let o = 0; o <= units.length; o++) {
+    const joins = o < units.length && copies(o);
+    if (joins && (o === run || units[o][0] === units[o - 1][1])) continue;
+    if (run < o) {
+      parts.push(SourceText.slice(source, units[run][0], units[o - 1][1]));
+    }
+    run = o;
+    if (joins) continue;
+    if (o < units.length) {
+      parts.push(SourceText.synth(text[o], units[o][0], units[o][1]));
     }
     run = o + 1;
   }
+  const end = source.length;
+  parts.push(SourceText.synth(text.slice(units.length), end, end));
   return SourceText.concat(parts);
 }

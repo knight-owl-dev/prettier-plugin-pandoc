@@ -28,4 +28,6 @@ the host.
 - **Structure from the AST, text from spans; what reads differently prints as
   written:** `print.js`, `check.js`.
 - **A line breaks only where Pandoc reads the paragraph on:** `wrap.js`.
+- **A container prints from the contents the parser read, its prefixes
+  rebuilt:** `blocks.js`.
 - **Keep issue numbers out of commit messages.** They belong in the PR.
