@@ -63,6 +63,8 @@ const WORDS = [
   ...['[r]:', '%', '*em', 'ph*', '`co', 'de`', '$x', 'y$', '"q', "it's"],
   ...['---|---', '|a|', '+--+', '--', '-----', '\\', 'x\\', '<!--', '-->'],
   ...['*x*', '_y_', '__s__', '**t**', 'a*b*c', '***u***', '*a', 'b*', '_c'],
+  ...['[a long link text](http://u)', '[two\nlines](u)', '![alt text](i.png)'],
+  ...['[x *y* z](u "a title")', '<http://auto.link>', '[ref link][r]'],
 ];
 
 const prose = ({ below, pick }) =>

@@ -36,7 +36,6 @@ const TODO = new Set([
   'always/inline-constructs.md',
   'always/inline-environments.md',
   'always/inline-math.md',
-  'always/inline-tex.md',
   'always/lazy-containers.md',
   'always/nesting.md',
   'always/quote-lazy-lines.md',
