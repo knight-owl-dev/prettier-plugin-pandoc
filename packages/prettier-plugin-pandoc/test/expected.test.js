@@ -11,11 +11,7 @@ import plugin from '../src/index.js';
 const CORPUS = new URL('./corpus/', import.meta.url);
 const EXPECTED = new URL('./expected/', import.meta.url);
 
-const TODO = new Set([
-  // Table captions: table formatting.
-  'preserve/simple-tables.md',
-  'always/simple-tables.md',
-]);
+const TODO = new Set([]);
 
 const corpus = readdirSync(CORPUS, { recursive: true }).filter(
   (f) => f.endsWith('.md') && !f.endsWith('README.md'),

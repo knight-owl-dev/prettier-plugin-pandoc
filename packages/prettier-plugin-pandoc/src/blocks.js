@@ -377,6 +377,33 @@ function printDiv(block, view, context, options) {
   return lines.join('\n');
 }
 
+const CAPTION_MARKER = /^ {0,3}([Tt]able:|:)[ \t]*$/;
+
+/**
+ * A table: its caption as a paragraph, after its marker and a space; the
+ * rest as written.
+ *
+ * @param {object} block
+ * @param {View} view
+ * @param {Context} context
+ * @param {object} options
+ */
+function printTable(block, view, context, options) {
+  const [, [, captionBlocks]] = block.c;
+  if (captionBlocks.length !== 1 || captionBlocks[0].t !== 'Plain') return null;
+  const [caption] = captionBlocks;
+  const { text } = view;
+  const [start, end] = extent(block, view);
+  const [from, to] = [view.start(caption.start), view.end(caption.end)];
+  const line = lineStart(text, from);
+  const marker = CAPTION_MARKER.exec(text.slice(line, from))?.[1];
+  if (marker === undefined || line < start || to > end) return null;
+  const here = { ...context, column: marker.length + 1 };
+  const words = reflow(caption, view, options, here);
+  if (words === null) return null;
+  return `${text.slice(start, line)}${marker} ${words}${text.slice(to, end)}`;
+}
+
 /**
  * A paragraph, or plain text in a tight item, through its words
  * (wrap.js).
@@ -411,6 +438,7 @@ const PRINTERS = {
   DefinitionList: printDefinitionList,
   Div: printDiv,
   CodeBlock: printCode,
+  Table: printTable,
   // After a line of text, `---` would underline a setext heading.
   HorizontalRule: (_block, _view, context) => (context.fresh ? '---' : null),
 };
