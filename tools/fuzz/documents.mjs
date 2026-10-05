@@ -63,6 +63,9 @@ const BLOCKS = [
   'ends in a bare command, \\relax  \n\\begin{y}z\\end{y}',
   '| a | b |\n|---|--:|\n| 1 | 2 |\n\nTable:  a caption long enough to wrap at the narrow widths',
   ':  before *it*\n\n  a  b\n  -- --\n  1  2',
+  'Right | Left | Mid\n--:|:--|:-:\n1 | `a|b` | x \\| y\n | | *e*',
+  '| wide cell text here | b |\n|-|-|\n| c |',
+  '|a|\n|-|\n|日本語|',
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.
