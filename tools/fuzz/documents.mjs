@@ -102,7 +102,10 @@ function nested(r, depth = 0) {
     case 0:
       return indent(inner, pick(['> ', '>']));
     case 1: {
-      const marker = pick(['- ', '* ', '1. ', 'a) ', '(@) ', '-\t', '-   ']);
+      const marker = pick([
+        ...['- ', '* ', '+ ', '1. ', '1) ', '10. ', '#. ', 'a) ', '(@) '],
+        ...['(1) ', 'ii. ', '-\t', '-   ', '1.  ', '* [ ] '],
+      ]);
       const width = marker.replace('\t', '    ').length;
       const more = below(2) ? `\n${marker}${prose(r)}` : '';
       return marker + indent(inner, ' '.repeat(width)).trimStart() + more;
@@ -118,7 +121,7 @@ function nested(r, depth = 0) {
     case 5:
       return `> ${prose(r)}\n${prose(r)}`;
     default:
-      return `${pick(['- ', '1. '])}${prose(r)}\n${prose(r)}`;
+      return `${pick(['- ', '1. ', '3) '])}${prose(r)}\n${pick(['- ', '* ', '1. ', '2. ', '1) '])}${prose(r)}`;
   }
 }
 

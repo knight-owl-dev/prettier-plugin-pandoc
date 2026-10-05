@@ -179,6 +179,7 @@ function isPara(text, read) {
  * @property {number} divLevel
  * @property {string | null} [inHtmlBlock] The HTML block it is in, `div`.
  * @property {boolean} [fresh] Whether a blank line, or nothing, precedes it.
+ * @property {number} [siblings] Blocks of its kind right before it.
  */
 
 /**

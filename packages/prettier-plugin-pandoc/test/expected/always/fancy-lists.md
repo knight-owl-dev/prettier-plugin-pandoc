@@ -20,9 +20,9 @@ ii. Roman two
 2) Its second item.
 
 1. A plain list
-#. continued by a hash item prettier does not read as one
+2. continued by a hash item prettier does not read as one
 
-1. A plain list with
+3. A plain list with
    a. a fancy list nested in it
    b. and its second item
 
