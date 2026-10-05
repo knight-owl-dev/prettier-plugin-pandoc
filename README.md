@@ -8,9 +8,10 @@ prints structure from that read and text as the source wrote it. It then reads
 its output again: what reads differently prints as written.
 
 Status: pre-release. Nothing is published yet. Formatting so far: one blank line
-between top-level blocks, paragraphs reflowed, and block quotes, lists,
-definition lists and fenced divs printed from their structure. Other blocks
-print as written until their construct gains formatting.
+between top-level blocks, paragraphs reflowed, fenced code with a fence fit for
+its content, and block quotes, lists, definition lists and fenced divs printed
+from their structure. Other blocks print as written until their construct gains
+formatting.
 
 ## Packages
 
@@ -33,8 +34,9 @@ For documents built with `pandoc --tab-stop=8`, in `.prettierrc`:
 
 Prettier's `proseWrap` reflows paragraphs: `preserve` (the default) keeps every
 line break where the author put it, `always` fills to `printWidth`, `never`
-joins each paragraph into one line. `embeddedLanguageFormatting` has no effect
-yet.
+joins each paragraph into one line. `embeddedLanguageFormatting` `auto`, the
+default, reformats a fenced sample tagged with a language prettier formats
+(`yaml`, `json`, …); `off` prints every sample as written.
 
 ## Preserve, never repair
 

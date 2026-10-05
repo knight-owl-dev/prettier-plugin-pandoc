@@ -27,6 +27,8 @@ const { assertNested } = await load(
   'packages/pandoc-parser/test/helpers/spans.js',
 );
 
+// Formatted samples compare by their attributes, as the fuzzer compares them.
+const formats = found.embeddedLanguageFormatting === 'auto';
 const format = (doc) =>
   prettier.format(doc, {
     parser: 'markdown',
@@ -34,6 +36,7 @@ const format = (doc) =>
     pandocTabStop: found.tabStop,
     proseWrap: found.proseWrap,
     printWidth: found.printWidth,
+    embeddedLanguageFormatting: found.embeddedLanguageFormatting,
   });
 
 const isLaTeX = found.format?.startsWith('latex');
@@ -61,9 +64,10 @@ const FAILS = {
     return (await format(once)) !== once;
   },
   async misread(doc) {
-    const soft = { meta: true, soft: true };
+    const soft = { meta: true, soft: true, sample: () => formats };
     const read = (text) => comparable(readCli(text, found), soft);
-    return read(doc) !== read(await format(doc));
+    const source = read(doc);
+    return source !== 'ERROR' && source !== read(await format(doc));
   },
   differ: (doc) => pandoc(doc) !== mine(doc),
   span(doc) {

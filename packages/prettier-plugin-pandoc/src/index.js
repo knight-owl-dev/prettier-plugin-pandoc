@@ -8,7 +8,7 @@
 
 import { DEFAULT_TAB_STOP } from '@knight-owl-dev/pandoc-parser';
 import { parse } from './parse.js';
-import { print } from './print.js';
+import { embed, print } from './print.js';
 
 const AST_FORMAT = 'pandoc';
 
@@ -32,7 +32,7 @@ export const parsers = {
 };
 
 export const printers = {
-  [AST_FORMAT]: { print, getVisitorKeys: () => [] },
+  [AST_FORMAT]: { print, embed, getVisitorKeys: () => [] },
 };
 
 export default { options, parsers, printers };
