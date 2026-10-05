@@ -12,6 +12,7 @@ import {
 } from './blocks.js';
 import { heldBlocks } from './check.js';
 import { languageOf, parserFor } from './code.js';
+import { definitionsOf, printDefinition } from './notes.js';
 
 const { literalline } = doc.builders;
 const { printDocToString } = doc.printer;
@@ -48,6 +49,29 @@ function spaced(gap, first, last, tabStop) {
 }
 
 /**
+ * The source from `from` to `to`, each note definition inside printed.
+ *
+ * @param {string} text
+ * @param {number} from
+ * @param {number} to
+ * @param {import('./notes.js').Definition[]} definitions
+ * @param {import('./wrap.js').Context} context
+ * @param {object} options
+ */
+function withDefinitions(text, from, to, definitions, context, options) {
+  let out = '';
+  let at = from;
+  for (const definition of definitions) {
+    if (definition.start < at || definition.end > to) continue;
+    const printed = printDefinition(definition, context, options);
+    if (printed === null) continue;
+    out += text.slice(at, definition.start) + printed;
+    at = definition.end;
+  }
+  return out + text.slice(at, to);
+}
+
+/**
  * The document printed, a held block and the gaps next to it as written.
  *
  * @param {{t: string, start: number, end: number}[]} blocks
@@ -55,7 +79,7 @@ function spaced(gap, first, last, tabStop) {
  * @param {Set<number>} held
  * @param {object} options
  */
-function render(blocks, text, held, options) {
+function render(blocks, text, held, options, definitions = []) {
   const view = sourceView(text);
   const context = {
     width: options.printWidth,
@@ -68,7 +92,11 @@ function render(blocks, text, held, options) {
   for (let k = 0; k <= blocks.length; k++) {
     const from = k === 0 ? 0 : ends[k - 1];
     const to = k === blocks.length ? text.length : blocks[k].start;
-    const gap = text.slice(from, to);
+    // Where the self-check holds a block, definitions print as written.
+    const gap =
+      held.size > 0
+        ? text.slice(from, to)
+        : withDefinitions(text, from, to, definitions, context, options);
     out +=
       held.has(k - 1) || held.has(k)
         ? gap
@@ -109,9 +137,16 @@ function printRoot(root, options, samples) {
   const withSamples = { ...options, pandocSamples: samples };
   // Blocks prettier-ignore leaves as written, the text around them too.
   const ignored = ignoredOf(root.blocks);
+  const definitions = definitionsOf(root.blocks, text);
   const out = inOrder(root.blocks)
     ? heldBlocks(root, withSamples, (held) =>
-        render(root.blocks, text, new Set([...held, ...ignored]), withSamples),
+        render(
+          root.blocks,
+          text,
+          new Set([...held, ...ignored]),
+          withSamples,
+          definitions,
+        ),
       )
     : text;
   return replaceEndOfLine(out, literalline);

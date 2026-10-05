@@ -23,7 +23,7 @@ export const sourceView = (text) => ({
 });
 
 // A container's contents as the parser read them.
-const contentsView = (contents) => ({
+export const contentsView = (contents) => ({
   text: contents.text,
   start: (offset) => contents.toInnerStart(offset),
   end: (offset) => contents.toInnerEnd(offset),
@@ -78,7 +78,7 @@ function collapsed(gap, first, last) {
  * @param {object} options
  * @returns {string | null}
  */
-function printIn(blocks, view, from, to, context, options) {
+export function printIn(blocks, view, from, to, context, options) {
   const ignored = ignoredOf(blocks);
   let out = '';
   let at = from;
@@ -146,7 +146,7 @@ export function ignoredOf(blocks) {
  * @param {string} first
  * @param {string} rest
  */
-function prefixed(body, first, rest) {
+export function prefixed(body, first, rest) {
   return body
     .split('\n')
     .map((line, k) => {
