@@ -10,6 +10,7 @@
 // a lookup in a link's text, whose state `link` drops, still happened.
 
 import { Node, Row } from '../ast/nodes.js';
+import { keepContents } from '../ast/spans.js';
 import { EMPTY_MAP } from '../persistent-map.js';
 
 /** @typedef {import('../core.js').Context} Context */
@@ -146,8 +147,12 @@ function numberCitations(value, noteNum) {
     const cells = numberCitations(value.cells, noteNum);
     return new Row(value.attr, cells, value.start, value.end);
   }
-  if (Array.isArray(value))
-    return value.map((v) => numberCitations(v, noteNum));
+  if (Array.isArray(value)) {
+    return keepContents(
+      value,
+      value.map((v) => numberCitations(v, noteNum)),
+    );
+  }
   if (value === null || typeof value !== 'object' || Object.isFrozen(value)) {
     return value;
   }
@@ -189,7 +194,9 @@ function fillNotes(value, notes) {
       : Object.fromEntries(filled);
   }
   const filled = value.map((v) => fillNotes(v, notes));
-  return filled.every((v, i) => v === value[i]) ? value : filled;
+  return filled.every((v, i) => v === value[i])
+    ? value
+    : keepContents(value, filled);
 }
 
 /**

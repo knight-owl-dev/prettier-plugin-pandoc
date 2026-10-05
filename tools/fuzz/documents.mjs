@@ -140,7 +140,7 @@ const PREFIXES = [
 const LINES = [
   ...['text', 'more text', '', '    code', '\tcode', '- item', '> quote'],
   ...['```', '~~~', 'Term', ':   def', '\\begin{x}', '\\end{x}', '<div>'],
-  ...['</div>', '::: d', ':::', '| a |', '|---|'],
+  ...['</div>', '::: d', ':::', '| a |', '|---|', 'a[^n] b', '[^n]: a note'],
 ];
 
 /**

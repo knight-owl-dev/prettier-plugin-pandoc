@@ -48,3 +48,41 @@ test('spans: a note spans its reference, its contents their definition', () => {
   assert.equal(slice(note), '[^1]');
   assert.equal(slice(note.c[0]), ' The *note*.');
 });
+
+// A note defined in a container: its contents span its definition's text,
+// and map in and out of what the reader read them as.
+const DEFINED_IN = {
+  'a block quote': [
+    '> a[^q]\n>\n> [^q]: In a *quote*,\n>     indented.\n',
+    'In a *quote*',
+  ],
+  'a list item': ['- a[^i]\n\n  [^i]: In an *item*.\n', 'In an *item*.'],
+  'a definition': [
+    'Term\n:   a[^d]\n\n    [^d]: In a *definition*.\n',
+    'In a *definition*.',
+  ],
+  'a quote in an item': ['- > a[^n]\n  >\n  > [^n]: *Nested*.\n', '*Nested*.'],
+};
+
+const notesIn = (value, out = []) => {
+  if (Array.isArray(value)) for (const v of value) notesIn(v, out);
+  else if (value !== null && typeof value === 'object') {
+    if (value.t === 'Note') out.push(value);
+    for (const v of Object.values(value)) notesIn(v, out);
+  }
+  return out;
+};
+
+for (const [where, [text, first]] of Object.entries(DEFINED_IN)) {
+  for (const tabStop of TAB_STOPS) {
+    test(`a note defined in ${where} spans its definition (tab stop ${tabStop})`, () => {
+      const [note] = notesIn(readMarkdown(text, { tabStop }).blocks);
+      const [para] = note.c;
+      assert.ok(text.slice(para.start, para.end).includes(first));
+      const { contents } = note.c;
+      const from = contents.toInnerStart(para.start);
+      assert.equal(contents.toOuterStart(from), para.start);
+      assert.ok(contents.text.slice(from).trimStart().startsWith(first));
+    });
+  }
+}
