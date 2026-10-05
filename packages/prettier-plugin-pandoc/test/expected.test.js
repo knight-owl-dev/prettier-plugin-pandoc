@@ -14,8 +14,6 @@ const EXPECTED = new URL('./expected/', import.meta.url);
 const TODO = new Set([
   'preserve/block-commands-mid-line.md',
   'preserve/code-last-line-space.md',
-  'preserve/code-misreads.md',
-  'preserve/code-samples.md',
   'preserve/definition-bodies.md',
   'preserve/divs.md',
   'preserve/example-lists.md',
@@ -39,7 +37,6 @@ const TODO = new Set([
   'always/block-commands-mid-line.md',
   'always/code-last-line-space.md',
   'always/code-misreads.md',
-  'always/code-samples.md',
   'always/definition-bodies.md',
   'always/divs.md',
   'always/example-lists.md',

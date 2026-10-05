@@ -21,6 +21,7 @@ const cases = Array.from({ length: Number(n) }, () => {
     tabStop: pick([2, 4, 8]),
     proseWrap: pick(['always', 'always', 'never', 'preserve']),
     printWidth: pick([10, 20, 40, 80]),
+    embeddedLanguageFormatting: pick(['auto', 'off']),
   };
 });
 
@@ -34,6 +35,7 @@ for (const c of cases) {
     pandocTabStop: c.tabStop,
     proseWrap: c.proseWrap,
     printWidth: c.printWidth,
+    embeddedLanguageFormatting: c.embeddedLanguageFormatting,
   };
   let once;
   try {
@@ -53,8 +55,22 @@ const read = (texts) =>
   readAll(texts.map((text, k) => ({ text, tabStop: cases[k].tabStop })));
 const before = read(cases.map((c) => c.doc));
 const after = read(formatted);
-const soft = { meta: true, soft: true };
+// The languages prettier formats a sample in, by name, alias or extension.
+const { languages } = await prettier.getSupportInfo();
+const names = new Set(
+  languages.flatMap((l) => [
+    l.name.toLowerCase(),
+    ...(l.aliases ?? []),
+    ...(l.extensions ?? []).map((e) => e.slice(1)),
+  ]),
+);
 for (const [k, c] of cases.entries()) {
+  const formats = c.embeddedLanguageFormatting === 'auto';
+  const soft = {
+    meta: true,
+    soft: true,
+    sample: (language) => formats && names.has(language.toLowerCase()),
+  };
   if (comparable(before[k], soft) === comparable(after[k], soft)) continue;
   // Lua's read leaves tabs unexpanded: the CLI confirms.
   const cli = (text) => comparable(readCli(text, c), soft);

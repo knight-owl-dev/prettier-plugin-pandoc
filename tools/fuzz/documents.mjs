@@ -39,6 +39,13 @@ const BLOCKS = [
   '<span>s</span>',
   '  - nested\n    - deeper',
   '% Title',
+  '```yaml\na:   1\nb: [ x,y ]\n```',
+  '```json\n{"a":1}\n```',
+  '~~~ {.js}\nlet  x=1\n~~~',
+  '````\n```\nnested\n```\n````',
+  '```markdown\n*  item\n```',
+  '```yaml\n: not yaml\n```',
+  '``` lua\nlocal  x\n```',
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.

@@ -85,16 +85,22 @@ export function nativeCli(text, { format = 'markdown', tabStop = 4 } = {}) {
 
 /**
  * A read to compare: its blocks, and its metadata where `meta`, soft breaks
- * as spaces where `soft`. `ERROR` for a read that failed.
+ * as spaces where `soft`, and code in a language `sample` names by its
+ * attributes alone, prettier's to lay out. `ERROR` for a read that failed.
  *
  * @param {string | null} json
- * @param {{meta?: boolean, soft?: boolean}} [options]
+ * @param {{meta?: boolean, soft?: boolean, sample?: (language: string) => boolean}} [options]
  */
-export function comparable(json, { meta = false, soft = false } = {}) {
+export function comparable(json, { meta = false, soft = false, sample } = {}) {
   if (json === null) return 'HANG';
   if (json.startsWith('ERROR')) return 'ERROR';
-  const doc = JSON.parse(json, (_, v) =>
-    soft && v?.t === 'SoftBreak' ? { t: 'Space' } : v,
-  );
+  const doc = JSON.parse(json, (_, v) => {
+    if (soft && v?.t === 'SoftBreak') return { t: 'Space' };
+    const language = v?.t === 'CodeBlock' ? v.c[0][1][0] : undefined;
+    if (language !== undefined && sample?.(language)) {
+      return { t: 'CodeBlock', c: [v.c[0]] };
+    }
+    return v;
+  });
   return JSON.stringify(meta ? [doc.meta, doc.blocks] : doc.blocks);
 }

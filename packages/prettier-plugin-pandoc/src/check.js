@@ -4,14 +4,31 @@
 // still does, the source is the output.
 
 import { readMarkdown, withoutSpans } from '@knight-owl-dev/pandoc-parser';
+import { languageOf, parserFor } from './code.js';
 
 const SPACE = { t: 'Space' };
 
-// A node's read, spans left out, as text to compare.
-const readAs = (node) =>
-  JSON.stringify(withoutSpans(node), (_, v) =>
-    v?.t === 'SoftBreak' ? SPACE : v,
-  );
+/**
+ * A node's read, spans left out, as text to compare: a formatted sample by
+ * its attributes alone, prettier's to lay out, as the oracle compares it.
+ *
+ * @param {{pandocSamples?: Map<object, string>, plugins: object[]}} options
+ */
+const readerOf = (options) => {
+  const formats = options.pandocSamples?.size > 0;
+  return (node) =>
+    JSON.stringify(withoutSpans(node), (_, v) => {
+      if (v?.t === 'SoftBreak') return SPACE;
+      if (
+        formats &&
+        v?.t === 'CodeBlock' &&
+        parserFor(languageOf(v), options)
+      ) {
+        return { t: 'CodeBlock', c: [v.c[0]] };
+      }
+      return v;
+    });
+};
 
 /**
  * The source's blocks that read differently, by index: those between the
@@ -22,7 +39,7 @@ const readAs = (node) =>
  * @param {{meta: object, blocks: object[]} | null} output
  * @returns {number[] | null}
  */
-function differing(source, output) {
+function differing(source, output, readAs) {
   const all = source.blocks.map((_, k) => k);
   if (output === null) return all;
   const a = source.blocks.map(readAs);
@@ -55,6 +72,7 @@ const ROUNDS = 4;
  * @param {(held: Set<number>) => string} render
  */
 export function heldBlocks(root, options, render) {
+  const readAs = readerOf(options);
   // Text that fails to read — YAML that is none — reads differently.
   const read = (text) => {
     try {
@@ -66,7 +84,7 @@ export function heldBlocks(root, options, render) {
   const held = new Set();
   for (let round = 0; round < ROUNDS; round++) {
     const out = render(held);
-    const diff = differing(root, read(out));
+    const diff = differing(root, read(out), readAs);
     if (diff === null) return out;
     const size = held.size;
     for (const k of diff) held.add(k);
