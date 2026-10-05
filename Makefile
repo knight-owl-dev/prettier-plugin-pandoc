@@ -4,8 +4,6 @@
 # readability; the digest is what resolves, so bump both together.
 CI_TOOLS_IMAGE ?= ghcr.io/knight-owl-dev/ci-tools:v1.5.0@sha256:e6f787624a5b19f7784c550a728d3574108f12488fb1f835f91bccdba7c3e32f
 
-TEST_IMAGE ?= prettier-plugin-pandoc-test:local
-
 # Whether a human is watching, probed once.
 IS_TTY := $(shell test -t 0 && echo 1)
 
@@ -14,30 +12,78 @@ IS_TTY := $(shell test -t 0 && echo 1)
 DOCKER_TTY ?= $(if $(IS_TTY),-t)
 
 .PHONY: resolve test test-image lint lint-fix lint-actions lint-docker lint-js \
-	lint-js-fix lint-md lint-md-fix lint-md-fmt lint-md-fmt-fix lint-spell help
+	lint-js-fix lint-md lint-md-fix lint-md-fmt lint-md-fmt-fix lint-spell help \
+	fuzz-print fuzz-parser shrink probe snapshots-diff snapshots-write bench \
+	bench-compare
 
-# Node and npm come from the test image, never the host. It runs as the
-# invoking user, so node_modules on the mount stays the host's to delete.
-# Funding and update notices are noise in every log they reach.
-TEST_RUNNER = docker run --rm $(DOCKER_TTY) --user "$$(id -u):$$(id -g)" \
-	-e HOME=/tmp -e NPM_CONFIG_FUND=false -e NPM_CONFIG_UPDATE_NOTIFIER=false \
-	-v "$(CURDIR):/work" -w /work $(TEST_IMAGE)
+# Node, npm and Pandoc come from the compose services (docker-compose.yaml),
+# never the host. They run as the invoking user, so node_modules on the mount
+# stays the host's to delete.
+COMPOSE = DOCKER_UID=$$(id -u) DOCKER_GID=$$(id -g) docker compose --progress quiet
 
-# No build context: the image copies nothing from the repo.
+# Each command in the `node` service, killed after TIMEOUT seconds: a hung
+# parse otherwise blocks forever.
+TIMEOUT ?= 1800
+RUN = tools/run.sh $(TIMEOUT)
+
 test-image:
-	@docker build -q -t $(TEST_IMAGE) - < test/Dockerfile > /dev/null
+	@$(COMPOSE) build node
 
 # npm writes this file on every install, so it dates the tree it describes.
 node_modules/.package-lock.json: package-lock.json | test-image
-	@$(TEST_RUNNER) npm ci --ignore-scripts
+	@$(COMPOSE) run --rm -T npm ci --ignore-scripts
 
 # Re-resolve the dependency tree into package-lock.json
 resolve: test-image
-	@$(TEST_RUNNER) npm install --ignore-scripts
+	@$(COMPOSE) run --rm -T npm install --ignore-scripts
 
 # Run every package's tests, the Pandoc oracle included
 test: test-image node_modules/.package-lock.json
-	@$(TEST_RUNNER) node --test
+	@$(RUN) node --test
+
+# The tools: docs/playbook.md says when to reach for each.
+N ?= 1500
+SEED ?= 1
+SHOW ?= 4
+KIND ?= markdown
+EXT ?=
+LINE ?= 1
+FORMAT ?= markdown
+WHAT ?= all
+REF ?= main
+RUNS ?= 5
+
+fuzz-print: test-image node_modules/.package-lock.json
+	@$(RUN) node tools/fuzz/print.mjs $(N) $(SEED) $(SHOW)
+
+fuzz-parser: test-image node_modules/.package-lock.json
+	@$(RUN) node tools/fuzz/parser.mjs $(KIND) $(N) $(SEED) $(SHOW) '$(EXT)'
+
+shrink: test-image node_modules/.package-lock.json
+	@test -n "$(CASE)" || { echo "CASE=<cases.jsonl> [LINE=n]" >&2; exit 2; }
+	@$(RUN) node tools/shrink.mjs '$(CASE)' $(LINE)
+
+probe: test-image node_modules/.package-lock.json
+	@$(RUN) node tools/probe.mjs '$(FILE)' '$(FORMAT)' '$(SPANS)'
+
+snapshots-diff: test-image node_modules/.package-lock.json
+	@$(RUN) node tools/snapshots.mjs diff $(KEYS)
+
+snapshots-write: test-image node_modules/.package-lock.json
+	@$(RUN) node tools/snapshots.mjs write $(KEYS)
+
+bench: test-image node_modules/.package-lock.json
+	@$(RUN) env COMMIT=$$(git rev-parse --short HEAD) \
+		node tools/bench/run.mjs $(WHAT) HEAD $(RUNS)
+
+# The baseline runs in a worktree of REF; this checkout's documents feed both.
+bench-compare: test-image node_modules/.package-lock.json
+	@tools/baseline.sh add $(REF)
+	@$(RUN) env ROOT=/work/.scratch/wt/base COMMIT=$$(git rev-parse --short $(REF)) \
+		node tools/bench/run.mjs $(WHAT) base $(RUNS); \
+		status=$$?; tools/baseline.sh remove; test $$status -eq 0
+	@$(MAKE) --no-print-directory bench
+	@$(RUN) node tools/bench/compare.mjs base HEAD
 
 # The lint targets invoke their tools bare; the aggregate targets re-enter the
 # ci-tools image, so the toolchain is the pinned one wherever make runs.
@@ -60,7 +106,7 @@ lint-actions:
 		&& validate-action-pins .github/workflows/*.yml && echo "OK"
 
 lint-docker:
-	@echo "Linting Dockerfile..." && hadolint test/Dockerfile && echo "OK"
+	@echo "Linting Dockerfile..." && hadolint tools/Dockerfile && echo "OK"
 
 # --error-on-warnings: Biome reports most rules as warnings, which would
 # otherwise exit 0.
@@ -104,4 +150,14 @@ help:
 	@echo "  make lint-md-fmt-fix   Format Markdown files (prettier)"
 	@echo "  make lint-spell        Check spelling"
 	@echo "  make help              Show this message"
+	@echo ""
+	@echo "Tools (docs/playbook.md; TIMEOUT=seconds kills a hung run):"
+	@echo "  make fuzz-print        Fuzz the plugin against Pandoc [N SEED SHOW]"
+	@echo "  make fuzz-parser       Fuzz pandoc-parser against Pandoc [KIND N SEED SHOW EXT]"
+	@echo "  make shrink            Shrink a fuzz failure (CASE=<file.jsonl> [LINE])"
+	@echo "  make probe             Pandoc's read beside pandoc-parser's [FILE FORMAT SPANS=1]"
+	@echo "  make snapshots-diff    Diff the plugin's output against its snapshots [KEYS]"
+	@echo "  make snapshots-write   Make the plugin's output its snapshots [KEYS]"
+	@echo "  make bench             Benchmark the parser and plugin [WHAT RUNS]"
+	@echo "  make bench-compare     Benchmark against REF (default main) [WHAT RUNS]"
 	@echo ""

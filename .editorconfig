@@ -11,7 +11,7 @@ indent_style = space
 indent_size = 4
 
 # JavaScript, read by Biome
-[*.js]
+[*.{js,mjs}]
 indent_size = 2
 max_line_length = 80
 

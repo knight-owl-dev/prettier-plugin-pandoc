@@ -9,6 +9,7 @@
     "includes": [
       "packages/*/src/**/*.js",
       "packages/*/test/**/*.js",
+      "tools/**/*.mjs",
       "**/*.json",
       "**/*.jsonc",
       "!package-lock.json"

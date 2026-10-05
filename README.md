@@ -48,7 +48,8 @@ would change what the document means.
 Run `make help` for the commands. Tests run in a test image carrying Node and a
 pinned Pandoc: formatting must leave Pandoc's parse of every corpus file
 unchanged, and that parse is the oracle. The plugin's `test/expected/` holds the
-output aimed at.
+output aimed at. [docs/playbook.md](docs/playbook.md) has the recipes for
+fuzzing, probing, snapshots and benchmarks.
 
 ## License
 

@@ -1,4 +1,4 @@
-# Test image: Node for the suite, Pandoc for its oracle.
+# The test image: Node for the suite and the tools, Pandoc for the oracle.
 #
 # The oracle asks Pandoc whether formatting changed what a document means, so
 # the Pandoc here is the reader under test. Its binary is static: copied onto
