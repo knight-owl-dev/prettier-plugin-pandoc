@@ -70,6 +70,8 @@ const BLOCKS = [
   'Setext {.cls}\n---',
   '\\begin{x}y\\end{x} setext after raw\n===',
   '###### Six\n\n####### seven is text',
+  '- item\n\n  ---\n\n  after the break',
+  '1. one\n\n   * * *\n\n2. two',
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.

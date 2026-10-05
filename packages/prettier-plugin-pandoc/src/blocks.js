@@ -295,6 +295,8 @@ function printItems(
       (opening ? context.column : 0) + expandTabs(first, tabStop).length;
     const head = alone === null ? Math.max(0, markerEnd - strip) : 0;
     const within = { ...context, inListItem: true, width, column: head };
+    // A list's sibling index for a break inside (prettier's choice).
+    if (!definitions) within.listSiblings = context.siblings ?? 0;
     const body = printIn(item, inner, 0, inner.text.length, within, options);
     if (body === null) return null;
     if (definitions || out !== '') {
@@ -570,8 +572,13 @@ const PRINTERS = {
   CodeBlock: printCode,
   Table: printTable,
   Header: printHeader,
-  // After a line of text, `---` would underline a setext heading.
-  HorizontalRule: (_block, _view, context) => (context.fresh ? '---' : null),
+  // After a line of text, `---` would underline a setext heading. In a
+  // list, prettier keeps a break unlike the list's `-` bullets.
+  HorizontalRule: (_block, _view, context) => {
+    if (!context.fresh) return null;
+    const { listSiblings } = context;
+    return listSiblings !== undefined && listSiblings % 2 === 0 ? '***' : '---';
+  },
 };
 
 // The column the end of `out` is at.
