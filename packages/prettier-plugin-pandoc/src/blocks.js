@@ -5,6 +5,7 @@
 
 import { readMarkdown } from '@knight-owl-dev/pandoc-parser';
 import { printCode } from './code.js';
+import { alignedPipeTable } from './tables.js';
 import { reflow } from './wrap.js';
 
 /** @typedef {import('./wrap.js').View} View */
@@ -380,8 +381,8 @@ function printDiv(block, view, context, options) {
 const CAPTION_MARKER = /^ {0,3}([Tt]able:|:)[ \t]*$/;
 
 /**
- * A table: its caption as a paragraph, after its marker and a space; the
- * rest as written.
+ * A table: a pipe table's rows aligned (tables.js), its caption as a
+ * paragraph after its marker and a space; the rest as written.
  *
  * @param {object} block
  * @param {View} view
@@ -389,19 +390,39 @@ const CAPTION_MARKER = /^ {0,3}([Tt]able:|:)[ \t]*$/;
  * @param {object} options
  */
 function printTable(block, view, context, options) {
+  const { text } = view;
+  const [start, end] = extent(block, view);
+  const edits = [
+    alignedPipeTable(block, view),
+    captionEdit(block, view, context, options),
+  ]
+    .filter((edit) => edit !== null && start <= edit.from && edit.to <= end)
+    .sort((a, b) => a.from - b.from);
+  if (edits.length === 0) return null;
+  let out = '';
+  let at = start;
+  for (const edit of edits) {
+    if (edit.from < at) return null;
+    out += text.slice(at, edit.from) + edit.text;
+    at = edit.to;
+  }
+  return out + text.slice(at, end);
+}
+
+// A caption's paragraph after its marker and a space, as an edit of the
+// line it starts on through its end.
+function captionEdit(block, view, context, options) {
   const [, [, captionBlocks]] = block.c;
   if (captionBlocks.length !== 1 || captionBlocks[0].t !== 'Plain') return null;
   const [caption] = captionBlocks;
   const { text } = view;
-  const [start, end] = extent(block, view);
   const [from, to] = [view.start(caption.start), view.end(caption.end)];
   const line = lineStart(text, from);
   const marker = CAPTION_MARKER.exec(text.slice(line, from))?.[1];
-  if (marker === undefined || line < start || to > end) return null;
+  if (marker === undefined) return null;
   const here = { ...context, column: marker.length + 1 };
   const words = reflow(caption, view, options, here);
-  if (words === null) return null;
-  return `${text.slice(start, line)}${marker} ${words}${text.slice(to, end)}`;
+  return words === null ? null : { from: line, to, text: `${marker} ${words}` };
 }
 
 /**
