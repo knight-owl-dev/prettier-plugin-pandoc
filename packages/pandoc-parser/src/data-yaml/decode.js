@@ -43,8 +43,35 @@ export function decodeAll(text) {
   if (!Array.isArray(docs)) return [];
   return docs.map((doc) => {
     if (doc.errors.length > 0) throw new YamlError(doc.errors[0].message);
+    if (atColumnZero(doc.contents, text)) {
+      throw new YamlError('did not find expected <document start>');
+    }
     return doc.contents === null ? null : parseO(doc.contents, doc);
   });
+}
+
+/**
+ * Whether a document's root is a block scalar with content at column 0.
+ * libyaml indents a block scalar at least one column, even at the root,
+ * where the spec allows none: content at column 0 ends the scalar, and the
+ * line is no document start.
+ *
+ * @see libyaml's yaml_parser_scan_block_scalar (`if (*indent < 1)`)
+ * @param {unknown} node
+ * @param {string} text
+ */
+function atColumnZero(node, text) {
+  if (!isScalar(node)) return false;
+  if (node.type !== 'BLOCK_FOLDED' && node.type !== 'BLOCK_LITERAL') {
+    return false;
+  }
+  const [start, end] = node.range;
+  const header = text.indexOf('\n', start);
+  if (header < 0 || header >= end) return false;
+  return text
+    .slice(header + 1, end)
+    .split('\n')
+    .some((line) => /^\S/.test(line));
 }
 
 /**
