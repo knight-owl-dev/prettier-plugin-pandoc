@@ -27,6 +27,8 @@ const times = (k, part) =>
 const DOCUMENTS = {
   corpus,
   'corpus x10': Array(10).fill(corpus).join('\n\n'),
+  // A read slower per character than x10's is no longer linear.
+  'corpus x20': Array(20).fill(corpus).join('\n\n'),
   prose: times(
     3000,
     (i) =>
