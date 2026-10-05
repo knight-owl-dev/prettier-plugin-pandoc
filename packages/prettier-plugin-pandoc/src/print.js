@@ -5,8 +5,10 @@
 import { doc } from 'prettier';
 import { columnAfter, extent, printBlock, sourceView } from './blocks.js';
 import { heldBlocks } from './check.js';
+import { languageOf, parserFor } from './code.js';
 
 const { literalline } = doc.builders;
+const { printDocToString } = doc.printer;
 const { replaceEndOfLine } = doc.utils;
 
 const isBlank = (line) => /^[ \t]*$/.test(line);
@@ -89,16 +91,68 @@ const inOrder = (blocks) =>
   );
 
 /**
+ * The document printed, `samples` standing for the code it formatted.
+ *
+ * @param {{blocks: object[]}} root
+ * @param {{originalText: string, pandocTabStop: number}} options
+ * @param {Map<object, string>} samples
+ */
+function printRoot(root, options, samples) {
+  const text = options.originalText;
+  const withSamples = { ...options, pandocSamples: samples };
+  const out = inOrder(root.blocks)
+    ? heldBlocks(root, withSamples, (held) =>
+        render(root.blocks, text, held, withSamples),
+      )
+    : text;
+  return replaceEndOfLine(out, literalline);
+}
+
+/**
  * @param {import('prettier').AstPath} path
  * @param {{originalText: string, pandocTabStop: number}} options
  */
 export function print(path, options) {
-  const { node } = path;
-  const text = options.originalText;
-  const out = inOrder(node.blocks)
-    ? heldBlocks(node, options, (held) =>
-        render(node.blocks, text, held, options),
-      )
-    : text;
-  return replaceEndOfLine(out, literalline);
+  return printRoot(path.node, options, new Map());
+}
+
+// Each code block under `value` in a language prettier formats, with its
+// parser.
+function samplesIn(value, options, out = []) {
+  if (Array.isArray(value)) {
+    for (const v of value) samplesIn(v, options, out);
+  } else if (value !== null && typeof value === 'object') {
+    const parser =
+      value.t === 'CodeBlock' && parserFor(languageOf(value), options);
+    if (parser) out.push({ block: value, parser });
+    else for (const v of Object.values(value)) samplesIn(v, options, out);
+  }
+  return out;
+}
+
+/**
+ * The document printed with each sample in a language prettier formats
+ * formatted. Prettier calls this for the root alone, as the printer's
+ * visitor keys stop there, and not at all with `embeddedLanguageFormatting`
+ * off, when `print` prints every sample as written.
+ *
+ * @param {import('prettier').AstPath} path
+ * @param {object} options
+ */
+export function embed(path, options) {
+  const samples = samplesIn(path.node.blocks, options);
+  if (samples.length === 0) return null;
+  return async (textToDoc) => {
+    const formatted = new Map();
+    for (const { block, parser } of samples) {
+      try {
+        const sample = await textToDoc(block.c[1], { parser });
+        const { formatted: code } = printDocToString(sample, options);
+        formatted.set(block, code.replace(/\n+$/, ''));
+      } catch {
+        // Code its parser cannot read stays as written.
+      }
+    }
+    return printRoot(path.node, options, formatted);
+  };
 }

@@ -4,6 +4,7 @@
 // written too.
 
 import { readMarkdown } from '@knight-owl-dev/pandoc-parser';
+import { printCode } from './code.js';
 import { reflow } from './wrap.js';
 
 /** @typedef {import('./wrap.js').View} View */
@@ -341,6 +342,7 @@ const PRINTERS = {
   OrderedList: printList,
   DefinitionList: printDefinitionList,
   Div: printDiv,
+  CodeBlock: printCode,
 };
 
 // The column the end of `out` is at.
