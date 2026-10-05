@@ -13,7 +13,7 @@ A paragraph whose environment \begin{x}y\end{x} - opens a list item
   with a paragraph of its own inside the second item.
 
 \begin{x}y\end{x} ::: note
-A div opening after an environment, its body *long* enough that the formatter
+A div opening after an environment, its body _long_ enough that the formatter
 would wrap it.
 :::
 

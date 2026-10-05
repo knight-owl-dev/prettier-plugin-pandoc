@@ -310,8 +310,8 @@ function printDiv(block, view, context, options) {
 }
 
 /**
- * A paragraph, or plain text in a tight item, reflowed, unless `proseWrap`
- * preserves it.
+ * A paragraph, or plain text in a tight item, through its words
+ * (wrap.js).
  *
  * @param {object} block
  * @param {View} view
@@ -319,7 +319,6 @@ function printDiv(block, view, context, options) {
  * @param {object} options
  */
 function printPara(block, view, context, options) {
-  if (options.proseWrap === 'preserve') return null;
   return reflow(block, view, options, context);
 }
 
