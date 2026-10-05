@@ -20,10 +20,11 @@ const readAs = (node) =>
  * reads are the same.
  *
  * @param {{meta: object, blocks: object[]}} source
- * @param {{meta: object, blocks: object[]}} output
+ * @param {{meta: object, blocks: object[]} | null} output
  * @returns {number[] | null}
  */
 function differing(source, output) {
+  if (output === null) return source.blocks.map((_, k) => k);
   const a = source.blocks.map(readAs);
   const b = output.blocks.map(readAs);
   const n = a.length;
@@ -49,7 +50,14 @@ function differing(source, output) {
  * @param {(held: Set<number>) => string} render
  */
 export function heldBlocks(root, options, render) {
-  const read = (text) => readMarkdown(text, { tabStop: options.pandocTabStop });
+  // Text that fails to read — YAML that is none — reads differently.
+  const read = (text) => {
+    try {
+      return readMarkdown(text, { tabStop: options.pandocTabStop });
+    } catch {
+      return null;
+    }
+  };
   const held = new Set();
   const out = render(held);
   const diff = differing(root, read(out));
