@@ -7,6 +7,7 @@
 // newlines. So no parser sees a tab or a carriage return.
 
 import { codePointLength } from './code-points.js';
+import { SourceText } from './source-text.js';
 
 const NEWLINES = 3;
 
@@ -14,7 +15,8 @@ const NEWLINES = 3;
  * The text a Pandoc reader parses, and for each offset between its
  * characters the source offset between theirs: a tab's spaces all end where
  * the tab does, a deleted carriage return goes with what follows it, and the
- * newlines added at the end sit at the source's end.
+ * newlines added at the end sit at the source's end. `input` is the text
+ * with that map: a tab's spaces stand for the tab.
  *
  * @see Text.Pandoc.UTF8.toText
  * @see Text.Pandoc.Shared.tabFilter
@@ -22,12 +24,20 @@ const NEWLINES = 3;
  * @param {string} source
  * @param {number} tabStop
  * @param {number} [newlines] The newlines the text ends in at least.
- * @returns {{text: string, toSource: (offset: number) => number}}
+ * @returns {{text: string, toSource: (offset: number) => number, input: SourceText}}
  */
 export function readerInput(source, tabStop, newlines = NEWLINES) {
   if (!/[\t\r﻿]/.test(source)) {
     const text = withNewlines(source, newlines);
-    return { text, toSource: (offset) => Math.min(offset, source.length) };
+    const input = SourceText.concat([
+      SourceText.slice(source, 0, source.length),
+      SourceText.synth(text.slice(source.length), source.length, source.length),
+    ]);
+    return {
+      text,
+      toSource: (offset) => Math.min(offset, source.length),
+      input,
+    };
   }
   const parts = [];
   // bounds[o]: the source offset at text offset o.
@@ -58,7 +68,11 @@ export function readerInput(source, tabStop, newlines = NEWLINES) {
   const read = parts.join('');
   const text = withNewlines(read, newlines);
   for (let o = read.length; o < text.length; o++) bounds.push(source.length);
-  return { text, toSource: (offset) => bounds[offset] };
+  return {
+    text,
+    toSource: (offset) => bounds[offset],
+    input: inputOf(source, text, bounds),
+  };
 }
 
 // `text` ending in `newlines` newlines; a line without one gets one, as
@@ -69,4 +83,23 @@ function withNewlines(text, newlines) {
     trailing++;
   }
   return trailing >= newlines ? text : text + '\n'.repeat(newlines - trailing);
+}
+
+// `text` as a `SourceText` over `source`: runs it copies as copies, each
+// other character standing for its bounds — a tab's space, a newline after
+// a dropped carriage return.
+function inputOf(source, text, bounds) {
+  const copies = (o) =>
+    bounds[o + 1] - bounds[o] === 1 && source[bounds[o]] === text[o];
+  const parts = [];
+  let run = 0;
+  for (let o = 0; o <= text.length; o++) {
+    if (o < text.length && copies(o)) continue;
+    if (run < o) parts.push(SourceText.slice(source, bounds[run], bounds[o]));
+    if (o < text.length) {
+      parts.push(SourceText.synth(text[o], bounds[o], bounds[o + 1]));
+    }
+    run = o + 1;
+  }
+  return SourceText.concat(parts);
 }

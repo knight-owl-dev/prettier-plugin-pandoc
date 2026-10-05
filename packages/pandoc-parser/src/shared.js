@@ -5,6 +5,7 @@
 
 import { concat, trimInlines } from './ast/inlines.js';
 import { Node } from './ast/nodes.js';
+import { keepContents } from './ast/spans.js';
 import { walkInlines } from './ast/walk.js';
 import { isAlpha, isAlphaNum, isSpace } from './char.js';
 import { charWidth } from './text-width.js';
@@ -470,11 +471,15 @@ export function compactify(items) {
   const last = final.at(-1);
   const otherParas = others.some((item) => item.some(isPara));
   if (last?.t === 'Para' && !final.slice(0, -1).some(isPara) && !otherParas) {
-    return [...others, [...final.slice(0, -1), withType(last, 'Plain')]];
+    const plain = [...final.slice(0, -1), withType(last, 'Plain')];
+    return [...others, keepContents(final, plain)];
   }
   if (!items.some((item) => item.some(isPara))) return items;
   return items.map((item) =>
-    item.map((b) => (b.t === 'Plain' ? withType(b, 'Para') : b)),
+    keepContents(
+      item,
+      item.map((b) => (b.t === 'Plain' ? withType(b, 'Para') : b)),
+    ),
   );
 }
 
@@ -533,5 +538,6 @@ export function taskListItemFromAscii(on, blocks) {
     first.c[taken - 1].end,
   );
   const inlines = [boxNode, ...first.c.slice(taken)];
-  return [new Node(first.t, inlines, first.start, first.end), ...rest];
+  const boxed = [new Node(first.t, inlines, first.start, first.end), ...rest];
+  return keepContents(blocks, boxed);
 }

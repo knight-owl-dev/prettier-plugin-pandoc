@@ -136,6 +136,56 @@ export class SourceText {
   }
 
   /**
+   * This text's map carried on out through `outer`, the text its offsets
+   * outside are in: a copy split where `outer`'s pieces are, synthesized
+   * text standing for what its span stands for.
+   *
+   * @param {SourceText} outer
+   * @returns {SourceText}
+   */
+  through(outer) {
+    const parts = this.pieces.map((p) => {
+      const text = this.text.slice(p.at, p.at + p.length);
+      if (p.copy) return new SourceText(text, outer.cut(p.from, p.to).pieces);
+      const from = outer.toOuterStart(p.from);
+      const to = p.to === p.from ? from : outer.toOuterEnd(p.to);
+      return SourceText.synth(text, from, to);
+    });
+    return SourceText.concat(parts);
+  }
+
+  /**
+   * Where in this text a node starting at outside offset `offset` starts:
+   * past what was dropped there, at the start of what stands for it.
+   *
+   * @param {number} offset
+   */
+  toInnerStart(offset) {
+    for (const p of this.pieces) {
+      if (offset === p.from || offset < p.to) {
+        return p.copy && offset > p.from ? p.at + (offset - p.from) : p.at;
+      }
+    }
+    return this.text.length;
+  }
+
+  /**
+   * Where in this text a node ending at outside offset `offset` ends:
+   * before what was dropped there, at the end of what stands for it.
+   *
+   * @param {number} offset
+   */
+  toInnerEnd(offset) {
+    let end = 0;
+    for (const p of this.pieces) {
+      if (p.from >= offset) break;
+      if (p.copy) end = p.at + Math.min(p.length, offset - p.from);
+      else end = offset >= p.to ? p.at + p.length : p.at;
+    }
+    return end;
+  }
+
+  /**
    * The outside offset a node starting at `offset` starts at.
    *
    * @param {number} offset
