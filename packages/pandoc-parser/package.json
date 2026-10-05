@@ -8,6 +8,9 @@
   "files": [
     "src"
   ],
+  "dependencies": {
+    "yaml": "^2.9.1"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/knight-owl-dev/prettier-plugin-pandoc.git",

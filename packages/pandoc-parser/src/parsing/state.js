@@ -40,6 +40,7 @@ import { toLower, words } from '../shared.js';
  * @property {number} fencedDivLevel How many fenced divs are open.
  * @property {Map<string, import('../latex/parsing.js').Macro>} macros The
  *   TeX macros defined so far.
+ * @property {Record<string, unknown>} meta The document's metadata so far.
  */
 
 /** @typedef {[string, string[], [string, string][]]} Attr */
@@ -73,6 +74,7 @@ export const defaultParserState = (options) => ({
   noteNumber: 0,
   inNote: false,
   macros: new Map(),
+  meta: {},
   inHtmlBlock: null,
   nextExample: 1,
   examples: EMPTY_MAP,

@@ -28,6 +28,7 @@ import { inlines1 } from './inlines.js';
 import { lineBlock } from './line-blocks.js';
 import { implicitFigure, referenceKey } from './links.js';
 import { bulletList, listStartInItem, orderedList } from './lists.js';
+import { yamlMetaBlockPrime } from './metadata.js';
 import { noteBlock } from './notes.js';
 import { divHtml, htmlBlock, htmlDivCloserAhead } from './raw-html.js';
 import { rawTeXBlock } from './raw-tex.js';
@@ -101,7 +102,7 @@ export function block(ctx) {
   blockChoice ??= choice([
     blank,
     codeBlockFenced,
-    // yamlMetaBlock',
+    yamlMetaBlockPrime,
     bulletList,
     divHtml,
     divFenced,
