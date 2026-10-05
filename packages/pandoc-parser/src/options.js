@@ -70,6 +70,9 @@ const LATEX_EXTENSIONS = ['auto_identifiers', 'latex_macros', 'smart'];
 
 const FORMATS = { markdown: EXTENSIONS, latex: LATEX_EXTENSIONS };
 
+/** The CLI's `--tab-stop`. */
+export const DEFAULT_TAB_STOP = 4;
+
 /**
  * Pandoc's reader options for a format, `markdown` or `latex`, its
  * default extensions changed as `+name` and `-name` in `extensions` say.
@@ -79,7 +82,7 @@ const FORMATS = { markdown: EXTENSIONS, latex: LATEX_EXTENSIONS };
  * @returns {ReaderOptions}
  */
 export function readerOptions({
-  tabStop = 4,
+  tabStop = DEFAULT_TAB_STOP,
   format = 'markdown',
   extensions = [],
   defaultImageExtension = '',

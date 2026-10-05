@@ -1,2 +1,4 @@
-# Pandoc input under test. Prettier reads .gitignore too.
+# Pandoc input under test, and the output expected of it. Prettier reads
+# .gitignore too.
 packages/*/test/corpus/
+packages/*/test/expected/
