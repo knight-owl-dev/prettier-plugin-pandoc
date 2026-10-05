@@ -25,6 +25,8 @@ export const FAIL = Symbol('FAIL');
  * @property {number} [depth] How deep in text parsed again `text` is: what
  *   Parsec's source name tells apart, a chunk's being its parent's and
  *   `_chunk`.
+ * @property {[string, unknown][]} [notesDefined] The notes a read of
+ *   extracted text defined, for `parseFromString` to map out.
  */
 
 /**
