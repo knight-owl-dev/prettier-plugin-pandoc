@@ -29,7 +29,6 @@ const TODO = new Set([
   'always/code-misreads.md',
   'always/definition-bodies.md',
   'always/example-lists.md',
-  'always/footnotes.md',
   'always/heading-misreads.md',
   'always/held-lines.md',
   'always/inline-commands-alone.md',

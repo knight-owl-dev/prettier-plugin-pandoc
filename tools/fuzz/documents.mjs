@@ -53,6 +53,8 @@ const BLOCKS = [
   '<div class="x">\n\npara in a div\n\n</div>',
   '<div>\ntight in a div\n</div>',
   '<div>\n\nunclosed div',
+  'a[^f] b[^g]\n\n[^f]: A note long enough to wrap a few times over at the\n    narrow widths.\n\n    A second *paragraph*.\n\n[^g]: Short.',
+  'c[^h]\n\n[^h]:\n    Below its marker.',
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.
