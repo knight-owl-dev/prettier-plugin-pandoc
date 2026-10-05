@@ -46,6 +46,21 @@ const BLOCKS = [
   '```markdown\n*  item\n```',
   '```yaml\n: not yaml\n```',
   '``` lua\nlocal  x\n```',
+  '<!-- prettier-ignore -->\n*keep*   as  written',
+  '<!-- prettier-ignore-start -->\n* * *\n\n*x*\n<!-- prettier-ignore-end -->',
+  '- - -',
+  'line\t\nbreak',
+  '<div class="x">\n\npara in a div\n\n</div>',
+  '<div>\ntight in a div\n</div>',
+  '<div>\n\nunclosed div',
+  'a[^f] b[^g]\n\n[^f]: A note long enough to wrap a few times over at the\n    narrow widths.\n\n    A second *paragraph*.\n\n[^g]: Short.',
+  'c[^h]\n\n[^h]:\n    Below its marker.',
+  '\\noindent\nA paragraph after a bare command, long enough to wrap.',
+  'a line\n\\noindent  \nafter trailing spaces',
+  '>   a quote indented past its marker',
+  'Interrupted text long enough to wrap at narrow widths\n\\begin{x}y\\end{x}',
+  '\\begin{x}y\\end{x}\n    an indented line after raw TeX',
+  'ends in a bare command, \\relax  \n\\begin{y}z\\end{y}',
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.
@@ -56,6 +71,8 @@ const WORDS = [
   ...['[r]:', '%', '*em', 'ph*', '`co', 'de`', '$x', 'y$', '"q', "it's"],
   ...['---|---', '|a|', '+--+', '--', '-----', '\\', 'x\\', '<!--', '-->'],
   ...['*x*', '_y_', '__s__', '**t**', 'a*b*c', '***u***', '*a', 'b*', '_c'],
+  ...['[a long link text](http://u)', '[two\nlines](u)', '![alt text](i.png)'],
+  ...['[x *y* z](u "a title")', '<http://auto.link>', '[ref link][r]'],
 ];
 
 const prose = ({ below, pick }) =>
@@ -86,7 +103,7 @@ function nested(r, depth = 0) {
       return `Term\n${marker}${indent(inner, '    ').trimStart()}`;
     }
     case 3:
-      return `::: d\n${inner}\n:::`;
+      return below(2) ? `::: d\n${inner}\n:::` : `<div>\n\n${inner}\n\n</div>`;
     case 4:
       return `- ${prose(r)}\n\n  ${indent(inner, '  ').trimStart()}`;
     case 5:
@@ -131,7 +148,7 @@ const PREFIXES = [
 const LINES = [
   ...['text', 'more text', '', '    code', '\tcode', '- item', '> quote'],
   ...['```', '~~~', 'Term', ':   def', '\\begin{x}', '\\end{x}', '<div>'],
-  ...['</div>', '::: d', ':::', '| a |', '|---|'],
+  ...['</div>', '::: d', ':::', '| a |', '|---|', 'a[^n] b', '[^n]: a note'],
 ];
 
 /**

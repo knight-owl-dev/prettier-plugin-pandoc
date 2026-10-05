@@ -53,6 +53,11 @@ const CONTEXTS = {
     text: (next) => `::: d\np\n${next}\n:::\n`,
     first: (doc) => doc.blocks[0]?.c[1]?.[0],
   },
+  'in an HTML div': {
+    options: { inHtmlBlock: 'div' },
+    text: (next) => `<div>\n\np\n${next}\n\n</div>\n`,
+    first: (doc) => doc.blocks[0]?.c[1]?.[0],
+  },
 };
 
 for (const [where, { options, text, first }] of Object.entries(CONTEXTS)) {

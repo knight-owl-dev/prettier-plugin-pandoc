@@ -10,8 +10,8 @@ its output again: what reads differently prints as written.
 Status: pre-release. Nothing is published yet. Formatting so far: one blank line
 between top-level blocks, paragraphs reflowed with prettier's emphasis markers,
 fenced code with a fence fit for its content, and block quotes, lists,
-definition lists and fenced divs printed from their structure. Other blocks
-print as written until their construct gains formatting.
+definition lists, divs and note definitions printed from their structure. Other
+blocks print as written until their construct gains formatting.
 
 ## Packages
 
@@ -37,6 +37,10 @@ line break where the author put it, `always` fills to `printWidth`, `never`
 joins each paragraph into one line. `embeddedLanguageFormatting` `auto`, the
 default, reformats a fenced sample tagged with a language prettier formats
 (`yaml`, `json`, …); `off` prints every sample as written.
+
+`<!-- prettier-ignore -->` leaves the block after it as written, and
+`<!-- prettier-ignore-start -->` … `<!-- prettier-ignore-end -->` everything
+between.
 
 ## Preserve, never repair
 

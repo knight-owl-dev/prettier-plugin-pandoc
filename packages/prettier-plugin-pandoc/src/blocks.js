@@ -23,7 +23,7 @@ export const sourceView = (text) => ({
 });
 
 // A container's contents as the parser read them.
-const contentsView = (contents) => ({
+export const contentsView = (contents) => ({
   text: contents.text,
   start: (offset) => contents.toInnerStart(offset),
   end: (offset) => contents.toInnerEnd(offset),
@@ -49,6 +49,15 @@ export function extent(block, view) {
 }
 
 const hasBlankLine = (text) => /\n[ \t]*\n/.test(text);
+
+// A gap without the indentation before the block after it, where that is
+// short of a tab stop: Pandoc reads it no differently.
+function unindented(gap, options) {
+  const indent = /(?:^|\n)( *)$/.exec(gap)[1];
+  return indent.length > 0 && indent.length < options.pandocTabStop
+    ? gap.slice(0, gap.length - indent.length)
+    : gap;
+}
 
 /**
  * Text between blocks in a container: runs of blank lines made one, none
@@ -78,23 +87,67 @@ function collapsed(gap, first, last) {
  * @param {object} options
  * @returns {string | null}
  */
-function printIn(blocks, view, from, to, context, options) {
+export function printIn(blocks, view, from, to, context, options) {
+  const ignored = ignoredOf(blocks);
   let out = '';
   let at = from;
   for (const [k, block] of blocks.entries()) {
     const [start, end] = extent(block, view);
     if (start < at) return null;
-    out += collapsed(view.text.slice(at, start), k === 0, false);
+    if (ignored.has(k) || ignored.has(k - 1)) {
+      out += view.text.slice(at, start);
+    } else {
+      const gap = collapsed(view.text.slice(at, start), k === 0, false);
+      const startsLine = k === 0 || gap.includes('\n');
+      out +=
+        block.t === 'CodeBlock' || !startsLine ? gap : unindented(gap, options);
+    }
     // On the first line, past the context's column; on others, from 0.
     const column = out.includes('\n')
       ? columnAfter(out)
       : context.column + out.length;
-    const here = { ...context, column };
-    out += printBlock(block, view, here, options);
+    const fresh = /\n[ \t]*\n[ \t]*$/.test(out);
+    const here = { ...context, column, fresh };
+    out += ignored.has(k)
+      ? view.text.slice(start, end)
+      : printBlock(block, view, here, options);
     at = end;
   }
   if (at > to) return null;
   return out + collapsed(view.text.slice(at, to), blocks.length === 0, true);
+}
+
+const IGNORE = /^<!--\s*prettier-ignore\s*-->$/;
+const IGNORE_START = /^<!--\s*prettier-ignore-start\s*-->$/;
+const IGNORE_END = /^<!--\s*prettier-ignore-end\s*-->$/;
+
+// An HTML comment's text, trimmed; null for any other block.
+const commentOf = (block) =>
+  block.t === 'RawBlock' && block.c[0] === 'html' ? block.c[1].trim() : null;
+
+/**
+ * The blocks prettier leaves as written, by index: the one after
+ * `<!-- prettier-ignore -->`, and each between `<!-- prettier-ignore-start
+ * -->` and `<!-- prettier-ignore-end -->`, or the end where none follows.
+ *
+ * @param {object[]} blocks
+ * @returns {Set<number>}
+ */
+export function ignoredOf(blocks) {
+  const out = new Set();
+  let inRange = false;
+  for (const [k, block] of blocks.entries()) {
+    const comment = commentOf(block);
+    if (inRange) {
+      if (comment !== null && IGNORE_END.test(comment)) inRange = false;
+      else out.add(k);
+    } else if (comment !== null && IGNORE_START.test(comment)) {
+      inRange = true;
+    } else if (comment !== null && IGNORE.test(comment)) {
+      if (k + 1 < blocks.length) out.add(k + 1);
+    }
+  }
+  return out;
 }
 
 /**
@@ -105,7 +158,7 @@ function printIn(blocks, view, from, to, context, options) {
  * @param {string} first
  * @param {string} rest
  */
-function prefixed(body, first, rest) {
+export function prefixed(body, first, rest) {
   return body
     .split('\n')
     .map((line, k) => {
@@ -277,10 +330,12 @@ function printDefinitionList(block, view, context, options) {
 
 const FENCE = /^[ \t]*:{3,}/;
 const CLOSER = /^[ \t]*:{3,}[ \t]*$/;
+const HTML_OPEN = /^[ \t]*<div(\s[^>]*)?>[ \t]*$/i;
+const HTML_CLOSE = /^[ \t]*<\/div\s*>[ \t]*$/i;
 
 /**
- * A fenced div: its fences as written, its blocks printed in a div. Null for
- * one from HTML.
+ * A div, fenced or from HTML: its fences or tags as written, its blocks
+ * printed in the div. Null where a tag shares its line with other text.
  *
  * @param {object} block
  * @param {View} view
@@ -293,14 +348,27 @@ function printDiv(block, view, context, options) {
   const openEnd = text.indexOf('\n', start);
   if (openEnd < 0 || openEnd >= end) return null;
   const open = text.slice(start, openEnd);
-  if (!FENCE.test(open)) return null;
+  const html = HTML_OPEN.test(open);
+  if (!html && !FENCE.test(open)) return null;
   const closeStart = lineStart(text, end);
   const close = text.slice(closeStart, end);
-  const closed = closeStart > openEnd && CLOSER.test(close);
-  const within = { ...context, divLevel: context.divLevel + 1, column: 0 };
+  const closed =
+    closeStart > openEnd && (html ? HTML_CLOSE : CLOSER).test(close);
+  // A closing tag sharing its line with text.
+  if (html && !closed && /<\/div\s*>[ \t]*$/i.test(close)) return null;
+  const within = html
+    ? { ...context, inHtmlBlock: 'div', column: 0 }
+    : { ...context, divLevel: context.divLevel + 1, column: 0 };
   const to = closed ? closeStart : end;
-  const body = printIn(block.c[1], view, openEnd + 1, to, within, options);
-  if (body === null) return null;
+  const printed = printIn(block.c[1], view, openEnd + 1, to, within, options);
+  if (printed === null) return null;
+  // An HTML block keeps a blank line written next to a tag.
+  const blank = (line) => html && /^[ \t]*$/.test(line ?? 'x');
+  const inner = text.slice(openEnd + 1, to).split('\n');
+  const body =
+    printed === ''
+      ? ''
+      : `${blank(inner[0]) ? '\n' : ''}${printed}${closed && blank(inner.at(-2)) ? '\n' : ''}`;
   const lines = [
     open,
     ...(body === '' ? [] : [body]),
@@ -329,7 +397,8 @@ const PRINTERS = {
     const { contents } = block.c;
     if (contents === undefined) return null;
     const inner = contentsView(contents);
-    const within = { ...context, width: context.width - 2, column: 0 };
+    // A quote opening mid-line, after raw TeX, starts at that column.
+    const within = { ...context, width: context.width - 2 };
     const body = printIn(block.c, inner, 0, inner.text.length, within, options);
     if (body === null) return null;
     // Spaces before its first marker that its span takes print as written.
@@ -342,6 +411,8 @@ const PRINTERS = {
   DefinitionList: printDefinitionList,
   Div: printDiv,
   CodeBlock: printCode,
+  // After a line of text, `---` would underline a setext heading.
+  HorizontalRule: (_block, _view, context) => (context.fresh ? '---' : null),
 };
 
 // The column the end of `out` is at.

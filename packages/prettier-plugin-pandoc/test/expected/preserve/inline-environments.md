@@ -22,6 +22,7 @@ that splits \end{x} the paragraph*.
 A fence inside one is its raw text: \begin{x} b
 ```
 \end{x}
+
 ```
 and the text after it a paragraph.
 
@@ -35,5 +36,5 @@ two\end{x} each raw.
 Text after one \begin{x}ends\end{x} underlined
 ===
 
-Link text holds one [as *text* \begin{x}y\end{x}](https://example.com) without
+Link text holds one [as _text_ \begin{x}y\end{x}](https://example.com) without
 ending the paragraph, and so do [plain brackets \begin{x}y\end{x}] around it.

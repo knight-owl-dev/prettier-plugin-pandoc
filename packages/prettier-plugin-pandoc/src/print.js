@@ -3,9 +3,16 @@
 // metadata — prints as written, its blank lines at either end dropped.
 
 import { doc } from 'prettier';
-import { columnAfter, extent, printBlock, sourceView } from './blocks.js';
+import {
+  columnAfter,
+  extent,
+  ignoredOf,
+  printBlock,
+  sourceView,
+} from './blocks.js';
 import { heldBlocks } from './check.js';
 import { languageOf, parserFor } from './code.js';
+import { definitionsOf, printDefinition } from './notes.js';
 
 const { literalline } = doc.builders;
 const { printDocToString } = doc.printer;
@@ -17,14 +24,17 @@ const isBlank = (line) => /^[ \t]*$/.test(line);
  * The source between two blocks, spaced: `first` before the first block,
  * `last` after the last. On the line a block ends, only what follows it
  * stays; on the line one starts, what precedes it, but for indentation
- * short of a tab stop, which Pandoc reads no differently.
+ * short of a tab stop, which Pandoc reads no differently. After `tight`
+ * text, a paragraph a block interrupts, no blank line: one would make it
+ * a paragraph of its own.
  *
  * @param {string} gap
  * @param {boolean} first
  * @param {boolean} last
  * @param {number} tabStop
+ * @param {boolean} [tight]
  */
-function spaced(gap, first, last, tabStop) {
+function spaced(gap, first, last, tabStop, tight = false) {
   // Blocks on one line stay on it.
   if (!first && !last && !gap.includes('\n')) return gap;
   const lines = gap.split('\n');
@@ -38,7 +48,46 @@ function spaced(gap, first, last, tabStop) {
     return (body === '' ? '' : `${body}${last ? '\n' : '\n\n'}`) + tail;
   const ended = `${isBlank(head) ? '' : head}\n`;
   if (last) return body === '' ? ended : `${ended}\n${body}\n`;
-  return body === '' ? `${ended}\n${tail}` : `${ended}\n${body}\n\n${tail}`;
+  if (body === '') return tight ? `${ended}${tail}` : `${ended}\n${tail}`;
+  return `${ended}\n${body}\n\n${tail}`;
+}
+
+/**
+ * Whether the gap after `block` keeps from a blank line: after a paragraph
+ * a block interrupts, which one would make a paragraph of its own, and
+ * before a line indented a tab stop, which one would make code.
+ *
+ * @param {{t: string} | undefined} block
+ * @param {string} gap
+ * @param {number} tabStop
+ */
+function tightBefore(block, gap, tabStop) {
+  if (block === undefined || /\n[ \t]*\n/.test(gap)) return false;
+  const indent = /(?:^|\n)( *)$/.exec(gap)[1];
+  return block.t === 'Plain' || indent.length >= tabStop;
+}
+
+/**
+ * The source from `from` to `to`, each note definition inside printed.
+ *
+ * @param {string} text
+ * @param {number} from
+ * @param {number} to
+ * @param {import('./notes.js').Definition[]} definitions
+ * @param {import('./wrap.js').Context} context
+ * @param {object} options
+ */
+function withDefinitions(text, from, to, definitions, context, options) {
+  let out = '';
+  let at = from;
+  for (const definition of definitions) {
+    if (definition.start < at || definition.end > to) continue;
+    const printed = printDefinition(definition, context, options);
+    if (printed === null) continue;
+    out += text.slice(at, definition.start) + printed;
+    at = definition.end;
+  }
+  return out + text.slice(at, to);
 }
 
 /**
@@ -49,7 +98,7 @@ function spaced(gap, first, last, tabStop) {
  * @param {Set<number>} held
  * @param {object} options
  */
-function render(blocks, text, held, options) {
+function render(blocks, text, held, options, definitions = []) {
   const view = sourceView(text);
   const context = {
     width: options.printWidth,
@@ -62,18 +111,29 @@ function render(blocks, text, held, options) {
   for (let k = 0; k <= blocks.length; k++) {
     const from = k === 0 ? 0 : ends[k - 1];
     const to = k === blocks.length ? text.length : blocks[k].start;
-    const gap = text.slice(from, to);
+    // Where the self-check holds a block, definitions print as written.
+    const gap =
+      held.size > 0
+        ? text.slice(from, to)
+        : withDefinitions(text, from, to, definitions, context, options);
     out +=
       held.has(k - 1) || held.has(k)
         ? gap
-        : spaced(gap, k === 0, k === blocks.length, options.pandocTabStop);
+        : spaced(
+            gap,
+            k === 0,
+            k === blocks.length,
+            options.pandocTabStop,
+            tightBefore(blocks[k - 1], gap, options.pandocTabStop),
+          );
     if (k === blocks.length) break;
+    const fresh = out === '' || /\n[ \t]*\n[ \t]*$/.test(out);
     out += held.has(k)
       ? text.slice(blocks[k].start, ends[k])
       : printBlock(
           blocks[k],
           view,
-          { ...context, column: columnAfter(out) },
+          { ...context, column: columnAfter(out), fresh },
           options,
         );
   }
@@ -100,9 +160,18 @@ const inOrder = (blocks) =>
 function printRoot(root, options, samples) {
   const text = options.originalText;
   const withSamples = { ...options, pandocSamples: samples };
+  // Blocks prettier-ignore leaves as written, the text around them too.
+  const ignored = ignoredOf(root.blocks);
+  const definitions = definitionsOf(root.blocks, text);
   const out = inOrder(root.blocks)
     ? heldBlocks(root, withSamples, (held) =>
-        render(root.blocks, text, held, withSamples),
+        render(
+          root.blocks,
+          text,
+          new Set([...held, ...ignored]),
+          withSamples,
+          definitions,
+        ),
       )
     : text;
   return replaceEndOfLine(out, literalline);

@@ -386,22 +386,46 @@ export function lineEnd(text, pos) {
  */
 export function parseFromString(ctx, parser, extracted) {
   const source = extracted.withoutCarriageReturns();
-  const { text, pos, depth = 0 } = ctx;
+  const { text, pos, depth = 0, notesDefined } = ctx;
   ctx.text = source.text;
   ctx.pos = 0;
   ctx.depth = depth + 1;
+  ctx.notesDefined = [];
   const x = parser(ctx);
+  const defined = ctx.notesDefined;
   ctx.text = text;
   ctx.pos = pos;
   ctx.depth = depth;
+  ctx.notesDefined = notesDefined;
   if (x === FAIL) return FAIL;
-  const mapped = mapSpans(
-    x,
-    (offset) => source.toOuterStart(offset),
-    (offset) => source.toOuterEnd(offset),
-    source,
-  );
+  const toStart = (offset) => source.toOuterStart(offset);
+  const toEnd = (offset) => source.toOuterEnd(offset);
+  mapNotes(ctx, defined, toStart, toEnd, source);
+  const mapped = mapSpans(x, toStart, toEnd, source);
   return Array.isArray(mapped) ? withContents(mapped, source) : mapped;
+}
+
+/**
+ * The notes a read of extracted text defined, mapped out to the text it
+ * was extracted from, as its blocks are: a note's contents are filled into
+ * the document once reading ends, from the state. A note the state no
+ * longer holds as defined, the read backtracked from.
+ *
+ * @param {Context} ctx
+ * @param {[string, unknown][]} defined Each label and contents defined.
+ * @param {(offset: number) => number} toStart
+ * @param {(offset: number) => number} toEnd
+ * @param {import('../source-text.js').SourceText} source
+ */
+function mapNotes(ctx, defined, toStart, toEnd, source) {
+  let { notes } = ctx.state;
+  for (const [label, contents] of defined) {
+    if (notes.get(label) !== contents) continue;
+    const mapped = mapSpans(contents, toStart, toEnd, source);
+    notes = notes.set(label, mapped);
+    ctx.notesDefined?.push([label, mapped]);
+  }
+  if (notes !== ctx.state.notes) updateState(ctx, { notes });
 }
 
 /**

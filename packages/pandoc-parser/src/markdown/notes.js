@@ -195,5 +195,7 @@ const noteBlockAt = attempt((ctx) => {
     notes: ctx.state.notes.set(label, contents),
     inNote: false,
   });
+  // A read of extracted text maps it out (parseFromString).
+  ctx.notesDefined?.push([label, contents]);
   return [];
 });

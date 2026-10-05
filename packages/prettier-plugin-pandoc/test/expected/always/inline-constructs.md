@@ -1,7 +1,7 @@
 # Inline constructs {#inline .unnumbered}
 
-A bracketed span in [small caps]{.smallcaps} and [a styled one]{style="color:
-red"} inside a paragraph long enough to wrap.
+A bracketed span in [small caps]{.smallcaps} and [a styled
+one]{style="color: red"} inside a paragraph long enough to wrap.
 
 An inline note^[with _emphasis_ inside, long enough that the formatter has to
 wrap it] and a footnote reference[^note].

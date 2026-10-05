@@ -21,5 +21,5 @@ IFNDEFOTHERSHOWN
 Inline gating: [SPANSECRETSHOWN]{.ifdef symbol="secret"} stays,
 [SPANUNSETHIDDEN]{.ifdef symbol="unset-symbol"} goes.
 
-Format targeting: [FMTLATEX]{.ifdef symbol="latex"} [FMTEPUB]{.ifdef
-symbol="epub"}
+Format targeting: [FMTLATEX]{.ifdef symbol="latex"}
+[FMTEPUB]{.ifdef symbol="epub"}

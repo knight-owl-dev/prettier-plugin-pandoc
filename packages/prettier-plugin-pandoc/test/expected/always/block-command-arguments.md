@@ -5,7 +5,8 @@ Pandoc reads each block command's arguments by the command's own rule.
 \section
 {A title on the next line} b
 
-\section b
+\section
+b
 
 \section*
 {A starred title} b
