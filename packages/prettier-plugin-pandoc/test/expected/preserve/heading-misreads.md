@@ -35,11 +35,9 @@ of a paragraph long enough that the formatter would join and wrap it
 - Another item's line, long enough that the formatter would join it and wrap
   * * *
 
-- An underlined item
-  ---
+- ## An underlined item
 
-A setext heading
----
+## A setext heading
 
 Is a heading to both, and so is the next.
 

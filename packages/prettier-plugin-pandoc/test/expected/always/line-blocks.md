@@ -20,5 +20,4 @@ wrap.
 
 A bar line over dashes is a heading:
 
-| not verse
----
+## | not verse

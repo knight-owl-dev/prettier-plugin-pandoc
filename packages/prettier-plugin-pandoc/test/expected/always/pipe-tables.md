@@ -15,8 +15,6 @@ A short table that padding would carry past the width:
 
 Dashes with no pipe under a row underline a heading:
 
-Choose A | B
-------
+## Choose A | B
 
-| Neither | does this |
----
+## | Neither | does this |
