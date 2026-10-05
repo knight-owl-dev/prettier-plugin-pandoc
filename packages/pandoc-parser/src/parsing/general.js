@@ -3,7 +3,7 @@
 // Ported from Pandoc 3.11's `Text.Pandoc.Parsing.General`.
 
 import * as B from '../ast/builder.js';
-import { mapSpans } from '../ast/spans.js';
+import { mapSpans, withContents } from '../ast/spans.js';
 import { char, newline, satisfy, space } from '../char.js';
 import {
   alt,
@@ -395,11 +395,13 @@ export function parseFromString(ctx, parser, extracted) {
   ctx.pos = pos;
   ctx.depth = depth;
   if (x === FAIL) return FAIL;
-  return mapSpans(
+  const mapped = mapSpans(
     x,
     (offset) => source.toOuterStart(offset),
     (offset) => source.toOuterEnd(offset),
+    source,
   );
+  return Array.isArray(mapped) ? withContents(mapped, source) : mapped;
 }
 
 /**

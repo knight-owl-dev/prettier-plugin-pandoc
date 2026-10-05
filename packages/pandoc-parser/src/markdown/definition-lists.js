@@ -8,6 +8,7 @@
 
 import * as B from '../ast/builder.js';
 import { Node } from '../ast/nodes.js';
+import { keepContents } from '../ast/spans.js';
 import {
   attempt,
   FAIL,
@@ -72,7 +73,9 @@ const definitionListItem = attempt((ctx) => {
   const tight = blanklines(ctx) === FAIL;
   const read = definitions(enabled(ctx, 'four_space_rule'))(ctx);
   if (read === FAIL || optionalBlanklines(ctx) === FAIL) return FAIL;
-  const defs = tight ? read.map((blocks) => blocks.map(paraToPlain)) : read;
+  const defs = tight
+    ? read.map((blocks) => keepContents(blocks, blocks.map(paraToPlain)))
+    : read;
   return [B.trimInlines(term), defs];
 });
 

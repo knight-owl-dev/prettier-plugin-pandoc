@@ -25,7 +25,7 @@ import { readResolved } from './references.js';
  */
 export function readMarkdown(source, options) {
   const opts = readerOptions(options);
-  const { text, toSource } = readerInput(source, opts.tabStop);
+  const { text, toSource, input } = readerInput(source, opts.tabStop);
   const [blocks, meta] = readResolved((references) => {
     const ctx = { text, pos: 0, state: defaultParserState(opts), references };
     optional(titleBlock)(ctx);
@@ -34,8 +34,8 @@ export function readMarkdown(source, options) {
     return { value: [value, ctx.state.meta], state: ctx.state };
   });
   return doc(
-    mapSpans(blocks, toSource, toSource),
-    mapSpans(meta, toSource, toSource),
+    mapSpans(blocks, toSource, toSource, input),
+    mapSpans(meta, toSource, toSource, input),
   );
 }
 
