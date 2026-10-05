@@ -1,8 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
 
-  // config:recommended is not extended: its :ignoreModulesAndTests covers
-  // **/test/**, where the test image's Dockerfile lives.
+  // config:recommended is not extended: its presets address ecosystems this
+  // repo does not have.
   "extends": ["docker:pinDigests"],
 
   "dependencyDashboard": true,
@@ -16,6 +16,9 @@
   // A weekly run under the default hourly cap leaves every update past the
   // second for next week; prConcurrentLimit already bounds the CI load.
   "prHourlyLimit": 0,
+
+  // It names the :local test image it builds, which no registry holds.
+  "ignorePaths": ["docker-compose.yaml"],
 
   "customManagers": [
     {
@@ -56,14 +59,6 @@
       "matchDatasources": ["docker"],
       "matchPackageNames": ["pandoc/minimal"],
       "labels": ["dependencies", "pandoc"]
-    },
-
-    // The github-actions manager reads renovate.yml's renovate-version input
-    // as this image. The input takes a version, so a digest has nowhere to go.
-    {
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["ghcr.io/renovatebot/renovate"],
-      "pinDigests": false
     },
 
     {
