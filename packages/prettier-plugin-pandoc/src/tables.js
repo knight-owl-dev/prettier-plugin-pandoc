@@ -6,6 +6,7 @@
 
 import { util } from 'prettier';
 import { lineStart } from './blocks.js';
+import { edited, markerEdits } from './emphasis.js';
 
 /** @typedef {import('./wrap.js').View} View */
 
@@ -41,18 +42,21 @@ export function alignedPipeTable(block, view) {
     return null;
   }
   if (lines.some((line) => util.getStringWidth(line) > COLUMNS)) return null;
-  const cells = rows.map((row) =>
-    row.cells.map((cell) => cellText(cell, view)),
+  const written = rows.map((row) =>
+    row.cells.map((cell) => cellText(cell, view, false)),
   );
-  if (cells.flat().some((cell) => cell === null || cell.includes('\n'))) {
+  if (written.flat().some((cell) => cell === null || cell.includes('\n'))) {
     return null;
   }
   // Text Pandoc drops, a cell past the separator's columns, stays: written.
   const bare = (line) => line.replace(/[\s|]/g, '');
   const rowLines = lines.filter((_, k) => k !== separatorAt);
-  if (rowLines.some((line, k) => bare(line) !== bare(cells[k].join('')))) {
+  if (rowLines.some((line, k) => bare(line) !== bare(written[k].join('')))) {
     return null;
   }
+  const cells = rows.map((row) =>
+    row.cells.map((cell) => cellText(cell, view, true)),
+  );
   const aligns = colspecs.map(([align]) => align.t);
   const widths = aligns.map((_, k) =>
     Math.max(3, ...cells.map((row) => util.getStringWidth(row[k] ?? ''))),
@@ -66,13 +70,17 @@ export function alignedPipeTable(block, view) {
   return { from, to, text: printed.join('\n') };
 }
 
-// A cell's text: what its contents span; empty for none.
-function cellText(cell, view) {
+// A cell's text: what its contents span, emphasis markers prettier's
+// where `edit`; empty for none.
+function cellText(cell, view, edit) {
   const blocks = cell[4];
   if (blocks.length === 0) return '';
   const start = view.start(blocks[0].start);
   const end = view.end(blocks.at(-1).end);
-  return start <= end ? view.text.slice(start, end).trim() : null;
+  if (start > end) return null;
+  const edits = edit ? markerEdits(blocks, view) : [];
+  edits.sort((a, b) => a.from - b.from);
+  return edited(view.text, start, end, edits).trim();
 }
 
 // `text` padded to `width` by its column's alignment.

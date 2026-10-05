@@ -4,7 +4,7 @@ A table no line of which passes the column width aligns its columns:
 
 | Right | Left | Center | Default |
 | ----: | :--- | :----: | ------- |
-|     1 | one  |  *x*   | a       |
+|     1 | one  |  _x_   | a       |
 |    22 | two  | `a|b`  | b \| c  |
 
 Table: A caption, spaced loosely.
