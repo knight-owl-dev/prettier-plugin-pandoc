@@ -8,7 +8,7 @@ services:
     image: prettier-plugin-pandoc-test:local
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     build:
-      context: test
+      context: tools
 
     working_dir: /work
 

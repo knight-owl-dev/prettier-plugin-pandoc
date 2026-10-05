@@ -106,7 +106,7 @@ lint-actions:
 		&& validate-action-pins .github/workflows/*.yml && echo "OK"
 
 lint-docker:
-	@echo "Linting Dockerfile..." && hadolint test/Dockerfile && echo "OK"
+	@echo "Linting Dockerfile..." && hadolint tools/Dockerfile && echo "OK"
 
 # --error-on-warnings: Biome reports most rules as warnings, which would
 # otherwise exit 0.
