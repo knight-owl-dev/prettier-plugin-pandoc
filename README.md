@@ -9,10 +9,11 @@ its output again: what reads differently prints as written.
 
 Status: pre-release. Nothing is published yet. Formatting so far: one blank line
 between top-level blocks, paragraphs reflowed with prettier's emphasis markers,
-headings in ATX form, list markers as prettier writes them, pipe tables aligned,
-fenced code with a fence fit for its content, and block quotes, lists,
-definition lists, divs and note definitions printed from their structure. Other
-blocks print as written until their construct gains formatting.
+headings in ATX form, list markers and reference definitions as prettier writes
+them, pipe tables aligned, fenced code with a fence fit for its content, and
+block quotes, lists, definition lists, divs and note definitions printed from
+their structure. Other blocks print as written until their construct gains
+formatting.
 
 ## Packages
 
