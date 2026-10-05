@@ -2,9 +2,10 @@
 gitignore: true
 
 # The corpus is Pandoc input under test, written to exercise what CommonMark
-# lint rules forbid.
+# lint rules forbid, and the output expected of it.
 ignores:
   - "packages/*/test/corpus/**"
+  - "packages/*/test/expected/**"
 
 config:
   line-length: false
