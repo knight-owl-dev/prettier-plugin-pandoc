@@ -40,6 +40,9 @@ function breaksIn(value, out, from = -Infinity, to = Infinity, glued = false) {
 }
 
 const SPACE = /^[ \t]*\n?[ \t]*$/;
+// A TeX command with no arguments: raw TeX takes the spaces after one, but
+// stops at a line's end.
+const BARE_COMMAND = /\\[A-Za-z@]+\*?[ \t]*$/;
 const HARD = /^([ \t]*|\\)\n[ \t]*$/;
 
 /**
@@ -56,14 +59,15 @@ const HARD = /^([ \t]*|\\)\n[ \t]*$/;
 /**
  * A paragraph's words as written, emphasis markers prettier's
  * (`emphasis.js`), each with the break before it: `space`, `soft` for a
- * line break, or `hard` for a hard break, which keeps what ends its line;
+ * line break, `keep` for one after a bare TeX command, which stays one, or
+ * `hard` for a hard break, which keeps what ends its line;
  * `glued` where that break is inside a link, which no line break splits.
  * Null where its breaks are not whitespace of its own text, in order — a
  * note's from elsewhere aside.
  *
  * @param {{c: unknown, start: number, end: number}} para
  * @param {View} view
- * @returns {{word: string, before: 'space' | 'soft' | 'hard' | null, glued: boolean}[] | null}
+ * @returns {{word: string, before: 'space' | 'soft' | 'keep' | 'hard' | null, glued: boolean}[] | null}
  */
 function wordsOf(para, view) {
   const { text } = view;
@@ -80,7 +84,12 @@ function wordsOf(para, view) {
   let before = null;
   let glued = false;
   // After a break, spaces a break's span stops short of: part of a tab.
-  const wordFrom = (word) => (before === null ? word : word.trimStart());
+  // First on its line, the spaces Pandoc skips before a paragraph.
+  const first = /^[ \t]*$/.test(
+    text.slice(text.lastIndexOf('\n', start - 1) + 1, start),
+  );
+  const wordFrom = (word) =>
+    before === null && !first ? word : word.trimStart();
   for (const b of breaks) {
     const gap = text.slice(b.start, b.end);
     if (b.start < from || b.end > end) return null;
@@ -89,9 +98,17 @@ function wordsOf(para, view) {
     // A hard break of spaces or a tab is two spaces; a backslash stays.
     const ending = hard ? gap.slice(0, gap.indexOf('\n')) : '';
     const kept = /^[ \t]+$/.test(ending) ? '  ' : ending;
-    words.push({ word: wordFrom(slice(from, b.start) + kept), before, glued });
+    const word = wordFrom(slice(from, b.start) + kept);
+    words.push({ word, before, glued });
     from = b.end;
-    before = hard ? 'hard' : b.t === 'SoftBreak' ? 'soft' : 'space';
+    const soft = b.t === 'SoftBreak';
+    before = hard
+      ? 'hard'
+      : soft && BARE_COMMAND.test(word)
+        ? 'keep'
+        : soft
+          ? 'soft'
+          : 'space';
     glued = b.glued && !hard;
   }
   // Spaces ending its line go; before a block on the same line they stay.
@@ -128,7 +145,8 @@ const join = (words) => words.map(({ word }) => word).join(' ');
 function lineFrom(words, at, width) {
   let line = words[at].word;
   let k = at + 1;
-  while (k < words.length && words[k].before !== 'hard') {
+  const breaks = (before) => before === 'hard' || before === 'keep';
+  while (k < words.length && !breaks(words[k].before)) {
     const next = `${line} ${words[k].word}`;
     if (!words[k].glued && widthOf(next) > width) break;
     line = next;
@@ -206,7 +224,11 @@ export function reflow(para, view, options, context) {
   let used = context.column;
   for (let k = 1; k < words.length; k++) {
     const { word, before, glued } = words[k];
-    if (before === 'hard' || (preserve && before === 'soft')) {
+    if (
+      before === 'hard' ||
+      before === 'keep' ||
+      (preserve && before === 'soft')
+    ) {
       lines.push(line);
       line = word;
       used = 0;

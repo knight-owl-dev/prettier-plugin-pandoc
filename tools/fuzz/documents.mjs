@@ -55,6 +55,9 @@ const BLOCKS = [
   '<div>\n\nunclosed div',
   'a[^f] b[^g]\n\n[^f]: A note long enough to wrap a few times over at the\n    narrow widths.\n\n    A second *paragraph*.\n\n[^g]: Short.',
   'c[^h]\n\n[^h]:\n    Below its marker.',
+  '\\noindent\nA paragraph after a bare command, long enough to wrap.',
+  'a line\n\\noindent  \nafter trailing spaces',
+  '>   a quote indented past its marker',
 ];
 
 // Words that open a block, or end a paragraph, at the start of a line.

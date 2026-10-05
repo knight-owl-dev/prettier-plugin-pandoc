@@ -50,6 +50,15 @@ export function extent(block, view) {
 
 const hasBlankLine = (text) => /\n[ \t]*\n/.test(text);
 
+// A gap without the indentation before the block after it, where that is
+// short of a tab stop: Pandoc reads it no differently.
+function unindented(gap, options) {
+  const indent = /(?:^|\n)( *)$/.exec(gap)[1];
+  return indent.length > 0 && indent.length < options.pandocTabStop
+    ? gap.slice(0, gap.length - indent.length)
+    : gap;
+}
+
 /**
  * Text between blocks in a container: runs of blank lines made one, none
  * added, since a blank line makes a list loose; none at either end of the
@@ -88,7 +97,10 @@ export function printIn(blocks, view, from, to, context, options) {
     if (ignored.has(k) || ignored.has(k - 1)) {
       out += view.text.slice(at, start);
     } else {
-      out += collapsed(view.text.slice(at, start), k === 0, false);
+      const gap = collapsed(view.text.slice(at, start), k === 0, false);
+      const startsLine = k === 0 || gap.includes('\n');
+      out +=
+        block.t === 'CodeBlock' || !startsLine ? gap : unindented(gap, options);
     }
     // On the first line, past the context's column; on others, from 0.
     const column = out.includes('\n')
