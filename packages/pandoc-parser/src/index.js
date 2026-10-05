@@ -9,4 +9,5 @@ export * from './char.js';
 export * from './core.js';
 export { readLaTeX } from './latex/reader.js';
 export { readMarkdown } from './markdown/index.js';
+export { DEFAULT_TAB_STOP } from './options.js';
 export * from './position.js';

@@ -2,7 +2,10 @@
   "version": "0.2",
   "language": "en-US",
   "dictionaries": ["docker", "node", "typescript", "tex"],
-  "ignorePaths": ["LICENSE", "package-lock.json", "packages/*/test/corpus/**",
+  "ignorePaths": [
+    "LICENSE",
+    "package-lock.json",
+    "packages/*/test/corpus/**",
     "packages/*/test/expected/**"
   ],
   "words": [
@@ -44,6 +47,7 @@
     "Pandoc",
     "Pandoc's",
     "plainify",
+    "pullquote",
     "RCDATA",
     "rowseps",
     "Semigroup",
