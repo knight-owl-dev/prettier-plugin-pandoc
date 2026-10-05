@@ -38,6 +38,10 @@ joins each paragraph into one line. `embeddedLanguageFormatting` `auto`, the
 default, reformats a fenced sample tagged with a language prettier formats
 (`yaml`, `json`, …); `off` prints every sample as written.
 
+`<!-- prettier-ignore -->` leaves the block after it as written, and
+`<!-- prettier-ignore-start -->` … `<!-- prettier-ignore-end -->` everything
+between.
+
 ## Preserve, never repair
 
 Markup Pandoc reads as broken stays as written. A fence a paragraph continues

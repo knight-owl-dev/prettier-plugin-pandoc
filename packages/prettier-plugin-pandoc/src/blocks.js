@@ -79,22 +79,63 @@ function collapsed(gap, first, last) {
  * @returns {string | null}
  */
 function printIn(blocks, view, from, to, context, options) {
+  const ignored = ignoredOf(blocks);
   let out = '';
   let at = from;
   for (const [k, block] of blocks.entries()) {
     const [start, end] = extent(block, view);
     if (start < at) return null;
-    out += collapsed(view.text.slice(at, start), k === 0, false);
+    if (ignored.has(k) || ignored.has(k - 1)) {
+      out += view.text.slice(at, start);
+    } else {
+      out += collapsed(view.text.slice(at, start), k === 0, false);
+    }
     // On the first line, past the context's column; on others, from 0.
     const column = out.includes('\n')
       ? columnAfter(out)
       : context.column + out.length;
-    const here = { ...context, column };
-    out += printBlock(block, view, here, options);
+    const fresh = /\n[ \t]*\n[ \t]*$/.test(out);
+    const here = { ...context, column, fresh };
+    out += ignored.has(k)
+      ? view.text.slice(start, end)
+      : printBlock(block, view, here, options);
     at = end;
   }
   if (at > to) return null;
   return out + collapsed(view.text.slice(at, to), blocks.length === 0, true);
+}
+
+const IGNORE = /^<!--\s*prettier-ignore\s*-->$/;
+const IGNORE_START = /^<!--\s*prettier-ignore-start\s*-->$/;
+const IGNORE_END = /^<!--\s*prettier-ignore-end\s*-->$/;
+
+// An HTML comment's text, trimmed; null for any other block.
+const commentOf = (block) =>
+  block.t === 'RawBlock' && block.c[0] === 'html' ? block.c[1].trim() : null;
+
+/**
+ * The blocks prettier leaves as written, by index: the one after
+ * `<!-- prettier-ignore -->`, and each between `<!-- prettier-ignore-start
+ * -->` and `<!-- prettier-ignore-end -->`, or the end where none follows.
+ *
+ * @param {object[]} blocks
+ * @returns {Set<number>}
+ */
+export function ignoredOf(blocks) {
+  const out = new Set();
+  let inRange = false;
+  for (const [k, block] of blocks.entries()) {
+    const comment = commentOf(block);
+    if (inRange) {
+      if (comment !== null && IGNORE_END.test(comment)) inRange = false;
+      else out.add(k);
+    } else if (comment !== null && IGNORE_START.test(comment)) {
+      inRange = true;
+    } else if (comment !== null && IGNORE.test(comment)) {
+      if (k + 1 < blocks.length) out.add(k + 1);
+    }
+  }
+  return out;
 }
 
 /**
@@ -329,7 +370,8 @@ const PRINTERS = {
     const { contents } = block.c;
     if (contents === undefined) return null;
     const inner = contentsView(contents);
-    const within = { ...context, width: context.width - 2, column: 0 };
+    // A quote opening mid-line, after raw TeX, starts at that column.
+    const within = { ...context, width: context.width - 2 };
     const body = printIn(block.c, inner, 0, inner.text.length, within, options);
     if (body === null) return null;
     // Spaces before its first marker that its span takes print as written.
@@ -342,6 +384,8 @@ const PRINTERS = {
   DefinitionList: printDefinitionList,
   Div: printDiv,
   CodeBlock: printCode,
+  // After a line of text, `---` would underline a setext heading.
+  HorizontalRule: (_block, _view, context) => (context.fresh ? '---' : null),
 };
 
 // The column the end of `out` is at.

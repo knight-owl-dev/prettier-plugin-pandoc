@@ -3,7 +3,13 @@
 // metadata — prints as written, its blank lines at either end dropped.
 
 import { doc } from 'prettier';
-import { columnAfter, extent, printBlock, sourceView } from './blocks.js';
+import {
+  columnAfter,
+  extent,
+  ignoredOf,
+  printBlock,
+  sourceView,
+} from './blocks.js';
 import { heldBlocks } from './check.js';
 import { languageOf, parserFor } from './code.js';
 
@@ -68,12 +74,13 @@ function render(blocks, text, held, options) {
         ? gap
         : spaced(gap, k === 0, k === blocks.length, options.pandocTabStop);
     if (k === blocks.length) break;
+    const fresh = out === '' || /\n[ \t]*\n[ \t]*$/.test(out);
     out += held.has(k)
       ? text.slice(blocks[k].start, ends[k])
       : printBlock(
           blocks[k],
           view,
-          { ...context, column: columnAfter(out) },
+          { ...context, column: columnAfter(out), fresh },
           options,
         );
   }
@@ -100,9 +107,11 @@ const inOrder = (blocks) =>
 function printRoot(root, options, samples) {
   const text = options.originalText;
   const withSamples = { ...options, pandocSamples: samples };
+  // Blocks prettier-ignore leaves as written, the text around them too.
+  const ignored = ignoredOf(root.blocks);
   const out = inOrder(root.blocks)
     ? heldBlocks(root, withSamples, (held) =>
-        render(root.blocks, text, held, withSamples),
+        render(root.blocks, text, new Set([...held, ...ignored]), withSamples),
       )
     : text;
   return replaceEndOfLine(out, literalline);

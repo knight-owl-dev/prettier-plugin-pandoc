@@ -77,7 +77,9 @@ function wordsOf(para, view) {
     if (b.start < from || b.end > end) return null;
     const hard = b.t === 'LineBreak';
     if (!(hard ? HARD : SPACE).test(gap)) return null;
-    const kept = hard ? gap.slice(0, gap.indexOf('\n')) : '';
+    // A hard break of spaces or a tab is two spaces; a backslash stays.
+    const ending = hard ? gap.slice(0, gap.indexOf('\n')) : '';
+    const kept = /^[ \t]+$/.test(ending) ? '  ' : ending;
     words.push({ word: wordFrom(slice(from, b.start) + kept), before });
     from = b.end;
     before = hard ? 'hard' : b.t === 'SoftBreak' ? 'soft' : 'space';
@@ -132,6 +134,7 @@ function isPara(text, read) {
  * @property {number} column
  * @property {boolean} inListItem
  * @property {number} divLevel
+ * @property {boolean} [fresh] Whether a blank line, or nothing, precedes it.
  */
 
 /**
