@@ -108,10 +108,11 @@ Diagnostics are ordered by file, as given, then by where they start.
 
 ## Rules
 
-The first four rules find what Pandoc reads other than as written;
-`metadata-in-markdown` is a project's own rule; the rest are Pandoc's messages,
-named in kebab case. A shortcut reference `[text]` nothing defines goes
-unreported, since prose writes `[sic]` that way.
+`block-in-paragraph`, `div-fence-length`, `undefined-reference` and
+`undefined-note` find misreads Pandoc gives no warning for.
+`metadata-in-markdown` holds a project to keeping metadata out of its Markdown.
+The rest are Pandoc's own messages, in kebab case. A shortcut reference `[text]`
+nothing defines goes unreported, since prose writes `[sic]` that way.
 
 | Rule                        | Severity | What it finds                                                                     |
 | --------------------------- | -------- | --------------------------------------------------------------------------------- |
