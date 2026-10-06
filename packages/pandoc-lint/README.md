@@ -12,15 +12,17 @@ written and logs nothing of.
 ## CLI
 
 ```sh
-pandoc-lint [--format=text|json|github] [--strict] [--info] [--tab-stop=N] FILE...
+pandoc-lint [--format=text|json|github] [--strict] [--info] [--tab-stop=N]
+            [--shortcuts=FILE]... [FILE]...
 ```
 
-| Option       | What it does                                                                   |
-| ------------ | ------------------------------------------------------------------------------ |
-| `--format`   | `text` (the default) for people, `json` for tools, `github` for GitHub Actions |
-| `--strict`   | Exit 1 on a warning too                                                        |
-| `--info`     | Report Pandoc's INFO messages as well                                          |
-| `--tab-stop` | Pandoc's `--tab-stop`, 4 by default                                            |
+| Option        | What it does                                                                   |
+| ------------- | ------------------------------------------------------------------------------ |
+| `--format`    | `text` (the default) for people, `json` for tools, `github` for GitHub Actions |
+| `--strict`    | Exit 1 on a warning too                                                        |
+| `--info`      | Report Pandoc's INFO messages as well                                          |
+| `--tab-stop`  | Pandoc's `--tab-stop`, 4 by default                                            |
+| `--shortcuts` | A keystone shortcuts file whose bodies to lint; repeatable                     |
 
 Diagnostics go to stdout. The exit status is 1 on an error, or on a warning with
 `--strict`; 2 on a usage error.
@@ -41,6 +43,16 @@ Its layout follows keystone's. For a tool, read the JSON.
 
 In GitHub Actions, `--format=github` writes each diagnostic as a workflow
 command, so the run and a pull request's diff show it on its line.
+
+## Shortcuts
+
+`--shortcuts=FILE` lints a keystone shortcuts file, as its
+[manual](https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/) lays one
+out: each shortcut's `body` read as a document of its own, every rule applied,
+each diagnostic at its line and column in the YAML. A folded or quoted body,
+whose lines are not the file's, reports at its start. What is no YAML
+(`yaml-syntax`), no mapping of shortcuts (`shortcut-file`) or a body that is no
+text (`shortcut-body`) is an error.
 
 ## JSON
 
@@ -108,6 +120,7 @@ messages. A shortcut `[text]` nothing defines goes unreported: prose writes
 ## API
 
 `lint(files, options)` lints `[{path, text}]` as one manuscript;
-`lintSnippet(text, {source, line, column, indent})` lints markdown taken from
-another file, placed where it is there. `formatText`, `formatJson` and
-`formatGithub` print what either returns.
+`lintSnippet(text, {source, line, column, indent, file})` lints markdown taken
+from another file, placed where it is there; `lintShortcuts(path, text)` lints a
+shortcuts file. `formatText`, `formatJson` and `formatGithub` print what either
+returns.

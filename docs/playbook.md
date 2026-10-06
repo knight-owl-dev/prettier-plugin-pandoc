@@ -97,11 +97,13 @@ in under 200ms at every `proseWrap`. A case more than 10% slower than `main` at
 ```sh
 make pandoc-lint FILES="ch1.md ch2.md"
 make pandoc-lint FILES="ch1.md ch2.md" ARGS="--format=json --info"
+make pandoc-lint FILES="ch1.md" ARGS="--shortcuts=shortcuts.yaml"
 ```
 
 Reads the files as Pandoc reads several, one document in the order given, and
 reports what Pandoc warns of at its file, line and column, in keystone's frame.
-`--info` adds Pandoc's INFO messages; `--strict` exits 1 on a warning.
+`--info` adds Pandoc's INFO messages; `--strict` exits 1 on a warning;
+`--shortcuts` lints a keystone shortcuts file's bodies.
 
 ## Add a tool
 
