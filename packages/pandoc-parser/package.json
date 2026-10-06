@@ -2,6 +2,13 @@
   "name": "@knight-owl-llc/pandoc-parser",
   "version": "0.0.0",
   "description": "Pandoc's markdown reader, ported: Pandoc's AST with source positions",
+  "keywords": [
+    "pandoc",
+    "markdown",
+    "parser",
+    "ast",
+    "latex"
+  ],
   "license": "GPL-2.0-or-later",
   "type": "module",
   "exports": "./src/index.js",
