@@ -28,11 +28,10 @@ In `.prettierrc`, for the files Pandoc builds:
 }
 ```
 
-The plugin replaces prettier's `markdown` parser for those files, and keeps what
-Pandoc reads. A CommonMark reader, GitHub's among them, reads some Markdown
-differently: to Pandoc, a `- item` line right after paragraph text continues the
-paragraph, and the plugin may join the two lines. A README or a changelog stays
-on prettier's own parser.
+Markdown GitHub renders, a README or a changelog, belongs on prettier's own
+parser. The plugin keeps what Pandoc reads, and a CommonMark reader such as
+GitHub's reads some Markdown differently: to Pandoc, a `- item` line right after
+paragraph text continues the paragraph, and the plugin may join the two lines.
 
 ## What it formats
 
@@ -58,11 +57,8 @@ to the document's end; repairing either would change what the document means.
 | `embeddedLanguageFormatting` | `auto` (the default) reformats a fenced sample tagged with a language prettier formats, such as `yaml`; `off` prints it as written. |
 | `tabWidth`                   | Pads a list marker toward it, by up to three spaces, so every line of the item starts at one column: `-   item` at 4.               |
 
-For documents built with `pandoc --tab-stop=8`:
-
-```json
-{ "plugins": ["@knight-owl-llc/prettier-plugin-pandoc"], "pandocTabStop": 8 }
-```
+For documents built with `pandoc --tab-stop=8`, the override's options take
+`"pandocTabStop": 8`.
 
 `<!-- prettier-ignore -->` keeps the next block as written;
 `<!-- prettier-ignore-start -->` and `<!-- prettier-ignore-end -->` keep
@@ -70,10 +66,10 @@ everything between them.
 
 ## markdownlint
 
-The plugin's output trips markdownlint where Pandoc and CommonMark part ways. A
-div's content sits against its fences, so a list or code fence there trips MD031
-and MD032; prettier's emphasis, `*` inside a word and `_` elsewhere, trips
-MD049's default. For the files the plugin formats:
+A few markdownlint rules trip on the plugin's output. A div's content sits
+against its fences, so a list or code fence there trips MD031 and MD032.
+Prettier's emphasis, `*` inside a word and `_` elsewhere, trips MD049's default.
+For the files the plugin formats:
 
 ```yaml
 blanks-around-fences: false
@@ -81,6 +77,8 @@ blanks-around-lists: false
 emphasis-style:
   style: underscore
 ```
+
+MD049 still reads a `*` inside raw TeX, which Pandoc passes to TeX, as emphasis.
 
 With `tabWidth` above 2, the padded markers trip MD030 and MD007 as well:
 
@@ -90,10 +88,8 @@ ul-indent:
   indent: 4 # the tabWidth
 ```
 
-MD049 still reads a `*` inside raw TeX, which Pandoc passes to TeX, as emphasis.
-
-markdownlint-cli2 applies a `.markdownlint.yaml` to its own directory, so one in
-the manuscript's directory holds these for those files alone.
+A `.markdownlint.yaml` in the manuscript's directory holds these for those files
+alone: markdownlint-cli2 applies one to its own directory.
 
 ## License
 

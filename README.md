@@ -2,17 +2,17 @@
 
 Format [Pandoc](https://pandoc.org/) Markdown with
 [prettier](https://prettier.io/), and lint it. Both run on a port of Pandoc's
-own Markdown reader, so a formatted document reads to Pandoc as its source did.
+own Markdown reader. A formatted document reads to Pandoc as its source did.
 
 Before 1.0: a block the plugin does not format yet prints as written.
 
 ## Packages
 
-| Package                                                                     | What it is                                                  |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| [`@knight-owl-llc/prettier-plugin-pandoc`](packages/prettier-plugin-pandoc) | The prettier plugin                                         |
-| [`@knight-owl-llc/pandoc-parser`](packages/pandoc-parser)                   | Pandoc's Markdown reader in JavaScript, with source spans   |
-| [`@knight-owl-llc/pandoc-lint`](packages/pandoc-lint)                       | Pandoc's warnings on a manuscript, at file, line and column |
+| Package                                                                     | What it is                                                |
+| --------------------------------------------------------------------------- | --------------------------------------------------------- |
+| [`@knight-owl-llc/prettier-plugin-pandoc`](packages/prettier-plugin-pandoc) | The prettier plugin                                       |
+| [`@knight-owl-llc/pandoc-parser`](packages/pandoc-parser)                   | Pandoc's Markdown reader in JavaScript, with source spans |
+| [`@knight-owl-llc/pandoc-lint`](packages/pandoc-lint)                       | Pandoc's warnings and misreads, at file, line and column  |
 
 ## Development
 
@@ -28,7 +28,7 @@ The three packages share one version. `make release RELEASE=patch` (or `minor`,
 `major`, `X.Y.Z`), or the Release workflow, stamps it into each package and
 opens a `release/vX.Y.Z` pull request; `AUTOMERGE=1` queues its merge.
 
-Merging tags `vX.Y.Z`, and the tag publishes:
+Merging it tags `vX.Y.Z`, and the tag publishes:
 
 - the `pandoc-lint` binaries for Linux x64 and arm64, each packed with
   `LICENSE`, `NOTICE.md` and its source, attested, on a GitHub Release with

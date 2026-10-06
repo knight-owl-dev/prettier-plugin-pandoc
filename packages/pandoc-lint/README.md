@@ -93,16 +93,16 @@ Three errors are about the file itself: `yaml-syntax` for invalid YAML,
 }
 ```
 
-| Field                  | What it is                                                          |
-| ---------------------- | ------------------------------------------------------------------- |
-| `version`              | The format's version, raised by a change that breaks a reader       |
-| `rule`                 | The rule, from [Rules](#rules)                                      |
-| `severity`             | `error`, `warn`, or `info` for Pandoc's INFO messages               |
-| `source`               | The file, as given                                                  |
-| `start`, `end`         | Offsets into the file in UTF-16 code units; `end` exclusive         |
-| `line`, `column`       | Where it starts, from 1; columns count code points                  |
-| `endLine`, `endColumn` | Where it ends, exclusive, in the file it starts in                  |
-| `callouts`             | The message in keystone's callouts: `problem` always, others as apt |
+| Field                  | What it is                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `version`              | The format's version, raised by a change that breaks a reader                     |
+| `rule`                 | The rule, from [Rules](#rules)                                                    |
+| `severity`             | `error`, `warn`, or `info` for Pandoc's INFO messages                             |
+| `source`               | The file, as given                                                                |
+| `start`, `end`         | Offsets into the file in UTF-16 code units; `end` exclusive                       |
+| `line`, `column`       | Where it starts, from 1; columns count code points                                |
+| `endLine`, `endColumn` | Where it ends, exclusive, in the file it starts in                                |
+| `callouts`             | The message in keystone's callouts: `problem` always, the others where they apply |
 
 Diagnostics are ordered by file, as given, then by where they start.
 
@@ -139,9 +139,9 @@ nothing defines goes unreported, since prose writes `[sic]` that way.
 | `lint(files, options)`                                    | Lints `[{path, text}]` as one manuscript                         |
 | `lintSnippet(text, {source, line, column, indent, file})` | Lints Markdown taken from another file, placed where it is there |
 | `lintShortcuts(path, text, options)`                      | Lints a shortcuts file                                           |
-| `formatText`, `formatJson`, `formatGithub`                | Print diagnostics as the CLI's formats                           |
+| `formatText`, `formatJson`, `formatGithub`                | Print diagnostics in the CLI's formats                           |
 
-`options` takes `tabStop`, `info` and `noMetadata`, as the CLI's flags.
+`options` takes `tabStop`, `info` and `noMetadata`, the CLI's flags.
 
 ## License
 
