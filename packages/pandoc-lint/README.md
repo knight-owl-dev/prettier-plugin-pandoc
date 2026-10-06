@@ -1,7 +1,5 @@
 # @knight-owl-llc/pandoc-lint
 
-[![npm](https://img.shields.io/badge/install-npm-red)](https://www.npmjs.com/package/@knight-owl-llc/pandoc-lint)
-
 Lint Pandoc Markdown: Pandoc's warnings and misreads, each at its file, line and
 column.
 
