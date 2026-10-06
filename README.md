@@ -1,5 +1,7 @@
 # prettier-plugin-pandoc
 
+[![npm](https://img.shields.io/badge/install-npm-red)](https://www.npmjs.com/org/knight-owl-llc)
+
 Format [Pandoc](https://pandoc.org/) Markdown with
 [prettier](https://prettier.io/), and lint it. Both run on a port of Pandoc's
 own Markdown reader. A formatted document reads to Pandoc as its source did.
