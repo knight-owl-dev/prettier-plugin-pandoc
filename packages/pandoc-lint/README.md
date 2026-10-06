@@ -1,4 +1,4 @@
-# @knight-owl-dev/pandoc-lint
+# @knight-owl-llc/pandoc-lint
 
 What Pandoc warns of reading a manuscript, and what it misreads, at its file,
 line and column.

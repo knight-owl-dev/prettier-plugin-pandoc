@@ -3,7 +3,7 @@
 // other block as written. A list item's marker and a fence print as
 // written too.
 
-import { readMarkdown } from '@knight-owl-dev/pandoc-parser';
+import { readMarkdown } from '@knight-owl-llc/pandoc-parser';
 import { printCode } from './code.js';
 import { withDefinitions } from './definitions.js';
 import { edited, markerEdits } from './emphasis.js';
@@ -205,7 +205,7 @@ function expandTabs(text, tabStop) {
  * from where that line starts in `view`: the marker as written. Null where
  * that is no marker.
  *
- * @param {import('@knight-owl-dev/pandoc-parser').SourceText} contents
+ * @param {import('@knight-owl-llc/pandoc-parser').SourceText} contents
  * @param {View} view
  * @param {number} tabStop
  * @returns {{marker: string, line: number, at: number} | null}

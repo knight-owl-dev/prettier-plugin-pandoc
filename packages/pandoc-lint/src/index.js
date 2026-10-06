@@ -4,7 +4,7 @@
 // Files are read as Pandoc's CLI reads several, joined into one document in
 // the order given; each diagnostic is mapped back to the file it is in.
 
-import { readMarkdown, toKey, toSources } from '@knight-owl-dev/pandoc-parser';
+import { readMarkdown, toKey, toSources } from '@knight-owl-llc/pandoc-parser';
 import { frame } from './frame.js';
 import { misreads } from './misreads.js';
 import { RULES } from './rules.js';

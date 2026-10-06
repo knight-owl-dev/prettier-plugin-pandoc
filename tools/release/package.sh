@@ -35,7 +35,7 @@ mkdir "${stage}/${name}"
 cp "${binary}" "${stage}/${name}/pandoc-lint"
 cp LICENSE NOTICE.md "${stage}/${name}/"
 cat > "${stage}/${name}/SOURCE" << SOURCE
-pandoc-lint v${version}, from @knight-owl-dev/pandoc-lint, compiled with Bun.
+pandoc-lint v${version}, from @knight-owl-llc/pandoc-lint, compiled with Bun.
 
 Licensed under GPL-2.0-or-later (LICENSE); NOTICE.md gives its provenance.
 Its source, complete: https://github.com/knight-owl-dev/prettier-plugin-pandoc/tree/v${version}

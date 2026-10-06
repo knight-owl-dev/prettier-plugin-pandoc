@@ -1,12 +1,12 @@
 // A prettier plugin that formats Pandoc markdown without changing what Pandoc
 // reads.
 //
-// @knight-owl-dev/pandoc-parser reads the document as Pandoc does; the
+// @knight-owl-llc/pandoc-parser reads the document as Pandoc does; the
 // printer takes structure from that AST and text from the source each node
 // spans, so the author's syntax survives what the AST drops. The output is
 // read again, and what reads differently prints as written (check.js).
 
-import { DEFAULT_TAB_STOP } from '@knight-owl-dev/pandoc-parser';
+import { DEFAULT_TAB_STOP } from '@knight-owl-llc/pandoc-parser';
 import { parse } from './parse.js';
 import { embed, print } from './print.js';
 
