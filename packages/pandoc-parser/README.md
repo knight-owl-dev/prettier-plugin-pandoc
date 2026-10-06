@@ -26,13 +26,14 @@ doc.blocks[0].start; // where the first block starts in `text`
 | `continuesParagraph(next, options)` | Whether Pandoc reads a paragraph on into the line `next`                                     |
 | `DEFAULT_TAB_STOP`                  | Pandoc's default `--tab-stop`, 4                                                             |
 
-A Markdown read carries three more properties, kept out of its JSON:
+A Markdown read carries four more properties, kept out of its JSON:
 
-| Property      | What it holds                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------- |
-| `definitions` | Each reference definition, and the span of each of its parts                                      |
-| `log`         | The messages Pandoc logs reading the document, in its order, each with Pandoc's fields and a span |
-| `unresolved`  | Each reference and note looked up and not found: its kind, form, label and span                   |
+| Property         | What it holds                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------- |
+| `definitions`    | Each reference definition, and the span of each of its parts                                      |
+| `log`            | The messages Pandoc logs reading the document, in its order, each with Pandoc's fields and a span |
+| `unresolved`     | Each reference and note looked up and not found: its kind, form, label and span                   |
+| `metadataBlocks` | Each YAML metadata block and title block Pandoc read metadata from: its kind and span             |
 
 Offsets count UTF-16 code units, as JavaScript strings index.
 

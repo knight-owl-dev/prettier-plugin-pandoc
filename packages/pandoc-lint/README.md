@@ -12,17 +12,18 @@ written and logs nothing of.
 ## CLI
 
 ```sh
-pandoc-lint [--format=text|json|github] [--strict] [--info] [--tab-stop=N]
+pandoc-lint [--format=text|json|github] [--strict] [--info] [--no-metadata] [--tab-stop=N]
             [--shortcuts=FILE]... [FILE]...
 ```
 
-| Option        | What it does                                                                   |
-| ------------- | ------------------------------------------------------------------------------ |
-| `--format`    | `text` (the default) for people, `json` for tools, `github` for GitHub Actions |
-| `--strict`    | Exit 1 on a warning too                                                        |
-| `--info`      | Report Pandoc's INFO messages as well                                          |
-| `--tab-stop`  | Pandoc's `--tab-stop`, 4 by default                                            |
-| `--shortcuts` | A keystone shortcuts file whose bodies to lint; repeatable                     |
+| Option          | What it does                                                                   |
+| --------------- | ------------------------------------------------------------------------------ |
+| `--format`      | `text` (the default) for people, `json` for tools, `github` for GitHub Actions |
+| `--strict`      | Exit 1 on a warning too                                                        |
+| `--info`        | Report Pandoc's INFO messages as well                                          |
+| `--no-metadata` | Report metadata in the Markdown, for a project that keeps it elsewhere         |
+| `--tab-stop`    | Pandoc's `--tab-stop`, 4 by default                                            |
+| `--shortcuts`   | A keystone shortcuts file whose bodies to lint; repeatable                     |
 
 It also compiles with Bun to a standalone binary that needs no Node: CI checks
 that binary lints as Node does (`make bun-check`).
@@ -99,9 +100,9 @@ Diagnostics come by file in the order given, then by where they start.
 
 ## Rules
 
-The first four are what Pandoc reads other than as written; the rest are its own
-messages. A shortcut `[text]` nothing defines goes unreported: prose writes
-`[sic]` so.
+The first four are what Pandoc reads other than as written, the fifth a
+project's own rule; the rest are Pandoc's messages. A shortcut `[text]` nothing
+defines goes unreported: prose writes `[sic]` so.
 
 | Rule                        | Severity | What it finds                                                                          |
 | --------------------------- | -------- | -------------------------------------------------------------------------------------- |
@@ -109,6 +110,7 @@ messages. A shortcut `[text]` nothing defines goes unreported: prose writes
 | `div-fence-length`          | warn     | A closing fence whose length differs from its opener's, in a nest of differing lengths |
 | `undefined-reference`       | warn     | A reference link or image, `[t][r]` or `[t][]`, whose label nothing defines            |
 | `undefined-note`            | warn     | A note reference whose label nothing defines                                           |
+| `metadata-in-markdown`      | error    | A YAML metadata block or title block, with `--no-metadata` alone                       |
 | `unclosed-div`              | warn     | A div closed only by the document's end                                                |
 | `duplicate-link-reference`  | warn     | A reference defined again, elsewhere                                                   |
 | `duplicate-note-reference`  | warn     | A note defined again                                                                   |

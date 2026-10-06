@@ -48,6 +48,8 @@ import { toLower, words } from '../shared.js';
  *   Messages held to report once reading ends.
  * @property {Held<object> | null} unresolved Each reference looked up and
  *   not found: `references.js` unresolved.
+ * @property {Held<{kind: 'yaml' | 'title', start: number, end: number}> | null}
+ *   metadataBlocks Each metadata block read: its kind and span.
  * @property {Map<string, import('../latex/parsing.js').Macro>} macros The
  *   TeX macros defined so far.
  * @property {Record<string, unknown>} meta The document's metadata so far.
@@ -115,6 +117,7 @@ export const defaultParserState = (options) => ({
   noteRefs: EMPTY_MAP,
   logMessages: null,
   unresolved: null,
+  metadataBlocks: null,
 });
 
 /**
