@@ -1,6 +1,6 @@
 {
   "name": "@knight-owl-llc/pandoc-parser",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Pandoc's markdown reader, ported: Pandoc's AST with source positions",
   "keywords": [
     "pandoc",
