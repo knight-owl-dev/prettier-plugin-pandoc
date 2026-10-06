@@ -1,5 +1,6 @@
-# The test image's Node and Pandoc, for the suite and the tools: `make` runs
-# every command through these services, never the host's.
+# The test image's Node and Pandoc, for the suite and the tools, and Bun for
+# pandoc-lint's standalone build: `make` runs every command through these
+# services, never the host's.
 
 name: prettier-plugin-pandoc
 
@@ -47,6 +48,31 @@ services:
       HOME: /tmp
       NPM_CONFIG_FUND: "false"
       NPM_CONFIG_UPDATE_NOTIFIER: "false"
+
+    volumes:
+      - .:/work
+
+  # No network_mode: none — a cross-target compile fetches that target's Bun.
+  bun:
+    image: prettier-plugin-pandoc-bun:local
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    build:
+      context: tools
+      dockerfile: bun.Dockerfile
+
+    working_dir: /work
+    entrypoint: ["sh"]
+
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    tmpfs:
+      - /tmp
+    environment:
+      HOME: /tmp
 
     volumes:
       - .:/work

@@ -1,0 +1,19 @@
+# Shortcuts as keystone's manual writes them, and one body that misreads.
+pullquote:
+  class: align
+  content: font
+  body: |
+    ::: rule
+    :::
+    ::: font
+    :::
+    ::: rule
+    :::
+epigraph:
+  class: font
+  content: slot
+  body: |
+      ::: quote
+      Opening words
+      ::: slot
+      :::

@@ -105,6 +105,17 @@ reports what Pandoc warns of at its file, line and column, in keystone's frame.
 `--info` adds Pandoc's INFO messages; `--strict` exits 1 on a warning;
 `--shortcuts` lints a keystone shortcuts file's bodies.
 
+## Bun build
+
+```sh
+make bun-check
+```
+
+Compiles `pandoc-lint` with the pinned Bun into standalone binaries for linux
+x64 and arm64 in `.scratch/bun/`, lints the corpus and a shortcuts fixture with
+the one this machine runs, and fails unless its JSON is Node's byte for byte.
+The other target is checked for its architecture alone. CI runs it on every PR.
+
 ## Add a tool
 
 A tool is a script under `tools/`. It takes positional arguments with defaults
