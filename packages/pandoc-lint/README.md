@@ -1,11 +1,13 @@
 # @knight-owl-dev/pandoc-lint
 
-What Pandoc warns of reading a manuscript, at its file, line and column.
+What Pandoc warns of reading a manuscript, and what it misreads, at its file,
+line and column.
 
 The files are read as Pandoc reads several, one document in the order given: a
 definition in one file serves the others, and a div left open runs on into the
 next. Each warning Pandoc's reader logs becomes a diagnostic in the file it is
-in, once, however often Pandoc logs it.
+in, once, however often Pandoc logs it; so does what Pandoc reads other than as
+written and logs nothing of.
 
 ## CLI
 
@@ -79,18 +81,23 @@ Diagnostics come by file in the order given, then by where they start.
 
 ## Rules
 
-| Rule                        | Severity | What Pandoc logs                         |
-| --------------------------- | -------- | ---------------------------------------- |
-| `unclosed-div`              | warn     | A div closed only by the document's end  |
-| `duplicate-link-reference`  | warn     | A reference defined again, elsewhere     |
-| `duplicate-note-reference`  | warn     | A note defined again                     |
-| `note-defined-but-not-used` | warn     | A note no reference uses                 |
-| `duplicate-identifier`      | warn     | An identifier given that one already has |
-| `yaml-warning`              | warn     | A metadata key given again               |
-| `macro-already-defined`     | warn     | A macro or environment defined again     |
-| `undefined-toggle`          | warn     | `\iftoggle` of a toggle not defined      |
-| `parsing-unescaped`         | info     | A TeX special character left unescaped   |
-| `skipped-content`           | info     | Raw TeX Pandoc drops                     |
+The first two are what Pandoc reads other than as written; the rest are its own
+messages.
+
+| Rule                        | Severity | What it finds                                                                          |
+| --------------------------- | -------- | -------------------------------------------------------------------------------------- |
+| `block-in-paragraph`        | error    | A div or code fence, heading, quote or list on the line after paragraph text           |
+| `div-fence-length`          | warn     | A closing fence whose length differs from its opener's, in a nest of differing lengths |
+| `unclosed-div`              | warn     | A div closed only by the document's end                                                |
+| `duplicate-link-reference`  | warn     | A reference defined again, elsewhere                                                   |
+| `duplicate-note-reference`  | warn     | A note defined again                                                                   |
+| `note-defined-but-not-used` | warn     | A note no reference uses                                                               |
+| `duplicate-identifier`      | warn     | An identifier given that one already has                                               |
+| `yaml-warning`              | warn     | A metadata key given again                                                             |
+| `macro-already-defined`     | warn     | A macro or environment defined again                                                   |
+| `undefined-toggle`          | warn     | `\iftoggle` of a toggle not defined                                                    |
+| `parsing-unescaped`         | info     | A TeX special character left unescaped                                                 |
+| `skipped-content`           | info     | Raw TeX Pandoc drops                                                                   |
 
 ## API
 

@@ -6,6 +6,7 @@
 
 import { readMarkdown, toKey, toSources } from '@knight-owl-dev/pandoc-parser';
 import { frame } from './frame.js';
+import { misreads } from './misreads.js';
 import { RULES } from './rules.js';
 
 export { frame } from './frame.js';
@@ -18,7 +19,7 @@ export { RULES } from './rules.js';
  *
  * @typedef {object} Diagnostic
  * @property {string} rule
- * @property {'warn' | 'info'} severity
+ * @property {'error' | 'warn' | 'info'} severity
  * @property {string} source
  * @property {number} start
  * @property {number} end
@@ -138,7 +139,7 @@ function diagnose(text, place, { tabStop, info = false }) {
   };
   const seen = new Set();
   const out = [];
-  for (const msg of doc.log) {
+  for (const msg of [...doc.log, ...misreads(doc, text, { tabStop })]) {
     const rule = RULES[msg.type];
     if (rule === undefined || (rule.severity === 'info' && !info)) continue;
     const key = JSON.stringify(msg);
