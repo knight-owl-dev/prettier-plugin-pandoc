@@ -180,4 +180,14 @@ export const RULES = {
       remedy: `Define it, as [^${msg.label}]: followed by its text, in any file of the manuscript.`,
     }),
   },
+  MetadataInMarkdown: {
+    rule: 'metadata-in-markdown',
+    severity: 'error',
+    callouts: (msg) => ({
+      problem: `${msg.kind === 'title' ? 'a title block' : 'a YAML metadata block'} is in the Markdown`,
+      because: 'The project keeps its metadata out of the manuscript.',
+      remedy:
+        "Move its fields to the project's metadata file and delete the block.",
+    }),
+  },
 };

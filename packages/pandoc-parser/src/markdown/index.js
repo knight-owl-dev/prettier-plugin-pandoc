@@ -28,7 +28,7 @@ import { readResolved } from './references.js';
 export function readMarkdown(source, options) {
   const opts = readerOptions(options);
   const { text, toSource, input } = readerInput(source, opts.tabStop);
-  const [blocks, meta, definitions, log, missed] = readResolved(
+  const [blocks, meta, definitions, log, missed, metadataBlocks] = readResolved(
     (references) => {
       const state = defaultParserState(opts);
       const ctx = { text, pos: 0, state, references, log: [] };
@@ -43,6 +43,7 @@ export function readMarkdown(source, options) {
         inOrder(ctx.state.definitions),
         [...ctx.log, ...held],
         inOrder(ctx.state.unresolved),
+        inOrder(ctx.state.metadataBlocks),
       ];
       return { value: read, state: ctx.state };
     },
@@ -69,6 +70,11 @@ export function readMarkdown(source, options) {
   // The references and notes looked up and not found, in source order.
   const misses = missed.map((m) => mapItemSpans(m, toSource, toSource));
   Object.defineProperty(result, 'unresolved', { value: misses });
+  // Where each metadata block is: a YAML block or Pandoc's title block.
+  const metadata = metadataBlocks.map((m) =>
+    mapItemSpans(m, toSource, toSource),
+  );
+  Object.defineProperty(result, 'metadataBlocks', { value: metadata });
   return result;
 }
 

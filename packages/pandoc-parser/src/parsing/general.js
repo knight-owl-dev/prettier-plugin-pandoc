@@ -416,7 +416,13 @@ export function parseFromString(ctx, parser, extracted) {
 
 // The lists a read holds in its state, whose items carry spans: what a
 // read of extracted text adds to them maps out with its blocks.
-const HELD = ['definitions', 'noteDefinitions', 'logMessages', 'unresolved'];
+const HELD = [
+  'definitions',
+  'noteDefinitions',
+  'logMessages',
+  'unresolved',
+  'metadataBlocks',
+];
 
 /**
  * An item with its spans mapped: `start`, `end` and `pos`, and each

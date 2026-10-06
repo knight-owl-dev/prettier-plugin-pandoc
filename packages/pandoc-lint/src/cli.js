@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pandoc-lint [--format=text|json|github] [--strict] [--info] [--tab-stop=N]
+// pandoc-lint [--format=text|json|github] [--strict] [--info] [--no-metadata] [--tab-stop=N]
 //             [--shortcuts=FILE]... [FILE]...
 //
 // Lints the files as one manuscript, read in the order given, as Pandoc
@@ -18,9 +18,15 @@ import {
 const FORMATS = { text: formatText, json: formatJson, github: formatGithub };
 
 const USAGE =
-  'usage: pandoc-lint [--format=text|json|github] [--strict] [--info] [--tab-stop=N] [--shortcuts=FILE]... [FILE]...';
+  'usage: pandoc-lint [--format=text|json|github] [--strict] [--info] [--no-metadata] [--tab-stop=N] [--shortcuts=FILE]... [FILE]...';
 
-const options = { format: 'text', strict: false, info: false, tabStop: 4 };
+const options = {
+  format: 'text',
+  strict: false,
+  info: false,
+  noMetadata: false,
+  tabStop: 4,
+};
 const paths = [];
 const shortcuts = [];
 for (const arg of process.argv.slice(2)) {
@@ -29,7 +35,9 @@ for (const arg of process.argv.slice(2)) {
     options.format = value;
   } else if (flag === '--strict' && value === undefined) options.strict = true;
   else if (flag === '--info' && value === undefined) options.info = true;
-  else if (flag === '--tab-stop' && /^[1-9][0-9]*$/.test(value ?? '')) {
+  else if (flag === '--no-metadata' && value === undefined) {
+    options.noMetadata = true;
+  } else if (flag === '--tab-stop' && /^[1-9][0-9]*$/.test(value ?? '')) {
     options.tabStop = Number(value);
   } else if (flag === '--shortcuts' && value) shortcuts.push(value);
   else if (arg.startsWith('--')) usage(`unknown option ${arg}`);

@@ -46,6 +46,8 @@ export { lintShortcuts } from './shortcuts.js';
  * @typedef {object} Options
  * @property {number} [tabStop]
  * @property {boolean} [info] Report Pandoc's INFO messages too.
+ * @property {boolean} [noMetadata] Report metadata in the Markdown, for a
+ *   project that keeps it elsewhere.
  */
 
 /**
@@ -184,7 +186,7 @@ const SEVERITY = { warn: 'WARN', info: 'INFO', error: 'ERROR' };
 
 // The diagnostics of the read of `text`, `place` giving where an offset in
 // it is: one per message, a message Pandoc logs twice once.
-function diagnose(text, place, { tabStop, info = false }) {
+function diagnose(text, place, { tabStop, info = false, noMetadata = false }) {
   const doc = readMarkdown(text, { tabStop });
   const where = (offset) => {
     const p = place(offset);
@@ -203,6 +205,7 @@ function diagnose(text, place, { tabStop, info = false }) {
     ...doc.log,
     ...misreads(doc, text, { tabStop }),
     ...undefinedReferences(doc),
+    ...(noMetadata ? doc.metadataBlocks.map(metadataInMarkdown) : []),
   ];
   for (const msg of messages) {
     const rule = RULES[msg.type];
@@ -226,6 +229,12 @@ function undefinedReferences(doc) {
       ...u,
     }));
 }
+
+// A metadata block, for a project that forbids metadata in its Markdown.
+const metadataInMarkdown = (block) => ({
+  type: 'MetadataInMarkdown',
+  ...block,
+});
 
 // A message as a diagnostic: its span kept to the file it starts in, and a
 // frame of the line it starts on.

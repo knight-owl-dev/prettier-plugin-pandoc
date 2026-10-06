@@ -22,13 +22,14 @@ import { yamlBsToMeta } from '../metadata.js';
 import {
   anyLine,
   blankline,
+  lastLineEnd,
   notAhead,
   optionalBlanklines,
   parseFromStringFresh,
   skipSpaces,
   spaceChar,
 } from '../parsing/general.js';
-import { whenEnabled } from '../parsing/state.js';
+import { updateState, whenEnabled } from '../parsing/state.js';
 import { SourceText } from '../source-text.js';
 import { parseBlocks } from './blocks.js';
 import { inline, inlines } from './inlines.js';
@@ -126,6 +127,7 @@ const dateLine = inlinesLine;
  */
 const pandocTitleBlock = whenEnabled('pandoc_title_block', (ctx) => {
   if (lookAhead(char('%'))(ctx) === FAIL) return FAIL;
+  const start = ctx.pos;
   return attempt((c) => {
     const title = option([], titleLine)(c);
     if (title === FAIL) return FAIL;
@@ -140,6 +142,7 @@ const pandocTitleBlock = whenEnabled('pandoc_title_block', (ctx) => {
     }
     if (title.length > 0) meta.title = B.metaInlines(title);
     addMeta(c, meta);
+    held(c, 'title', start);
     return undefined;
   })(ctx);
 });
@@ -194,8 +197,19 @@ const yamlMetaBlock = attempt((ctx) => {
  * @type {import('../core.js').Parser<B.Blocks>}
  */
 export const yamlMetaBlockPrime = whenEnabled('yaml_metadata_block', (ctx) => {
+  const start = ctx.pos;
   const meta = yamlMetaBlock(ctx);
   if (meta === FAIL) return FAIL;
   addMeta(ctx, meta);
+  held(ctx, 'yaml', start);
   return [];
 });
+
+// Record a metadata block of `kind` read from `start` to here, its blank
+// lines after it left out: where it is, for a consumer to find.
+function held(ctx, kind, start) {
+  const item = { kind, start, end: lastLineEnd(ctx.text, start, ctx.pos) };
+  updateState(ctx, {
+    metadataBlocks: { item, next: ctx.state.metadataBlocks },
+  });
+}

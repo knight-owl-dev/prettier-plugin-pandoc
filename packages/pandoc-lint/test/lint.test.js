@@ -173,3 +173,23 @@ test('references and notes nothing in the manuscript defines', () => {
     ],
   );
 });
+
+test('metadata in the Markdown, with noMetadata alone', () => {
+  const files = [
+    { path: 'a.md', text: '% Title\n\nText.\n' },
+    { path: 'b.md', text: 'More.\n\n---\nauthor: B\n...\n' },
+  ];
+  assert.deepEqual(lint(files), []);
+  assert.deepEqual(
+    lint(files, { noMetadata: true }).map((d) => [d.rule, d.source, d.line]),
+    [
+      ['metadata-in-markdown', 'a.md', 1],
+      ['metadata-in-markdown', 'b.md', 3],
+    ],
+  );
+  const body = lintSnippet('---\nk: v\n---\n', { noMetadata: true });
+  assert.deepEqual(
+    body.map((d) => d.rule),
+    ['metadata-in-markdown'],
+  );
+});
