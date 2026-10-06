@@ -2,6 +2,9 @@
 // spans left out. Each format reads with Pandoc's default extensions.
 
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // The tab stops every comparison runs at: below, at and above Pandoc's
 // default, since each indentation rule moves with it.
@@ -32,6 +35,26 @@ export function pandocAst(text, tabStop = 4) {
 export function pandocLaTeXAst(text, ext = '', args = [], cwd = undefined) {
   const flags = ['-f', `latex${ext}`, '-t', 'json', ...args];
   return JSON.parse(pandoc(flags, text, cwd));
+}
+
+/**
+ * What Pandoc logs reading `text` from `format`: its `--log` JSON.
+ *
+ * @param {string} text
+ * @param {string} [format]
+ * @param {number} [tabStop]
+ * @returns {object[]}
+ */
+export function pandocLog(text, format = 'markdown', tabStop = 4) {
+  const dir = mkdtempSync(join(tmpdir(), 'log-'));
+  const log = join(dir, 'log.json');
+  try {
+    const args = ['-f', format, '-t', 'json', `--tab-stop=${tabStop}`];
+    pandoc([...args, `--log=${log}`], text);
+    return JSON.parse(readFileSync(log, 'utf8'));
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
 }
 
 /**

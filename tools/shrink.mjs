@@ -9,7 +9,7 @@
 
 import { readFileSync } from 'node:fs';
 import * as prettier from 'prettier';
-import { comparable, nativeCli, readCli } from './lib/pandoc.mjs';
+import { comparable, logCli, nativeCli, readCli } from './lib/pandoc.mjs';
 import { args, load } from './lib/run.mjs';
 
 const { file, line } = args({ file: '', line: '1' });
@@ -25,6 +25,9 @@ const plugin = (await load('packages/prettier-plugin-pandoc/src/index.js'))
 const parser = await load('packages/pandoc-parser/src/index.js');
 const { assertNested } = await load(
   'packages/pandoc-parser/test/helpers/spans.js',
+);
+const { logsCompared } = await load(
+  'packages/pandoc-parser/test/helpers/log.js',
 );
 
 // Formatted samples compare by their attributes, as the fuzzer compares them.
@@ -70,6 +73,11 @@ const FAILS = {
     return source !== 'ERROR' && source !== read(await format(doc));
   },
   differ: (doc) => pandoc(doc) !== mine(doc),
+  log(doc) {
+    const theirs = logCli(doc, found);
+    const pair = logsCompared(doc, found.tabStop, ours(doc).log, theirs);
+    return JSON.stringify(pair[0]) !== JSON.stringify(pair[1]);
+  },
   span(doc) {
     try {
       assertNested(ours(doc).blocks, 0, doc.length, 'document');

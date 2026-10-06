@@ -17,6 +17,7 @@ import {
   option,
   sepEndBy,
 } from '../core.js';
+import { message, report } from '../logging.js';
 import { yamlBsToMeta } from '../metadata.js';
 import {
   anyLine,
@@ -167,6 +168,7 @@ const notBlankline = notFollowedBy(blankline);
 const yamlMetaBlock = attempt((ctx) => {
   const at = ctx.pos;
   if (string('---')(ctx) === FAIL || blankline(ctx) === FAIL) return FAIL;
+  const body = ctx.pos;
   if (notBlankline(ctx) === FAIL) return FAIL;
   const lines = yamlLines(ctx);
   if (lines === FAIL) return FAIL;
@@ -175,7 +177,13 @@ const yamlMetaBlock = attempt((ctx) => {
   if (optionalBlanklines(ctx) === FAIL) return FAIL;
   // Values span nothing where the block starts: in a container, in its
   // text's offsets.
-  const meta = yamlBsToMeta(readBlocks(ctx), raw, at);
+  // The lines are as written, after `---\n`.
+  const warn = (path, start, end) => {
+    const [from, to] = [body + start - 4, body + end - 4];
+    const fields = { message: `Duplicate key: ${path}`, pos: at };
+    report(ctx, message('YamlWarning', from, to, fields));
+  };
+  const meta = yamlBsToMeta(readBlocks(ctx), raw, at, warn);
   return meta === null ? FAIL : meta;
 });
 

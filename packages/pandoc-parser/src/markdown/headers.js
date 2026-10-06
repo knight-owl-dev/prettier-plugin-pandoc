@@ -17,6 +17,7 @@ import {
   skipMany,
   skipMany1,
 } from '../core.js';
+import { unlogged } from '../logging.js';
 import {
   anyLine,
   blankline,
@@ -67,7 +68,9 @@ function headingText(ctx, ends) {
   if (lookupCount(ctx) === lookups) return { ils, raw, unresolved: ils };
   const { pos, state } = ctx;
   ctx.pos = start;
-  const unresolved = withoutTables(ctx, (c) => readHeadingText(c, ends));
+  const unresolved = unlogged(ctx, () =>
+    withoutTables(ctx, (c) => readHeadingText(c, ends)),
+  );
   [ctx.pos, ctx.state] = [pos, state];
   return { ils, raw, unresolved };
 }
@@ -97,7 +100,7 @@ function registerImplicitHeader(ctx, raw, attr) {
 
 // A heading of `level` and its text: attributes and identifier settled.
 function heading(ctx, attr, level, { ils, raw, unresolved }, start, end) {
-  const settled = registerHeader(ctx, attr, unresolved);
+  const settled = registerHeader(ctx, attr, unresolved, [start, end]);
   registerImplicitHeader(ctx, raw, settled);
   return B.headerWith(settled, level, ils, start, end);
 }

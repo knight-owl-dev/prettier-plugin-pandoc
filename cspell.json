@@ -17,6 +17,7 @@
     "autolinks",
     "bareloc",
     "blanklines",
+    "closepos",
     "colseps",
     "combinators",
     "COMMONMARK",
@@ -46,6 +47,7 @@
     "nonspace",
     "nullary",
     "numcols",
+    "openpos",
     "Pandoc",
     "Pandoc's",
     "pcall",
@@ -68,6 +70,7 @@
     "tmpfs",
     "trimr",
     "unlines",
+    "unlogged",
     "unwords",
     "wikilink",
     "wikilinks"

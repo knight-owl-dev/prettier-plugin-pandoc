@@ -33,6 +33,7 @@ import {
   sepEndBy,
   skipMany,
 } from '../core.js';
+import { message, report } from '../logging.js';
 import { trim } from '../shared.js';
 import {
   anyTok,
@@ -258,10 +259,21 @@ const colWidthOf = attempt((ctx) => {
   const i = ts.findIndex((t) => t.type === 'CtrlSeq' && t.name === 'linewidth');
   return i === -1 ? null : readDouble(trim(untokenize(ts.slice(0, i))));
 });
-// Pandoc warns of a width it skips (`SkippedContent`).
-const skippedWidth = option(null, (ctx) =>
-  braced(ctx) === FAIL ? FAIL : null,
-);
+// A width no `colWidth`, logged as skipped.
+const skippedWidth = option(null, (ctx) => {
+  const start = ctx.state.at;
+  const s = braced(ctx);
+  if (s === FAIL) return FAIL;
+  const contents = untokenize(s);
+  report(
+    ctx,
+    message('SkippedContent', start, ctx.state.at, {
+      contents,
+      pos: ctx.state.at,
+    }),
+  );
+  return null;
+});
 
 function alignSpec(ctx) {
   const pref = alignPrefix(ctx);

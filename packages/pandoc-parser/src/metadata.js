@@ -21,24 +21,28 @@ import { SourceText } from './source-text.js';
 /**
  * The metadata of a YAML block's text: null where it is no mapping, which
  * makes it no metadata block. Text that is no YAML fails the whole read,
- * as it does Pandoc's.
+ * as it does Pandoc's. Each key given again is passed to `warn`, its path
+ * and its span in `text`.
  *
  * @see Text.Pandoc.Readers.Metadata.yamlBsToMeta
  * @param {ReadBlocks} readBlocks
  * @param {string} text
  * @param {number} at Where the block starts.
+ * @param {(path: string, start: number, end: number) => void} [warn]
  * @returns {Record<string, MetaValue> | null}
  */
-export function yamlBsToMeta(readBlocks, text, at) {
+export function yamlBsToMeta(readBlocks, text, at, warn = () => {}) {
   let xs;
+  const warnings = [];
   try {
-    xs = decodeAll(text);
+    xs = decodeAll(text, warnings);
   } catch (e) {
     if (!(e instanceof YamlError)) throw e;
     throw new Error(
       `Error parsing YAML metadata at offset ${at}: ${e.message}`,
     );
   }
+  for (const { path, start, end } of warnings) warn(path, start, end);
   if (xs.length === 0 || (xs.length === 1 && xs[0] === null)) return {};
   const [first] = xs;
   // expected YAML object

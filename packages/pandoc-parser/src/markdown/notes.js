@@ -10,10 +10,12 @@ import * as B from '../ast/builder.js';
 import { Node } from '../ast/nodes.js';
 import { char } from '../char.js';
 import { alt, attempt, FAIL, many, notFollowedBy, optional } from '../core.js';
+import { logMessage, message, report } from '../logging.js';
 import {
   anyLine,
   blankline,
   blanklines,
+  lastLineEnd,
   notAhead,
   parseFromStringFresh,
 } from '../parsing/general.js';
@@ -52,6 +54,7 @@ const noteAt = attempt((ctx) => {
   const label = noteMarker(ctx);
   if (label === FAIL) return FAIL;
   countNote(ctx);
+  updateState(ctx, { noteRefs: ctx.state.noteRefs.set(label, true) });
   if (!lookupTables(ctx).notes.has(label)) {
     return B.str(`[^${label}]`, start, ctx.pos);
   }
@@ -161,9 +164,8 @@ const unlined = (chunks) =>
 /**
  * A note's definition: its marker, `:`, then lines, more after blank lines
  * where indented, read again as blocks with no notes resolved. Recorded,
- * the last of a label's definitions its contents; no block.
- *
- * Not ported yet: the warning of a note defined again.
+ * the last of a label's definitions its contents; no block. A label
+ * defined again is logged.
  *
  * @see Text.Pandoc.Readers.Markdown.noteBlock
  * @param {Context} ctx
@@ -173,7 +175,9 @@ export function noteBlock(ctx) {
 }
 
 const noteBlockAt = attempt((ctx) => {
+  const pos = ctx.pos;
   if (skipNonindentSpaces(ctx) === FAIL) return FAIL;
+  const start = ctx.pos;
   const label = noteMarker(ctx);
   if (label === FAIL || colon(ctx) === FAIL) return FAIL;
   maybeBlankline(ctx);
@@ -191,11 +195,53 @@ const noteBlockAt = attempt((ctx) => {
     parseFromStringFresh(c, parseBlocks, text),
   );
   if (contents === FAIL) return FAIL;
+  const defined = {
+    key: label,
+    start,
+    end: lastLineEnd(ctx.text, start, end),
+    pos,
+  };
+  if (ctx.state.notes.has(label)) {
+    const fields = { contents: label, pos };
+    const msg = message('DuplicateNoteReference', start, defined.end, fields);
+    logMessage(ctx, msg);
+  }
   updateState(ctx, {
     notes: ctx.state.notes.set(label, contents),
+    noteDefinitions: { item: defined, next: ctx.state.noteDefinitions },
     inNote: false,
   });
   // A read of extracted text maps it out (parseFromString).
   ctx.notesDefined?.push([label, contents]);
   return [];
 });
+
+/**
+ * Log each note defined and never referred to, at its last definition, in
+ * the order of their labels.
+ *
+ * @see Text.Pandoc.Readers.Markdown.checkNotes
+ * @param {Context} ctx
+ */
+export function checkNotes(ctx) {
+  const last = new Map();
+  for (let at = ctx.state.noteDefinitions; at !== null; at = at.next) {
+    if (!last.has(at.item.key)) last.set(at.item.key, at.item);
+  }
+  const unused = [...last.values()].filter(
+    (d) => !ctx.state.noteRefs.has(d.key),
+  );
+  for (const { key, start, end, pos } of unused.sort(byLabel)) {
+    report(ctx, message('NoteDefinedButNotUsed', start, end, { key, pos }));
+  }
+}
+
+// Haskell's order of `Text`: by code point.
+function byLabel(a, b) {
+  const [x, y] = [[...a.key], [...b.key]];
+  for (let k = 0; k < Math.min(x.length, y.length); k++) {
+    const d = x[k].codePointAt(0) - y[k].codePointAt(0);
+    if (d !== 0) return d;
+  }
+  return x.length - y.length;
+}

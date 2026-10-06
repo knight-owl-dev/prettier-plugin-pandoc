@@ -41,6 +41,11 @@ import { toLower, words } from '../shared.js';
  * @property {Definitions | null} definitions The reference definitions read
  *   so far, the last first: where each part is, for a consumer to print or
  *   check.
+ * @property {Held<{key: string, start: number, end: number}> | null}
+ *   noteDefinitions Each note definition read: its label and span.
+ * @property {PersistentMap<boolean>} noteRefs The note labels referred to.
+ * @property {Held<import('../logging.js').LogMessage> | null} logMessages
+ *   Messages held to report once reading ends.
  * @property {Map<string, import('../latex/parsing.js').Macro>} macros The
  *   TeX macros defined so far.
  * @property {Record<string, unknown>} meta The document's metadata so far.
@@ -61,7 +66,13 @@ import { toLower, words } from '../shared.js';
  * @property {[number, number] | null} attributes With their braces.
  */
 
-/** @typedef {{definition: Definition, next: Definitions | null}} Definitions */
+/**
+ * A list held in the parser's state, the last first.
+ *
+ * @template T
+ * @typedef {{item: T, next: Held<T> | null}} Held
+ */
+/** @typedef {Held<Definition>} Definitions */
 
 /**
  * A place in text read: its depth in text parsed again, the text, and an
@@ -98,6 +109,9 @@ export const defaultParserState = (options) => ({
   examples: EMPTY_MAP,
   fencedDivLevel: 0,
   definitions: null,
+  noteDefinitions: null,
+  noteRefs: EMPTY_MAP,
+  logMessages: null,
 });
 
 /**
