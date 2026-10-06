@@ -36,10 +36,17 @@ const EMBEDDED = ['auto', 'off'];
 // tab stop, and prettier's own parser reads at four whatever Pandoc is set to.
 const TAB_STOPS = [2, 4, 8];
 
+// prettier's, which a list item's later blocks align to: rotated over the
+// widths, so each meets each tab stop.
+const TAB_WIDTHS = [2, 4, 8];
+
 // Every combination of the three, for each corpus file.
-const CONFIGURATIONS = WIDTHS.flatMap((printWidth) =>
+const CONFIGURATIONS = WIDTHS.flatMap((printWidth, i) =>
   EMBEDDED.flatMap((embedded) =>
-    TAB_STOPS.map((tabStop) => ({ printWidth, embedded, tabStop })),
+    TAB_STOPS.map((tabStop, j) => {
+      const tabWidth = TAB_WIDTHS[(i + j) % TAB_WIDTHS.length];
+      return { printWidth, embedded, tabStop, tabWidth };
+    }),
   ),
 );
 
@@ -76,14 +83,15 @@ const corpus = readdirSync(CORPUS, { recursive: true }).filter(
 for (const name of corpus) {
   const text = readFileSync(new URL(name, CORPUS), 'utf8');
 
-  for (const { printWidth, embedded, tabStop } of CONFIGURATIONS) {
+  for (const { printWidth, embedded, tabStop, tabWidth } of CONFIGURATIONS) {
     const options = {
       ...BASE,
       printWidth,
+      tabWidth,
       embeddedLanguageFormatting: embedded,
       pandocTabStop: tabStop,
     };
-    const label = `${name} (width ${printWidth}, embedded ${embedded}, tab stop ${tabStop})`;
+    const label = `${name} (width ${printWidth}, embedded ${embedded}, tab stop ${tabStop}, tab width ${tabWidth})`;
     const todo = TODO.has(name) || TODO.has(`${name}:${embedded}`);
     const read = {
       samples: embedded === 'auto' ? 'by-meaning' : 'as-written',

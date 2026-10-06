@@ -17,16 +17,24 @@ const corpus = readdirSync(CORPUS, { recursive: true }).filter(
   (f) => f.endsWith('.md') && !f.endsWith('README.md'),
 );
 
-for (const proseWrap of ['preserve', 'always']) {
+// Each snapshot directory's options: `tab-width-4` is where a list item's
+// text aligns past its marker.
+const MODES = {
+  preserve: { proseWrap: 'preserve' },
+  always: { proseWrap: 'always' },
+  'tab-width-4': { proseWrap: 'always', tabWidth: 4 },
+};
+
+for (const [mode, modeOptions] of Object.entries(MODES)) {
   for (const name of corpus) {
-    const key = `${proseWrap}/${name}`;
+    const key = `${mode}/${name}`;
     test(`${key}: formats as expected`, { todo: TODO.has(key) }, async () => {
       const text = readFileSync(new URL(name, CORPUS), 'utf8');
       const expected = readFileSync(new URL(key, EXPECTED), 'utf8');
       const options = {
         parser: 'markdown',
         plugins: [plugin],
-        proseWrap,
+        ...modeOptions,
         printWidth: 80,
         pandocTabStop: 4,
       };

@@ -60,6 +60,10 @@ joins each paragraph into one line. `embeddedLanguageFormatting` `auto`, the
 default, reformats a fenced sample tagged with a language prettier formats
 (`yaml`, `json`, …); `off` prints every sample as written.
 
+`tabWidth` aligns a list item's text: its marker padded toward that column, by
+up to three spaces, as Pandoc writes lists, every line of the item at one column
+(`-   item` at `4`).
+
 `<!-- prettier-ignore -->` leaves the block after it as written, and
 `<!-- prettier-ignore-start -->` … `<!-- prettier-ignore-end -->` everything
 between.

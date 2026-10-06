@@ -220,25 +220,36 @@ function markerOf(contents, view, tabStop) {
   return /^ *\S+ *$/.test(expanded) ? { marker, line, at } : null;
 }
 
+// Pandoc's reads of a marker, by the text read: markers repeat.
+const indents = new Map();
+
 /**
  * The columns Pandoc strips from an item's or definition's lines after
- * `marker` alone on its line; null where it opens none.
+ * `marker` alone on its line, or with text right after it where `inline`;
+ * null where it opens none.
  *
  * @param {string} marker
  * @param {boolean} definition
  * @param {number} tabStop
+ * @param {boolean} [inline]
  * @returns {number | null}
  */
-function indentAfter(marker, definition, tabStop) {
-  const lines = `${marker}\n${' '.repeat(marker.length)}x\n`;
+function indentAfter(marker, definition, tabStop, inline = false) {
+  const lines = inline
+    ? `${marker}x\n`
+    : `${marker}\n${' '.repeat(marker.length)}x\n`;
   const text = definition ? `Term\n${lines}` : lines;
-  const [block] = readMarkdown(text, { tabStop }).blocks;
-  const items = {
-    BulletList: () => block.c,
-    OrderedList: () => block.c[1],
-    DefinitionList: () => (definition ? block.c[0][1] : undefined),
-  }[block?.t]?.();
-  return items?.[0]?.indent ?? null;
+  const key = `${tabStop}\n${text}`;
+  if (!indents.has(key)) {
+    const [block] = readMarkdown(text, { tabStop }).blocks;
+    const items = {
+      BulletList: () => block.c,
+      OrderedList: () => block.c[1],
+      DefinitionList: () => (definition ? block.c[0][1] : undefined),
+    }[block?.t]?.();
+    indents.set(key, items?.[0]?.indent ?? null);
+  }
+  return indents.get(key);
 }
 
 /**
@@ -283,7 +294,7 @@ function printItems(
     const written = opening
       ? view.text.slice(Math.max(line, after), at)
       : marker;
-    const first = markers?.[out === '' ? 0 : items.indexOf(item)] ?? written;
+    let first = markers?.[out === '' ? 0 : items.indexOf(item)] ?? written;
     const inner = contentsView(contents);
     // Spaces Pandoc left before the first line's text, five past the marker
     // or part of a tab, print as written.
@@ -294,7 +305,23 @@ function printItems(
       ? indentAfter(expandTabs(first, tabStop).trimEnd(), definitions, tabStop)
       : null;
     // A new marker's content starts after it, one space on.
-    const strip = alone ?? (first === written ? indent : first.length);
+    let strip = alone ?? (first === written ? indent : first.length);
+    // A list item's text at prettier's alignment to `tabWidth`, the marker
+    // padded, where Pandoc strips that far.
+    if (alone === null && !definitions) {
+      const bare = expandTabs(first, tabStop).trimEnd();
+      const prefix = bare.length + 1;
+      const target =
+        prefix + Math.max(0, Math.min(options.tabWidth - prefix, 3));
+      const padded = bare.padEnd(target);
+      if (
+        target > strip &&
+        indentAfter(padded, false, tabStop, true) === target
+      ) {
+        first = padded;
+        strip = target;
+      }
+    }
     const width = context.width - strip;
     // The first line's text starts where the marker as printed ends, past
     // the columns continuation lines strip.

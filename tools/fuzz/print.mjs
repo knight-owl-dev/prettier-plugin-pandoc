@@ -1,5 +1,5 @@
 // Fuzz the plugin against Pandoc: random Markdown (`documents.mjs`) at
-// random tab stops, widths and `proseWrap`. Pandoc must read each output as its
+// random tab stops, tab widths, widths and `proseWrap`. Pandoc must read each output as its
 // source, soft breaks as spaces, and a second format must change nothing.
 //
 //   node tools/fuzz/print.mjs [N] [SEED] [SHOW]
@@ -19,6 +19,7 @@ const cases = Array.from({ length: Number(n) }, () => {
   return {
     doc: markdown(r),
     tabStop: pick([2, 4, 8]),
+    tabWidth: pick([2, 4, 8]),
     proseWrap: pick(['always', 'always', 'never', 'preserve']),
     printWidth: pick([10, 20, 40, 80]),
     embeddedLanguageFormatting: pick(['auto', 'off']),
@@ -33,6 +34,7 @@ for (const c of cases) {
     parser: 'markdown',
     plugins: [plugin],
     pandocTabStop: c.tabStop,
+    tabWidth: c.tabWidth,
     proseWrap: c.proseWrap,
     printWidth: c.printWidth,
     embeddedLanguageFormatting: c.embeddedLanguageFormatting,
