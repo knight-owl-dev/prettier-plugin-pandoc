@@ -1,5 +1,7 @@
 # @knight-owl-llc/pandoc-parser
 
+[![npm](https://img.shields.io/badge/install-npm-red)](https://www.npmjs.com/package/@knight-owl-llc/pandoc-parser)
+
 Pandoc 3.11's Markdown reader, ported to JavaScript: a document's AST as Pandoc
 reads it, each node with the span of source it was read from.
 

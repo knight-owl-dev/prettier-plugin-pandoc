@@ -1,5 +1,7 @@
 # @knight-owl-llc/prettier-plugin-pandoc
 
+[![npm](https://img.shields.io/badge/install-npm-red)](https://www.npmjs.com/package/@knight-owl-llc/prettier-plugin-pandoc)
+
 Format [Pandoc](https://pandoc.org/) Markdown with
 [prettier](https://prettier.io/) without changing what Pandoc reads.
 
