@@ -1,0 +1,133 @@
+name: Publish
+
+# Publishes the tag a merged release PR promotes (release.yml,
+# tag-release.yml): the pandoc-lint binaries, attested, on a GitHub Release,
+# then the packages on npm, with provenance. npm goes last: a release can be
+# made again, a published version cannot.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-26.04-arm
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read
+        id: read
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="$(tools/release/validate-version.sh "$(tools/release/get-version.sh)")"
+          if [[ "${TAG}" != "v${version}" ]]; then
+            echo "ERROR: tag ${TAG} does not match the packages' version ${version}" >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Test
+        run: make test
+
+      - name: Pack check
+        run: make pack-check
+
+  # Each on its own architecture, so each binary is run and checked against
+  # Node, not only built.
+  binaries:
+    name: Binary (linux-${{ matrix.arch }})
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-26.04
+          - arch: arm64
+            runner: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build and check
+        run: make bun-check
+
+      - name: Package
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: tools/release/package.sh "${ARCH}"
+
+      # What keystone verifies with `gh attestation verify` before it ships the
+      # binary: built here, from the tag.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.tar.gz
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist-${{ matrix.arch }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: [validate, binaries]
+    runs-on: ubuntu-26.04-arm
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum ./*.tar.gz > checksums.txt
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "${TAG}" --verify-tag --title "${TAG}" --generate-notes \
+            dist/*.tar.gz dist/checksums.txt
+
+  # npm's trusted publishing: the job's OIDC token is the credential, and the
+  # provenance names this workflow and the tag. On the runner's Node rather
+  # than the test image's, which the token does not reach.
+  npm:
+    name: npm
+    needs: [validate, release]
+    runs-on: ubuntu-26.04-arm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+          registry-url: https://registry.npmjs.org
+
+      # The parser first: the others depend on it, pinned at this version.
+      - name: Publish
+        run: |
+          for package in pandoc-parser pandoc-lint prettier-plugin-pandoc; do
+            npm publish --workspace "packages/${package}" --access public --ignore-scripts
+          done
