@@ -103,6 +103,58 @@ export function formatJson(diagnostics) {
   return `${JSON.stringify({ version: 1, diagnostics }, null, 2)}\n`;
 }
 
+// GitHub's command for each severity.
+const COMMAND = { error: 'error', warn: 'warning', info: 'notice' };
+
+// A workflow command's message escaped, and a property's: `%` and line
+// breaks, and in a property `:` and `,` too.
+const escapeData = (s) =>
+  s.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+const escapeProperty = (s) =>
+  escapeData(s).replaceAll(':', '%3A').replaceAll(',', '%2C');
+
+/**
+ * Each diagnostic as a GitHub Actions workflow command, which annotates
+ * its lines in a run and a pull request's diff: the rule its title, the
+ * problem and the prose callouts its message, the code frame left out.
+ *
+ * @see https://docs.github.com/actions/reference/workflow-commands-for-github-actions
+ * @param {Diagnostic[]} diagnostics
+ * @returns {string}
+ */
+export function formatGithub(diagnostics) {
+  return diagnostics
+    .map((d) => {
+      const {
+        problem,
+        offenders = [],
+        because,
+        effect,
+        remedy,
+        see,
+      } = d.callouts;
+      const message = [problem, ...offenders, because, effect, remedy, see]
+        .filter(Boolean)
+        .join('\n');
+      // GitHub's end column is the last one the span covers.
+      const endColumn =
+        d.endLine === d.line ? Math.max(d.column, d.endColumn - 1) : undefined;
+      const properties = [
+        ['file', d.source],
+        ['line', d.line],
+        ['endLine', d.endLine],
+        ['col', d.column],
+        ['endColumn', endColumn],
+        ['title', d.rule],
+      ]
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => `${k}=${escapeProperty(String(v))}`)
+        .join(',');
+      return `::${COMMAND[d.severity]} ${properties}::${escapeData(message)}\n`;
+    })
+    .join('');
+}
+
 /**
  * Each diagnostic as keystone frames one, its location before it as
  * compilers write one: `path:line:column: `.

@@ -12,15 +12,15 @@ written and logs nothing of.
 ## CLI
 
 ```sh
-pandoc-lint [--format=text|json] [--strict] [--info] [--tab-stop=N] FILE...
+pandoc-lint [--format=text|json|github] [--strict] [--info] [--tab-stop=N] FILE...
 ```
 
-| Option       | What it does                                      |
-| ------------ | ------------------------------------------------- |
-| `--format`   | `text` (the default) for people, `json` for tools |
-| `--strict`   | Exit 1 on a warning too                           |
-| `--info`     | Report Pandoc's INFO messages as well             |
-| `--tab-stop` | Pandoc's `--tab-stop`, 4 by default               |
+| Option       | What it does                                                                   |
+| ------------ | ------------------------------------------------------------------------------ |
+| `--format`   | `text` (the default) for people, `json` for tools, `github` for GitHub Actions |
+| `--strict`   | Exit 1 on a warning too                                                        |
+| `--info`     | Report Pandoc's INFO messages as well                                          |
+| `--tab-stop` | Pandoc's `--tab-stop`, 4 by default                                            |
 
 Diagnostics go to stdout. The exit status is 1 on an error, or on a warning with
 `--strict`; 2 on a usage error.
@@ -38,6 +38,9 @@ ch2.md:3:1: WARN: link reference [a] is defined again
 ```
 
 Its layout follows keystone's. For a tool, read the JSON.
+
+In GitHub Actions, `--format=github` writes each diagnostic as a workflow
+command, so the run and a pull request's diff show it on its line.
 
 ## JSON
 
@@ -103,5 +106,5 @@ messages.
 
 `lint(files, options)` lints `[{path, text}]` as one manuscript;
 `lintSnippet(text, {source, line, column, indent})` lints markdown taken from
-another file, placed where it is there. `formatText` and `formatJson` print what
-either returns.
+another file, placed where it is there. `formatText`, `formatJson` and
+`formatGithub` print what either returns.
