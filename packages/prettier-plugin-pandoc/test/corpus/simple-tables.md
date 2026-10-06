@@ -29,3 +29,10 @@ multiple lines.
      12     12        12             12
     123     123       123           123
 -------     ------ ----------   -------
+
+Emphasis in a simple table:
+
+  Term    Meaning
+------  ---------
+*stem*  __base__
+

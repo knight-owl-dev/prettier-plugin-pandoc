@@ -13,6 +13,12 @@ A short table that padding would carry past the width:
 |---|---|---|
 | one | two | a cell long enough that padding the others to it runs the row past seventy-two |
 
+A row past seventy-two columns keeps its layout, its emphasis edited:
+
+| Term | Meaning |
+| --- | --- |
+| _stem_ | a **word's** base, which the suffixes the rows below list attach to |
+
 Dashes with no pipe under a row underline a heading:
 
 ## Choose A | B
