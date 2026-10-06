@@ -28,22 +28,25 @@ import { readResolved } from './references.js';
 export function readMarkdown(source, options) {
   const opts = readerOptions(options);
   const { text, toSource, input } = readerInput(source, opts.tabStop);
-  const [blocks, meta, definitions, log] = readResolved((references) => {
-    const state = defaultParserState(opts);
-    const ctx = { text, pos: 0, state, references, log: [] };
-    optional(titleBlock)(ctx);
-    const value = parseBlocks(ctx);
-    if (value === FAIL) throw new Error('the markdown reader failed');
-    checkNotes(ctx);
-    const held = inOrder(ctx.state.logMessages);
-    const read = [
-      value,
-      ctx.state.meta,
-      inOrder(ctx.state.definitions),
-      [...ctx.log, ...held],
-    ];
-    return { value: read, state: ctx.state };
-  });
+  const [blocks, meta, definitions, log, missed] = readResolved(
+    (references) => {
+      const state = defaultParserState(opts);
+      const ctx = { text, pos: 0, state, references, log: [] };
+      optional(titleBlock)(ctx);
+      const value = parseBlocks(ctx);
+      if (value === FAIL) throw new Error('the markdown reader failed');
+      checkNotes(ctx);
+      const held = inOrder(ctx.state.logMessages);
+      const read = [
+        value,
+        ctx.state.meta,
+        inOrder(ctx.state.definitions),
+        [...ctx.log, ...held],
+        inOrder(ctx.state.unresolved),
+      ];
+      return { value: read, state: ctx.state };
+    },
+  );
   const result = doc(
     mapSpans(blocks, toSource, toSource, input),
     mapSpans(meta, toSource, toSource, input),
@@ -63,6 +66,9 @@ export function readMarkdown(source, options) {
   // What Pandoc would log reading it, in its order.
   const logged = log.map((m) => mapItemSpans(m, toSource, toSource));
   Object.defineProperty(result, 'log', { value: logged });
+  // The references and notes looked up and not found, in source order.
+  const misses = missed.map((m) => mapItemSpans(m, toSource, toSource));
+  Object.defineProperty(result, 'unresolved', { value: misses });
   return result;
 }
 

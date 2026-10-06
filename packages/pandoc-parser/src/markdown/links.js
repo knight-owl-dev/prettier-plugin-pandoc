@@ -56,7 +56,7 @@ import { litChar, skipNonindentSpaces, spnl } from './common.js';
 import { code, endline, escapedChar, inlines, math } from './inlines.js';
 import { rawHtmlInline } from './raw-html.js';
 import { rawLaTeXInlinePrime } from './raw-tex.js';
-import { lookupTables } from './references.js';
+import { lookupTables, unresolved } from './references.js';
 
 /** @typedef {import('../core.js').Context} Context */
 /** @template T @typedef {import('../core.js').Parser<T>} Parser */
@@ -397,6 +397,9 @@ export function referenceLink(ctx, build, ref, start) {
   const raw = second?.raw ?? '';
   const isImage = build === B.imageWith;
   const key = toKey(raw === '' || raw === '[]' ? ref.raw : raw);
+  // What the texts read below look up reaches the output only as text,
+  // where the reference resolves to nothing.
+  const missedBefore = ctx.state.unresolved;
   const parsedRaw =
     second === null
       ? []
@@ -412,6 +415,7 @@ export function referenceLink(ctx, build, ref, start) {
   if (defined !== undefined) {
     const [[url, title], definedAttr] = defined;
     const combined = combineAttr(attr, definedAttr);
+    updateState(ctx, { unresolved: missedBefore });
     return build(combined, url, title, ref.label, start, end);
   }
   const heading = enabled(ctx, 'implicit_header_references')
@@ -419,8 +423,21 @@ export function referenceLink(ctx, build, ref, start) {
     : undefined;
   if (heading !== undefined) {
     const [[url, title]] = heading;
+    updateState(ctx, { unresolved: missedBefore });
     return build(attr, url, title, ref.label, start, end);
   }
+  unresolved(ctx, {
+    kind: isImage ? 'image' : 'link',
+    form:
+      second === null
+        ? 'shortcut'
+        : raw === '' || raw === '[]'
+          ? 'collapsed'
+          : 'full',
+    label: raw === '' || raw === '[]' ? ref.raw : raw,
+    start,
+    end,
+  });
   return B.concat([
     isImage ? B.str('!', start, start + 1) : B.str('[', ref.from, ref.from + 1),
     fallback,

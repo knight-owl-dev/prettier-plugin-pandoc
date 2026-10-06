@@ -84,13 +84,16 @@ Diagnostics come by file in the order given, then by where they start.
 
 ## Rules
 
-The first two are what Pandoc reads other than as written; the rest are its own
-messages.
+The first four are what Pandoc reads other than as written; the rest are its own
+messages. A shortcut `[text]` nothing defines goes unreported: prose writes
+`[sic]` so.
 
 | Rule                        | Severity | What it finds                                                                          |
 | --------------------------- | -------- | -------------------------------------------------------------------------------------- |
 | `block-in-paragraph`        | error    | A div or code fence, heading, quote or list on the line after paragraph text           |
 | `div-fence-length`          | warn     | A closing fence whose length differs from its opener's, in a nest of differing lengths |
+| `undefined-reference`       | warn     | A reference link or image, `[t][r]` or `[t][]`, whose label nothing defines            |
+| `undefined-note`            | warn     | A note reference whose label nothing defines                                           |
 | `unclosed-div`              | warn     | A div closed only by the document's end                                                |
 | `duplicate-link-reference`  | warn     | A reference defined again, elsewhere                                                   |
 | `duplicate-note-reference`  | warn     | A note defined again                                                                   |

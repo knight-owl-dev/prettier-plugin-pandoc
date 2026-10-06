@@ -31,7 +31,12 @@ import { parseBlocks } from './blocks.js';
 import { indentSpaces, skipNonindentSpaces } from './common.js';
 import { notFollowedByDivCloser } from './divs.js';
 import { inBalancedBrackets, noteMarker } from './links.js';
-import { lookupTables, pendingNote, withoutNotes } from './references.js';
+import {
+  lookupTables,
+  pendingNote,
+  unresolved,
+  withoutNotes,
+} from './references.js';
 
 /** @typedef {import('../core.js').Context} Context */
 
@@ -56,6 +61,8 @@ const noteAt = attempt((ctx) => {
   countNote(ctx);
   updateState(ctx, { noteRefs: ctx.state.noteRefs.set(label, true) });
   if (!lookupTables(ctx).notes.has(label)) {
+    const item = { kind: 'note', form: 'full', label, start, end: ctx.pos };
+    unresolved(ctx, /** @type {const} */ (item));
     return B.str(`[^${label}]`, start, ctx.pos);
   }
   const pending = pendingNote(label, ctx.state.noteNumber);
