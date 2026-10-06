@@ -191,7 +191,12 @@ function diagnose(text, place, { tabStop, info = false }) {
   };
   const seen = new Set();
   const out = [];
-  for (const msg of [...doc.log, ...misreads(doc, text, { tabStop })]) {
+  const messages = [
+    ...doc.log,
+    ...misreads(doc, text, { tabStop }),
+    ...undefinedReferences(doc),
+  ];
+  for (const msg of messages) {
     const rule = RULES[msg.type];
     if (rule === undefined || (rule.severity === 'info' && !info)) continue;
     const key = JSON.stringify(msg);
@@ -200,6 +205,18 @@ function diagnose(text, place, { tabStop, info = false }) {
     out.push(diagnostic(rule, msg, read, place, text));
   }
   return out;
+}
+
+// The references and notes nothing defines, in a form that says one was
+// meant: a shortcut `[text]` is how prose writes `[sic]`, and goes
+// unreported.
+function undefinedReferences(doc) {
+  return doc.unresolved
+    .filter((u) => u.form !== 'shortcut')
+    .map((u) => ({
+      type: u.kind === 'note' ? 'UndefinedNote' : 'UndefinedReference',
+      ...u,
+    }));
 }
 
 // A message as a diagnostic: its span kept to the file it starts in, and a

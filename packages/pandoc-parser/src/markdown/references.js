@@ -11,6 +11,7 @@
 
 import { Node, Row } from '../ast/nodes.js';
 import { keepContents } from '../ast/spans.js';
+import { updateState } from '../parsing/state.js';
 import { EMPTY_MAP } from '../persistent-map.js';
 
 /** @typedef {import('../core.js').Context} Context */
@@ -43,9 +44,10 @@ const EMPTY_TABLES = Object.freeze({
 
 /**
  * A reader context's references: the tables of the read before, none in
- * the first, and how many lookups this read made.
+ * the first, how many lookups this read made, and whether notes are
+ * hidden from them, in a note's contents.
  *
- * @typedef {{tables: Tables | null, lookups: number}} References
+ * @typedef {{tables: Tables | null, lookups: number, noNotes?: boolean}} References
  */
 
 /**
@@ -106,13 +108,28 @@ export function withoutTables(ctx, p) {
  */
 export function withoutNotes(ctx, p) {
   const references = referencesOf(ctx);
-  const { tables } = references;
+  const { tables, noNotes } = references;
   references.tables = tables && { ...tables, notes: EMPTY_MAP };
+  references.noNotes = true;
   try {
     return p(ctx);
   } finally {
     references.tables = tables;
+    references.noNotes = noNotes;
   }
+}
+
+/**
+ * Record a lookup that found nothing, where the read is: a link, an
+ * image or a note, its form and label, and its span. A note looked up in
+ * a note's contents is none: notes are hidden there.
+ *
+ * @param {Context} ctx
+ * @param {{kind: 'link' | 'image' | 'note', form: 'full' | 'collapsed' | 'shortcut', label: string, start: number, end: number}} item
+ */
+export function unresolved(ctx, item) {
+  if (item.kind === 'note' && referencesOf(ctx).noNotes) return;
+  updateState(ctx, { unresolved: { item, next: ctx.state.unresolved } });
 }
 
 /**

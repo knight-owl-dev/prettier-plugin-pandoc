@@ -46,6 +46,8 @@ import { toLower, words } from '../shared.js';
  * @property {PersistentMap<boolean>} noteRefs The note labels referred to.
  * @property {Held<import('../logging.js').LogMessage> | null} logMessages
  *   Messages held to report once reading ends.
+ * @property {Held<object> | null} unresolved Each reference looked up and
+ *   not found: `references.js` unresolved.
  * @property {Map<string, import('../latex/parsing.js').Macro>} macros The
  *   TeX macros defined so far.
  * @property {Record<string, unknown>} meta The document's metadata so far.
@@ -112,6 +114,7 @@ export const defaultParserState = (options) => ({
   noteDefinitions: null,
   noteRefs: EMPTY_MAP,
   logMessages: null,
+  unresolved: null,
 });
 
 /**

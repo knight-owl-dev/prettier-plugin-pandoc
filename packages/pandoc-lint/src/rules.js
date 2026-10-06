@@ -162,4 +162,22 @@ export const RULES = {
       remedy: 'Make each closing fence as long as its opener.',
     }),
   },
+  UndefinedReference: {
+    rule: 'undefined-reference',
+    severity: 'warn',
+    callouts: (msg) => ({
+      problem: `reference ${msg.label} is not defined`,
+      effect: `Pandoc prints the ${msg.kind} as text, brackets and all.`,
+      remedy: `Define it, as ${msg.label}: followed by its target, in any file of the manuscript.`,
+    }),
+  },
+  UndefinedNote: {
+    rule: 'undefined-note',
+    severity: 'warn',
+    callouts: (msg) => ({
+      problem: `note [^${msg.label}] is not defined`,
+      effect: 'Pandoc prints the reference as text, brackets and all.',
+      remedy: `Define it, as [^${msg.label}]: followed by its text, in any file of the manuscript.`,
+    }),
+  },
 };

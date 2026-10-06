@@ -158,3 +158,18 @@ test('GitHub: a workflow command per diagnostic, escaped', () => {
     ].join('\n'),
   );
 });
+
+test('references and notes nothing in the manuscript defines', () => {
+  const files = [
+    { path: 'a.md', text: '[a][x], [b][], [c], ![i][y] and Text[^n].\n' },
+    { path: 'b.md', text: '[^m]: See[^q].\n\nUse[^m].\n\n[x]: /x\n' },
+  ];
+  assert.deepEqual(
+    lint(files).map((d) => [d.rule, d.column, d.callouts.problem]),
+    [
+      ['undefined-reference', 9, 'reference [b] is not defined'],
+      ['undefined-reference', 21, 'reference [y] is not defined'],
+      ['undefined-note', 37, 'note [^n] is not defined'],
+    ],
+  );
+});
