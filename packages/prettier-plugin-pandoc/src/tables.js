@@ -70,6 +70,26 @@ export function alignedPipeTable(block, view) {
   return { from, to, text: printed.join('\n') };
 }
 
+/**
+ * Each cell's emphasis in prettier's markers, for a table that keeps its
+ * layout: a marker swap keeps each line's length.
+ *
+ * @param {{c: unknown[]}} block
+ * @param {View} view
+ */
+export function cellEdits(block, view) {
+  const [, , , head, bodies, foot] = block.c;
+  const rows = [
+    ...head[1],
+    ...bodies.flatMap((body) => [...body[2], ...body[3]]),
+    ...foot[1],
+  ];
+  return markerEdits(
+    rows.flatMap((row) => row.cells.map((cell) => cell[4])),
+    view,
+  );
+}
+
 // A cell's text: what its contents span, emphasis markers prettier's
 // where `edit`; empty for none.
 function cellText(cell, view, edit) {

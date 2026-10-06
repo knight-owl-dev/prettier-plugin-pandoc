@@ -7,7 +7,7 @@ import { readMarkdown } from '@knight-owl-llc/pandoc-parser';
 import { printCode } from './code.js';
 import { withDefinitions } from './definitions.js';
 import { edited, markerEdits } from './emphasis.js';
-import { alignedPipeTable } from './tables.js';
+import { alignedPipeTable, cellEdits } from './tables.js';
 import { reflow } from './wrap.js';
 
 /** @typedef {import('./wrap.js').View} View */
@@ -499,8 +499,9 @@ function printHeader(block, view, context) {
 const CAPTION_MARKER = /^ {0,3}([Tt]able:|:)[ \t]*$/;
 
 /**
- * A table: a pipe table's rows aligned (tables.js), its caption as a
- * paragraph after its marker and a space; the rest as written.
+ * A table: a pipe table's rows aligned (tables.js), or else its cells'
+ * emphasis edited in place; its caption as a paragraph after its marker
+ * and a space; the rest as written.
  *
  * @param {object} block
  * @param {View} view
@@ -510,8 +511,9 @@ const CAPTION_MARKER = /^ {0,3}([Tt]able:|:)[ \t]*$/;
 function printTable(block, view, context, options) {
   const { text } = view;
   const [start, end] = extent(block, view);
+  const aligned = alignedPipeTable(block, view);
   const edits = [
-    alignedPipeTable(block, view),
+    ...(aligned === null ? cellEdits(block, view) : [aligned]),
     captionEdit(block, view, context, options),
   ]
     .filter((edit) => edit !== null && start <= edit.from && edit.to <= end)
