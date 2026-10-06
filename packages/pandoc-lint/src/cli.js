@@ -1,21 +1,23 @@
 #!/usr/bin/env node
-// pandoc-lint [--format=text|json] [--strict] [--info] [--tab-stop=N] FILE…
+// pandoc-lint [--format=text|json|github] [--strict] [--info] [--tab-stop=N] FILE…
 //
 // Lints the files as one manuscript, read in the order given, as Pandoc
 // reads several. Exits 1 on an error, or on any warning with `--strict`;
 // 2 on a usage error.
 
 import { readFileSync } from 'node:fs';
-import { formatJson, formatText, lint } from './index.js';
+import { formatGithub, formatJson, formatText, lint } from './index.js';
+
+const FORMATS = { text: formatText, json: formatJson, github: formatGithub };
 
 const USAGE =
-  'usage: pandoc-lint [--format=text|json] [--strict] [--info] [--tab-stop=N] FILE...';
+  'usage: pandoc-lint [--format=text|json|github] [--strict] [--info] [--tab-stop=N] FILE...';
 
 const options = { format: 'text', strict: false, info: false, tabStop: 4 };
 const paths = [];
 for (const arg of process.argv.slice(2)) {
   const [flag, value] = arg.split(/=(.*)/s);
-  if (flag === '--format' && (value === 'text' || value === 'json')) {
+  if (flag === '--format' && Object.hasOwn(FORMATS, value ?? '')) {
     options.format = value;
   } else if (flag === '--strict' && value === undefined) options.strict = true;
   else if (flag === '--info' && value === undefined) options.info = true;
@@ -36,9 +38,7 @@ for (const path of paths) {
   }
 }
 const diagnostics = lint(files, options);
-process.stdout.write(
-  options.format === 'json' ? formatJson(diagnostics) : formatText(diagnostics),
-);
+process.stdout.write(FORMATS[options.format](diagnostics));
 const fails = diagnostics.some(
   (d) => d.severity === 'error' || (options.strict && d.severity === 'warn'),
 );
