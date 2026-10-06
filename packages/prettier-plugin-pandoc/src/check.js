@@ -3,7 +3,7 @@
 // change. Where it reads differently, those blocks print as written; if it
 // still does, the source is the output.
 
-import { readMarkdown, withoutSpans } from '@knight-owl-dev/pandoc-parser';
+import { readMarkdown, withoutSpans } from '@knight-owl-llc/pandoc-parser';
 import { languageOf, parserFor } from './code.js';
 
 const SPACE = { t: 'Space' };

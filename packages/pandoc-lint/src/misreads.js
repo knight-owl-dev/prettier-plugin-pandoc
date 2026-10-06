@@ -3,7 +3,7 @@
 // opener than its length shows. Found in the parser's read, so Pandoc's
 // rules decide, not a pattern.
 
-import { readMarkdown } from '@knight-owl-dev/pandoc-parser';
+import { readMarkdown } from '@knight-owl-llc/pandoc-parser';
 
 /**
  * A misread, as the log's messages are: its type, span and fields.

@@ -7,7 +7,7 @@
 import {
   continuesParagraph,
   readMarkdown,
-} from '@knight-owl-dev/pandoc-parser';
+} from '@knight-owl-llc/pandoc-parser';
 import { util } from 'prettier';
 import { edited, markerEdits } from './emphasis.js';
 

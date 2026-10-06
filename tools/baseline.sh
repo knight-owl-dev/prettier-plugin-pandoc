@@ -12,15 +12,18 @@ case ${1:-} in
     [ -d "$W" ] && "$0" remove
     git worktree add --detach "$W" "$(git rev-parse "${2:-main}")" >/dev/null 2>&1
     mkdir "$W/node_modules"
+    # The scope the ref's own packages are named in: a ref before the rename
+    # imports another.
+    scope=$(sed -n 's/^  "name": "\(@[^/]*\)\/.*/\1/p' "$W/packages/pandoc-parser/package.json")
     for e in node_modules/* node_modules/.[!.]*; do
       n=$(basename "$e")
-      [ "$n" = "@knight-owl-dev" ] && continue
+      case "$n" in @knight-owl-*) continue ;; esac
       ln -s "../../../../node_modules/$n" "$W/node_modules/$n"
     done
-    mkdir "$W/node_modules/@knight-owl-dev"
+    mkdir "$W/node_modules/$scope"
     for p in "$W"/packages/*; do
       n=$(basename "$p")
-      ln -s "../../packages/$n" "$W/node_modules/@knight-owl-dev/$n"
+      ln -s "../../packages/$n" "$W/node_modules/$scope/$n"
     done
     git -C "$W" log --oneline -1
     ;;

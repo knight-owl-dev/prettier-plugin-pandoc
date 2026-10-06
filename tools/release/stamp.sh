@@ -16,7 +16,7 @@ version="$(tools/release/validate-version.sh "$1")"
 for manifest in packages/*/package.json; do
   sed -i.bak \
     -e "s/^  \"version\": \"[^\"]*\",$/  \"version\": \"${version}\",/" \
-    -e "s/^    \"@knight-owl-dev\/pandoc-parser\": \"[^\"]*\"$/    \"@knight-owl-dev\/pandoc-parser\": \"${version}\"/" \
+    -e "s/^    \"@knight-owl-llc\/pandoc-parser\": \"[^\"]*\"$/    \"@knight-owl-llc\/pandoc-parser\": \"${version}\"/" \
     "${manifest}"
   rm "${manifest}.bak"
 done

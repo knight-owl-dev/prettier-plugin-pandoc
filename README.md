@@ -19,9 +19,9 @@ formatting.
 
 | Package                                                                     | What it is                                                              |
 | --------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| [`@knight-owl-dev/prettier-plugin-pandoc`](packages/prettier-plugin-pandoc) | The prettier plugin                                                     |
-| [`@knight-owl-dev/pandoc-parser`](packages/pandoc-parser)                   | Pandoc's Markdown reader, ported: its AST, with source spans            |
-| [`@knight-owl-dev/pandoc-lint`](packages/pandoc-lint)                       | What Pandoc warns of reading a manuscript, at its file, line and column |
+| [`@knight-owl-llc/prettier-plugin-pandoc`](packages/prettier-plugin-pandoc) | The prettier plugin                                                     |
+| [`@knight-owl-llc/pandoc-parser`](packages/pandoc-parser)                   | Pandoc's Markdown reader, ported: its AST, with source spans            |
+| [`@knight-owl-llc/pandoc-lint`](packages/pandoc-lint)                       | What Pandoc warns of reading a manuscript, at its file, line and column |
 
 ## Options
 
@@ -32,7 +32,7 @@ formatting.
 For documents built with `pandoc --tab-stop=8`, in `.prettierrc`:
 
 ```json
-{ "plugins": ["@knight-owl-dev/prettier-plugin-pandoc"], "pandocTabStop": 8 }
+{ "plugins": ["@knight-owl-llc/prettier-plugin-pandoc"], "pandocTabStop": 8 }
 ```
 
 Prettier's `proseWrap` reflows paragraphs: `preserve` (the default) keeps every
