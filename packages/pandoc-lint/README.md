@@ -24,6 +24,9 @@ pandoc-lint [--format=text|json|github] [--strict] [--info] [--tab-stop=N]
 | `--tab-stop`  | Pandoc's `--tab-stop`, 4 by default                                            |
 | `--shortcuts` | A keystone shortcuts file whose bodies to lint; repeatable                     |
 
+It also compiles with Bun to a standalone binary that needs no Node: CI checks
+that binary lints as Node does (`make bun-check`).
+
 Diagnostics go to stdout. The exit status is 1 on an error, or on a warning with
 `--strict`; 2 on a usage error.
 

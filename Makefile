@@ -12,9 +12,9 @@ IS_TTY := $(shell test -t 0 && echo 1)
 DOCKER_TTY ?= $(if $(IS_TTY),-t)
 
 .PHONY: resolve test test-image lint lint-fix lint-actions lint-docker lint-js \
-	lint-js-fix lint-md lint-md-fix lint-md-fmt lint-md-fmt-fix lint-spell help \
+	lint-js-fix lint-md lint-md-fix lint-md-fmt lint-md-fmt-fix lint-sh lint-spell help \
 	fuzz-print fuzz-parser shrink probe snapshots-diff snapshots-write bench \
-	bench-compare pandoc-lint
+	bench-compare pandoc-lint bun-check
 
 # Node, npm and Pandoc come from the compose services (docker-compose.yaml),
 # never the host. They run as the invoking user, so node_modules on the mount
@@ -80,6 +80,18 @@ pandoc-lint: test-image node_modules/.package-lock.json
 	@test -n "$(FILES)" || { echo "FILES=<file.md ...> [ARGS]" >&2; exit 2; }
 	@$(RUN) node packages/pandoc-lint/src/cli.js $(ARGS) $(FILES)
 
+# What pandoc-lint lints in the Bun check: the corpus, and a shortcuts file.
+BUN_CHECK_ARGS = --shortcuts=packages/pandoc-lint/test/fixtures/shortcuts.yaml \
+	packages/prettier-plugin-pandoc/test/corpus/*.md
+
+bun-check: test-image node_modules/.package-lock.json
+	@$(COMPOSE) build bun
+	@$(COMPOSE) run --rm -T bun tools/bun/check.sh $(BUN_CHECK_ARGS)
+	@$(RUN) sh -c 'node packages/pandoc-lint/src/cli.js --format=json --info \
+		$(BUN_CHECK_ARGS) > .scratch/bun/node.json || true'
+	@cmp .scratch/bun/node.json .scratch/bun/bun.json \
+		&& echo "Bun's JSON is Node's"
+
 # The baseline runs in a worktree of REF; this checkout's documents feed both.
 bench-compare: test-image node_modules/.package-lock.json
 	@tools/baseline.sh add $(REF)
@@ -91,7 +103,7 @@ bench-compare: test-image node_modules/.package-lock.json
 
 # The lint targets invoke their tools bare; the aggregate targets re-enter the
 # ci-tools image, so the toolchain is the pinned one wherever make runs.
-LINT_TARGETS := lint-actions lint-docker lint-js lint-md lint-md-fmt lint-spell
+LINT_TARGETS := lint-actions lint-docker lint-js lint-md lint-md-fmt lint-sh lint-spell
 
 LINT_RUNNER ?= docker run --rm $(DOCKER_TTY) -e GITHUB_TOKEN \
 	-v "$(CURDIR):/work" -w /work $(CI_TOOLS_IMAGE) make
@@ -109,8 +121,11 @@ lint-actions:
 	@echo "Validating GitHub Actions pins..." \
 		&& validate-action-pins .github/workflows/*.yml && echo "OK"
 
+lint-sh:
+	@echo "Linting shell scripts..." && shellcheck tools/*.sh tools/*/*.sh && echo "OK"
+
 lint-docker:
-	@echo "Linting Dockerfile..." && hadolint tools/Dockerfile && echo "OK"
+	@echo "Linting Dockerfile..." && hadolint tools/Dockerfile tools/bun.Dockerfile && echo "OK"
 
 # --error-on-warnings: Biome reports most rules as warnings, which would
 # otherwise exit 0.
@@ -145,7 +160,8 @@ help:
 	@echo "  make lint              Run all linters"
 	@echo "  make lint-fix          Fix all auto-fixable lint issues"
 	@echo "  make lint-actions      Lint workflows and verify action pins"
-	@echo "  make lint-docker       Lint the test image Dockerfile"
+	@echo "  make lint-docker       Lint the Dockerfiles (test image, Bun)"
+	@echo "  make lint-sh           Lint the shell scripts (shellcheck)"
 	@echo "  make lint-js           Lint and format-check JavaScript and JSON (biome)"
 	@echo "  make lint-js-fix       Fix JavaScript and JSON formatting and lint issues"
 	@echo "  make lint-md           Lint Markdown files"
@@ -165,4 +181,5 @@ help:
 	@echo "  make bench             Benchmark the parser and plugin [WHAT RUNS]"
 	@echo "  make bench-compare     Benchmark against REF (default main) [WHAT RUNS]"
 	@echo "  make pandoc-lint       Lint a manuscript (FILES=<file.md ...> [ARGS])"
+	@echo "  make bun-check         Compile pandoc-lint with Bun; check it lints as Node does"
 	@echo ""

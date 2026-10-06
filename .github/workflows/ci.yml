@@ -44,3 +44,13 @@ jobs:
 
       - name: Test
         run: make test
+
+  bun:
+    name: Bun build
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Bun build
+        run: make bun-check
