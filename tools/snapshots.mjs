@@ -1,5 +1,5 @@
-// The plugin's snapshots, `test/expected/<proseWrap>/<file>`: the output
-// aimed at for each corpus file, at width 80 and tab stop 4.
+// The plugin's snapshots, `test/expected/<mode>/<file>`: the output aimed at
+// for each corpus file, at width 80 and tab stop 4.
 //
 //   node tools/snapshots.mjs diff [KEY...]   the current output against each
 //   node tools/snapshots.mjs write [KEY...]  each made the current output
@@ -25,21 +25,25 @@ const test = `${ROOT}/packages/prettier-plugin-pandoc/test`;
 const corpus = readdirSync(`${test}/corpus`, { recursive: true }).filter(
   (f) => f.endsWith('.md') && !f.endsWith('README.md'),
 );
+// As expected.test.js sets each mode.
+const MODES = {
+  preserve: { proseWrap: 'preserve' },
+  always: { proseWrap: 'always' },
+  'tab-width-4': { proseWrap: 'always', tabWidth: 4 },
+};
 const keys =
   given.length > 0
     ? given
-    : ['preserve', 'always'].flatMap((wrap) =>
-        corpus.map((f) => `${wrap}/${f}`),
-      );
+    : Object.keys(MODES).flatMap((mode) => corpus.map((f) => `${mode}/${f}`));
 
 let differs = 0;
 for (const key of keys) {
-  const [proseWrap, ...name] = key.split('/');
+  const [mode, ...name] = key.split('/');
   const source = readFileSync(`${test}/corpus/${name.join('/')}`, 'utf8');
   const output = await prettier.format(source, {
     parser: 'markdown',
     plugins: [plugin],
-    proseWrap,
+    ...MODES[mode],
     printWidth: 80,
     pandocTabStop: 4,
   });

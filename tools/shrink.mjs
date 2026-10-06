@@ -37,6 +37,7 @@ const format = (doc) =>
     parser: 'markdown',
     plugins: [plugin],
     pandocTabStop: found.tabStop,
+    tabWidth: found.tabWidth,
     proseWrap: found.proseWrap,
     printWidth: found.printWidth,
     embeddedLanguageFormatting: found.embeddedLanguageFormatting,

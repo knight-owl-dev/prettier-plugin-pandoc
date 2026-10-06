@@ -60,6 +60,6 @@
    - is code to Pandoc
      - but indented code to CommonMark, whose items prettier re-indents
 
-         ```
-         code
-         ```
+       ```
+       code
+       ```
