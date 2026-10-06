@@ -2,6 +2,13 @@
   "name": "@knight-owl-llc/pandoc-lint",
   "version": "0.0.0",
   "description": "Lint Pandoc markdown: what Pandoc warns of, at its file, line and column",
+  "keywords": [
+    "pandoc",
+    "markdown",
+    "lint",
+    "linter",
+    "keystone"
+  ],
   "license": "GPL-2.0-or-later",
   "type": "module",
   "exports": "./src/index.js",
