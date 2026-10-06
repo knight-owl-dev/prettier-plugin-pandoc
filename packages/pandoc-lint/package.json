@@ -1,6 +1,6 @@
 {
   "name": "@knight-owl-llc/pandoc-lint",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Lint Pandoc markdown: what Pandoc warns of, at its file, line and column",
   "keywords": [
     "pandoc",
@@ -21,7 +21,7 @@
     "NOTICE.md"
   ],
   "dependencies": {
-    "@knight-owl-llc/pandoc-parser": "0.0.0"
+    "@knight-owl-llc/pandoc-parser": "0.1.0"
   },
   "repository": {
     "type": "git",
