@@ -32,6 +32,7 @@ A run ends in a count per kind of failure:
 | `differ`   | `pandoc-parser` reads the document differently from Pandoc |
 | `span`     | A node's span lies outside its parent's                    |
 | `contents` | A container's contents map a child's span wrongly          |
+| `log`      | A Markdown read logs other than Pandoc does                |
 | `hang`     | Pandoc takes longer than 30 seconds                        |
 
 The first `SHOW` failures print; all of them go to

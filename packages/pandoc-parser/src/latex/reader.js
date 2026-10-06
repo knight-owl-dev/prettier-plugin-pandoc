@@ -32,6 +32,7 @@ import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
 import { languagesByExtension } from '../highlighting.js';
 import { numUnit, showFl } from '../image-size.js';
 import { readerInput } from '../input.js';
+import { message, report } from '../logging.js';
 import { readerOptions } from '../options.js';
 import { anyOrderedListMarker } from '../parsing/lists.js';
 import { defaultParserState } from '../parsing/state.js';
@@ -528,8 +529,43 @@ const eatOne = (f) => (ctx) => {
   return t === FAIL ? FAIL : f(t);
 };
 const symbolAsString = eatOne((t) => B.str(t.text, t.start, t.end));
-// Pandoc warns of a special character unescaped (`ParsingUnescaped`).
-const unescapedSymbolAsString = symbolAsString;
+const unescapedSymbolAsString = (ctx) => {
+  const t = anyTok(ctx);
+  if (t === FAIL) return FAIL;
+  report(
+    ctx,
+    message('ParsingUnescaped', t.start, t.end, { contents: t.text }),
+  );
+  return B.str(t.text, t.start, t.end);
+};
+
+/**
+ * Log `contents` skipped, from `start` to where the parse is; Pandoc's
+ * position `pos`, by default where the parse is.
+ *
+ * @param {object} ctx
+ * @param {string} contents
+ * @param {number} start
+ * @param {number} [pos]
+ */
+function skipped(ctx, contents, start, pos = ctx.state.at) {
+  const fields = { contents, pos };
+  report(ctx, message('SkippedContent', start, ctx.state.at, fields));
+}
+
+/**
+ * Nothing, `raw` logged as skipped.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.ignore
+ * @param {object} ctx
+ * @param {string} raw
+ * @param {number} start
+ * @returns {[]}
+ */
+function ignore(ctx, raw, start) {
+  skipped(ctx, raw, start);
+  return [];
+}
 
 const hyphens = (ctx) => {
   const start = ctx.state.at;
@@ -995,22 +1031,26 @@ const verbatimBraced = withVerbatimMode(braced);
 
 /**
  * `\iftoggle{name}{yes}{no}`: the branch the toggle takes, put back to
- * read; neither for a toggle not defined.
+ * read; neither for a toggle not defined, logged.
  *
  * @see Text.Pandoc.Readers.LaTeX.ifToggle
  * @param {object} ctx
  */
 function ifToggle(ctx) {
+  const from = ctx.state.at;
   const name = braced(ctx);
   if (name === FAIL || spaces(ctx) === FAIL) return FAIL;
   const yes = verbatimBraced(ctx);
   if (yes === FAIL || spaces(ctx) === FAIL) return FAIL;
   const no = verbatimBraced(ctx);
   if (no === FAIL) return FAIL;
-  const on = ctx.state.s.toggles.get(untokenize(name));
-  // Pandoc warns of a toggle not defined (`UndefinedToggle`).
+  const contents = untokenize(name);
+  const on = ctx.state.s.toggles.get(contents);
   if (on !== undefined) {
     setInput(ctx, prepend(on ? yes : no, ctx.state.input), false);
+  } else {
+    const fields = { contents, pos: ctx.state.at };
+    report(ctx, message('UndefinedToggle', from, ctx.state.at, fields));
   }
   return undefined;
 }
@@ -2347,10 +2387,10 @@ const inlineCommandPrime = attempt((ctx) => {
     if (!(isInlineCommand(name) || !isBlockCommand(name))) return FAIL;
     const rawcommand = getRawCommand(name, cmd + star)(c);
     if (rawcommand === FAIL) return FAIL;
-    // Pandoc warns of what it drops (`SkippedContent`).
-    return enabled(c, 'raw_tex')
-      ? B.rawInline('latex', rawcommand, start, c.state.at)
-      : [];
+    if (enabled(c, 'raw_tex')) {
+      return B.rawInline('latex', rawcommand, start, c.state.at);
+    }
+    return ignore(c, rawcommand, start);
   };
   const p = lookupListDefault(
     null,
@@ -2393,10 +2433,10 @@ export const blockCommand = attempt((ctx) => {
   const rawContents = (c) => {
     const rawcontents = getRawCommand(name, txt + star)(c);
     if (rawcontents === FAIL) return FAIL;
-    // Pandoc warns of what it drops (`SkippedContent`).
-    return enabled(c, 'raw_tex')
-      ? B.rawBlock('latex', rawcontents, start, c.state.at)
-      : [];
+    if (enabled(c, 'raw_tex')) {
+      return B.rawBlock('latex', rawcontents, start, c.state.at);
+    }
+    return ignore(c, rawcontents, start);
   };
   const rawDefiniteBlock = (c) =>
     isBlockCommand(name) ? rawContents(c) : FAIL;
@@ -2772,14 +2812,16 @@ function listOf(name, f, itemParser) {
 }
 
 const markerSpec = (ctx) => {
+  const from = ctx.state.at;
   if (symbol('[')(ctx) === FAIL) return FAIL;
   const ts = manyTill(anyTok, symbol(']'))(ctx);
   if (ts === FAIL) return FAIL;
   const text = untokenize(ts);
   const state = defaultParserState(readerOptions());
   const { value } = parse(anyOrderedListMarker, text, state);
-  // Pandoc warns of the option it skips (`SkippedContent`).
-  return value === FAIL ? [1, DefaultStyle, DefaultDelim] : value;
+  if (value !== FAIL) return value;
+  skipped(ctx, `[${text}]`, from);
+  return [1, DefaultStyle, DefaultDelim];
 };
 const itemindent = optional(
   attempt((ctx) => {
@@ -2793,6 +2835,7 @@ const itemindent = optional(
 const setcounter = option(
   1,
   attempt((ctx) => {
+    const from = ctx.state.at;
     if (controlSeq('setcounter')(ctx) === FAIL) return FAIL;
     const ctrToks = braced(ctx);
     if (ctrToks === FAIL) return FAIL;
@@ -2802,9 +2845,12 @@ const setcounter = option(
     if (sp(ctx) === FAIL) return FAIL;
     const num = braced(ctx);
     if (num === FAIL) return FAIL;
-    // Haskell's `read` of an `Int`; Pandoc warns of one it skips.
-    const t = untokenize(num).trim();
-    return /^-?[0-9]+$/.test(t) ? Number(BigInt.asIntN(64, BigInt(t))) + 1 : 1;
+    // Haskell's `read` of an `Int`.
+    const n = untokenize(num);
+    const t = n.trim();
+    if (/^-?[0-9]+$/.test(t)) return Number(BigInt.asIntN(64, BigInt(t))) + 1;
+    skipped(ctx, `\\setcounter{${ctr}}{${n}}`, from, from);
+    return 1;
   }),
 );
 const enumerateItems = listenv('enumerate', many(item));
@@ -2892,6 +2938,7 @@ function rawEnv(name, start) {
     const opts = rawopts(ctx);
     if (opts === FAIL) return FAIL;
     const beginCommand = `\\begin{${name}}${opts.join('')}`;
+    const pos1 = ctx.state.at;
     if (enabled(ctx, 'raw_tex')) {
       const read = rawBody(ctx);
       if (read === FAIL) return FAIL;
@@ -2900,7 +2947,8 @@ function rawEnv(name, start) {
     }
     const bs = body(ctx);
     if (bs === FAIL) return FAIL;
-    // Pandoc warns of the `\begin` and `\end` it skips (`SkippedContent`).
+    skipped(ctx, beginCommand, start, pos1);
+    skipped(ctx, `\\end{${name}}`, ctx.state.at);
     return B.divWith(['', [name], []], bs, start, ctx.state.at);
   };
 }
@@ -2917,13 +2965,15 @@ function rawEnv(name, start) {
 function rawVerbEnv(name, start) {
   const read = withRaw(verbEnv(name));
   return (ctx) => {
+    const pos = ctx.state.at;
     const r = read(ctx);
     if (r === FAIL) return FAIL;
     const raw = `\\begin{${name}}${untokenize(r[1])}`;
-    // Pandoc warns of what it skips (`SkippedContent`).
-    return enabled(ctx, 'raw_tex')
-      ? B.rawBlock('latex', raw, start, ctx.state.at)
-      : [];
+    if (enabled(ctx, 'raw_tex')) {
+      return B.rawBlock('latex', raw, start, ctx.state.at);
+    }
+    skipped(ctx, raw, start, pos);
+    return [];
   };
 }
 

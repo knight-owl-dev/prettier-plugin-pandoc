@@ -17,6 +17,7 @@ import {
   skipMany,
 } from '../core.js';
 import { lookupEntity } from '../entities.js';
+import { logMessage, logOf, message } from '../logging.js';
 import { NBSP, uniqueIdent } from '../shared.js';
 import { SourceText } from '../source-text.js';
 import { enabled, updateState } from './state.js';
@@ -338,23 +339,27 @@ export const lineBlockLines = (ctx) => {
 /**
  * The attributes of a heading of `inlines`: with `auto_identifiers`, an
  * identifier made from its text where it has none; either way recorded as
- * used.
+ * used. An identifier given that is used already is logged, of the heading
+ * at `span`.
  *
- * Not ported yet: `ascii_identifiers`, off by default, and the warning of a
- * duplicate identifier.
+ * Not ported yet: `ascii_identifiers`, off by default.
  *
  * @see Text.Pandoc.Parsing.General.registerHeader
  * @param {Context} ctx
  * @param {import('./state.js').Attr} attr
  * @param {import('../ast/nodes.js').Node[]} inlines
+ * @param {[number, number]} span
  * @returns {import('./state.js').Attr}
  */
-export function registerHeader(ctx, [ident, classes, pairs], inlines) {
+export function registerHeader(ctx, [ident, classes, pairs], inlines, span) {
   const used = ctx.state.identifiers;
-  const id =
-    ident === '' && enabled(ctx, 'auto_identifiers')
-      ? uniqueIdent(inlines, used)
-      : ident;
+  const auto = ident === '' && enabled(ctx, 'auto_identifiers');
+  const id = auto ? uniqueIdent(inlines, used) : ident;
+  if (!auto && id !== '' && used.has(id)) {
+    const [start, end] = span;
+    const fields = { contents: id, pos: ctx.pos };
+    logMessage(ctx, message('DuplicateIdentifier', start, end, fields));
+  }
   if (id !== '') updateState(ctx, { identifiers: used.set(id, true) });
   return [id, classes, pairs];
 }
@@ -387,7 +392,8 @@ export function lineEnd(text, pos) {
 export function parseFromString(ctx, parser, extracted) {
   const source = extracted.withoutCarriageReturns();
   const { text, pos, depth = 0, notesDefined } = ctx;
-  const { definitions } = ctx.state;
+  const before = ctx.state;
+  const logged = logOf(ctx)?.length ?? 0;
   ctx.text = source.text;
   ctx.pos = 0;
   ctx.depth = depth + 1;
@@ -398,48 +404,79 @@ export function parseFromString(ctx, parser, extracted) {
   ctx.pos = pos;
   ctx.depth = depth;
   ctx.notesDefined = notesDefined;
-  if (x === FAIL) return FAIL;
   const toStart = (offset) => source.toOuterStart(offset);
   const toEnd = (offset) => source.toOuterEnd(offset);
+  mapLogged(ctx, logged, toStart, toEnd);
+  if (x === FAIL) return FAIL;
   mapNotes(ctx, defined, toStart, toEnd, source);
-  mapDefinitions(ctx, definitions, toStart, toEnd);
+  mapHeld(ctx, before, toStart, toEnd);
   const mapped = mapSpans(x, toStart, toEnd, source);
   return Array.isArray(mapped) ? withContents(mapped, source) : mapped;
 }
 
+// The lists a read holds in its state, whose items carry spans: what a
+// read of extracted text adds to them maps out with its blocks.
+const HELD = ['definitions', 'noteDefinitions', 'logMessages'];
+
 /**
- * The reference definitions a read of extracted text added, those before
- * `since`, mapped out to the text it was extracted from.
+ * An item with its spans mapped: `start`, `end` and `pos`, and each
+ * `[start, end]` pair among its fields.
+ *
+ * @template {object} T
+ * @param {T} item
+ * @param {(offset: number) => number} toStart
+ * @param {(offset: number) => number} toEnd
+ * @returns {T}
+ */
+export function mapItemSpans(item, toStart, toEnd) {
+  const out = {};
+  for (const [key, value] of Object.entries(item)) {
+    if (key === 'start' || key === 'pos') out[key] = toStart(value);
+    else if (key === 'end') out[key] = toEnd(value);
+    else if (
+      Array.isArray(value) &&
+      value.length === 2 &&
+      value.every(Number.isInteger)
+    ) {
+      out[key] = [toStart(value[0]), toEnd(value[1])];
+    } else out[key] = value;
+  }
+  return /** @type {T} */ (out);
+}
+
+/**
+ * The items a read of extracted text added to each held list, those before
+ * `since`'s, mapped out to the text it was extracted from.
  *
  * @param {Context} ctx
- * @param {import('./state.js').Definitions | null} since
+ * @param {Record<string, unknown>} since The state before the read.
  * @param {(offset: number) => number} toStart
  * @param {(offset: number) => number} toEnd
  */
-function mapDefinitions(ctx, since, toStart, toEnd) {
-  const added = [];
-  for (
-    let at = ctx.state.definitions;
-    at !== since && at !== null;
-    at = at.next
-  ) {
-    added.push(at.definition);
+function mapHeld(ctx, since, toStart, toEnd) {
+  const fields = {};
+  for (const name of HELD) {
+    const added = [];
+    for (let at = ctx.state[name]; at !== since[name] && at; at = at.next) {
+      added.push(at.item);
+    }
+    if (added.length === 0) continue;
+    let list = since[name];
+    for (const item of added.reverse()) {
+      list = { item: mapItemSpans(item, toStart, toEnd), next: list };
+    }
+    fields[name] = list;
   }
-  if (added.length === 0) return;
-  const span = (s) => (s === null ? null : [toStart(s[0]), toEnd(s[1])]);
-  let definitions = since;
-  for (const d of added.reverse()) {
-    const definition = {
-      start: toStart(d.start),
-      end: toEnd(d.end),
-      label: span(d.label),
-      url: span(d.url),
-      title: span(d.title),
-      attributes: span(d.attributes),
-    };
-    definitions = { definition, next: definitions };
+  if (Object.keys(fields).length > 0) updateState(ctx, fields);
+}
+
+// The messages logged since the first `logged`, by a read of extracted
+// text, failed or not, mapped out to the text it was extracted from.
+function mapLogged(ctx, logged, toStart, toEnd) {
+  const log = logOf(ctx);
+  for (let k = logged; log && k < log.length; k++) {
+    log[k] = mapItemSpans(log[k], toStart, toEnd);
   }
-  updateState(ctx, { definitions });
 }
 
 /**

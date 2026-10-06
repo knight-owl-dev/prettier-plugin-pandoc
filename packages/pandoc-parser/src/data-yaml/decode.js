@@ -27,13 +27,23 @@ export class YamlError extends Error {}
 const STR_TAG = 'tag:yaml.org,2002:str';
 
 /**
- * Each document of `text`, decoded.
+ * A key given again in a mapping: its path, as Aeson formats it relative
+ * (`.a[0]['b c']`), and the span of the key in the text.
+ *
+ * @see Data.Yaml.Internal.Warning
+ * @typedef {{path: string, start: number, end: number}} DuplicateKey
+ */
+
+/**
+ * Each document of `text`, decoded; each key given again pushed to
+ * `warnings`, the last first, as `Data.Yaml` gives them.
  *
  * @see Data.Yaml.Internal.decodeAllHelper
  * @param {string} text
+ * @param {DuplicateKey[]} [warnings]
  * @returns {Value[]}
  */
-export function decodeAll(text) {
+export function decodeAll(text, warnings = []) {
   const docs = parseAllDocuments(text, {
     schema: 'failsafe',
     uniqueKeys: false,
@@ -41,13 +51,17 @@ export function decodeAll(text) {
     prettyErrors: false,
   });
   if (!Array.isArray(docs)) return [];
-  return docs.map((doc) => {
+  const found = [];
+  const values = docs.map((doc) => {
     if (doc.errors.length > 0) throw new YamlError(doc.errors[0].message);
     if (atColumnZero(doc.contents, text)) {
       throw new YamlError('did not find expected <document start>');
     }
-    return doc.contents === null ? null : parseO(doc.contents, doc);
+    if (doc.contents === null) return null;
+    return parseO(doc.contents, { doc, path: [], warnings: found });
   });
+  warnings.push(...found.reverse());
+  return values;
 }
 
 /**
@@ -126,50 +140,87 @@ export function textToScientific(t) {
 const scalarText = (node) => (node.value === null ? '' : String(node.value));
 
 /**
+ * Where a decode is: its document, the path to the node, and the duplicate
+ * keys found, null under an alias, whose node `Data.Yaml` decoded once.
+ *
+ * @typedef {{doc: object, path: (string | number)[], warnings: DuplicateKey[] | null}} Decoding
+ */
+
+/**
  * A node decoded: scalars resolved, aliases to what they name, mappings
  * with merge keys merged and later keys replacing earlier ones.
  *
  * @see Data.Yaml.Internal.parseO
  * @param {unknown} node
- * @param {object} doc
+ * @param {Decoding} at
  * @returns {Value}
  */
-function parseO(node, doc) {
+function parseO(node, at) {
   if (node === null || node === undefined) return null;
   if (isAlias(node)) {
-    const target = node.resolve(doc);
+    const target = node.resolve(at.doc);
     if (target === undefined)
       throw new YamlError(`Unknown alias ${node.source}`);
-    return parseO(target, doc);
+    return parseO(target, { ...at, warnings: null });
   }
   if (isScalar(node)) return textToValue(node.type, node.tag, scalarText(node));
-  if (isSeq(node)) return node.items.map((item) => parseO(item, doc));
-  if (isMap(node)) return parseM(node, doc);
+  if (isSeq(node)) {
+    return node.items.map((item, n) =>
+      parseO(item, { ...at, path: [...at.path, n] }),
+    );
+  }
+  if (isMap(node)) return parseM(node, at);
   throw new YamlError('Unexpected node');
 }
 
 /**
  * A mapping: its keys text; `<<` merging a mapping, or a list of them, for
- * the keys not given before it.
+ * the keys not given before it. A key given again is a warning, unless a
+ * merge gave it and nothing since.
  *
  * @see Data.Yaml.Internal.parseM
  * @param {object} node
- * @param {object} doc
+ * @param {Decoding} at
  * @returns {Map<string, Value>}
  */
-function parseM(node, doc) {
+function parseM(node, at) {
   let front = new Map();
+  let merged = new Set();
   for (const { key, value } of node.items) {
-    const s = keyText(key, doc);
-    const o = parseO(value, doc);
+    const s = keyText(key, at);
+    const path = [...at.path, s];
+    const o = parseO(value, { ...at, path });
     if (s === '<<' && (o instanceof Map || Array.isArray(o))) {
-      const merged = o instanceof Map ? o : mergeObjects(o);
-      front = new Map([...merged, ...front]);
+      const xs = o instanceof Map ? o : mergeObjects(o);
+      merged = new Set([...xs.keys()].filter((k) => !front.has(k)));
+      front = new Map([...xs, ...front]);
     } else {
+      if (front.has(s) && !merged.has(s) && at.warnings !== null) {
+        const [start, end] = key?.range ?? [0, 0];
+        at.warnings.push({ path: relativePath(path), start, end });
+      }
+      merged.delete(s);
       front.set(s, o);
     }
   }
   return front;
+}
+
+/**
+ * A path as Aeson formats it relative: `.key` for a key of a letter then
+ * letters and digits, `['key']` escaped for any other, `[n]` an index.
+ *
+ * @see Data.Aeson.Types.formatRelativePath
+ * @param {(string | number)[]} path
+ */
+function relativePath(path) {
+  return path
+    .map((part) => {
+      if (typeof part === 'number') return `[${part}]`;
+      if (/^\p{L}[\p{L}\p{N}]*$/u.test(part)) return `.${part}`;
+      return `['${part.replace(/['\\]/g, '\\$&')}']`;
+    })
+    .join('');
 }
 
 // Mappings in a list merged, earlier keys kept; anything else skipped.
@@ -180,11 +231,11 @@ function mergeObjects(list) {
 }
 
 // A key's text: a scalar's as written, or an alias's to text.
-function keyText(key, doc) {
+function keyText(key, at) {
   if (isScalar(key)) return scalarText(key);
   if (key === null || key === undefined) return '';
   if (isAlias(key)) {
-    const v = parseO(key, doc);
+    const v = parseO(key, at);
     if (typeof v === 'string') return v;
     throw new YamlError('Non-string key alias');
   }

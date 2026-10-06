@@ -17,6 +17,7 @@ import {
   skipMany,
   skipMany1,
 } from '../core.js';
+import { message, report } from '../logging.js';
 import {
   blankline,
   blanklines,
@@ -80,7 +81,7 @@ const level = (ctx, by) =>
 
 /**
  * A div: an opening fence and its attributes, then blocks to a closing
- * fence, or to where the blocks end where none closes it.
+ * fence, or to where the blocks end where none closes it, logged.
  *
  * @see Text.Pandoc.Readers.Markdown.divFenced
  * @param {Context} ctx
@@ -102,7 +103,7 @@ const fenced = attempt((ctx) => {
   level(ctx, 1);
   const bs = contents(ctx);
   if (bs === FAIL) return FAIL;
-  closer(ctx);
+  if (closer(ctx) === FAIL) report(ctx, message('UnclosedDiv', start, ctx.pos));
   level(ctx, -1);
   const blocks = bs.flat();
   const end = blockEnd(ctx.text, start, ctx.pos, blocks);

@@ -9,10 +9,12 @@ import { mapSpans } from '../ast/spans.js';
 import { FAIL, optional } from '../core.js';
 import { readerInput } from '../input.js';
 import { readerOptions } from '../options.js';
+import { mapItemSpans } from '../parsing/general.js';
 import { defaultParserState } from '../parsing/state.js';
 import { parseBlocks } from './blocks.js';
 import { endline, inline } from './inlines.js';
 import { titleBlock } from './metadata.js';
+import { checkNotes } from './notes.js';
 import { readResolved } from './references.js';
 
 /**
@@ -26,12 +28,20 @@ import { readResolved } from './references.js';
 export function readMarkdown(source, options) {
   const opts = readerOptions(options);
   const { text, toSource, input } = readerInput(source, opts.tabStop);
-  const [blocks, meta, definitions] = readResolved((references) => {
-    const ctx = { text, pos: 0, state: defaultParserState(opts), references };
+  const [blocks, meta, definitions, log] = readResolved((references) => {
+    const state = defaultParserState(opts);
+    const ctx = { text, pos: 0, state, references, log: [] };
     optional(titleBlock)(ctx);
     const value = parseBlocks(ctx);
     if (value === FAIL) throw new Error('the markdown reader failed');
-    const read = [value, ctx.state.meta, inOrder(ctx.state.definitions)];
+    checkNotes(ctx);
+    const held = inOrder(ctx.state.logMessages);
+    const read = [
+      value,
+      ctx.state.meta,
+      inOrder(ctx.state.definitions),
+      [...ctx.log, ...held],
+    ];
     return { value: read, state: ctx.state };
   });
   const result = doc(
@@ -50,13 +60,16 @@ export function readMarkdown(source, options) {
     attributes: span(d.attributes),
   }));
   Object.defineProperty(result, 'definitions', { value: located });
+  // What Pandoc would log reading it, in its order.
+  const logged = log.map((m) => mapItemSpans(m, toSource, toSource));
+  Object.defineProperty(result, 'log', { value: logged });
   return result;
 }
 
 // A list the last first, as an array in order.
 function inOrder(list) {
   const out = [];
-  for (let at = list; at !== null; at = at.next) out.push(at.definition);
+  for (let at = list; at !== null; at = at.next) out.push(at.item);
   return out.reverse();
 }
 

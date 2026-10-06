@@ -5,6 +5,7 @@
 // Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX.Macro`.
 
 import { alt, attempt, FAIL, many, many1, option, optional } from '../core.js';
+import { message, report } from '../logging.js';
 import {
   anyControlSeq,
   anyTok,
@@ -301,7 +302,8 @@ const numbered = (n) => Array.from({ length: n }, (_, k) => ({ num: k + 1 }));
 
 /**
  * `\newcommand` and its kin: read verbatim, its macros expanded where it
- * is used; an existing macro kept unless renewed.
+ * is used; an existing macro kept unless renewed, and logged unless
+ * provided.
  *
  * @see Text.Pandoc.Readers.LaTeX.Macro.newcommand
  */
@@ -338,9 +340,13 @@ function newcommand(ctx) {
       optarg,
       body,
     );
-    // Pandoc warns of a macro defined again (`MacroAlreadyDefined`).
     if (lookupMacro(c, cs.name) === undefined) return [[cs.name, m]];
-    return mtype === 'renewcommand' ? [[cs.name, m]] : [];
+    if (mtype === 'renewcommand') return [[cs.name, m]];
+    if (mtype !== 'providecommand') {
+      const fields = { name: cs.text };
+      report(c, message('MacroAlreadyDefined', pos.start, c.state.at, fields));
+    }
+    return [];
   })(ctx);
 }
 
@@ -389,7 +395,11 @@ function newenvironment(ctx) {
       makeMacro('GroupScope', 'ExpandWhenUsed', [], null, [...endcontents, eg]),
     ];
     if (lookupMacro(c, name) === undefined) return result;
-    return mtype === 'renewenvironment' ? result : null;
+    if (mtype === 'renewenvironment') return result;
+    if (mtype !== 'provideenvironment') {
+      report(c, message('MacroAlreadyDefined', at, c.state.at, { name }));
+    }
+    return null;
   })(ctx);
 }
 

@@ -3,12 +3,23 @@
 // the Lua reader does not.
 
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const LUA = `local cases = pandoc.json.decode(io.read('a'))
 local out = {}
 for i, c in ipairs(cases) do
+  local logged = #PANDOC_STATE.log
   local ok, d = pcall(pandoc.read, c.text, c.format, {tab_stop = c.tabStop})
-  out[i] = ok and pandoc.write(d, 'json') or ('ERROR ' .. tostring(d))
+  local log = {}
+  for k = logged + 1, #PANDOC_STATE.log do
+    log[#log + 1] = PANDOC_STATE.log[k]
+  end
+  out[i] = {
+    json = ok and pandoc.write(d, 'json') or ('ERROR ' .. tostring(d)),
+    log = pandoc.json.encode(log),
+  }
 end
 io.write(pandoc.json.encode(out))`;
 
@@ -38,16 +49,24 @@ function runLua(cases, seconds) {
 /**
  * Each case's read as Pandoc's JSON, `ERROR …` where reading fails, null
  * where it takes longer than `seconds`: a batch that times out is split
- * until the case that hangs stands alone.
+ * until the case that hangs stands alone. With `log`, each read beside
+ * Pandoc's log of it, as `--log` writes it.
  *
  * @param {Read[]} cases
- * @param {{batch?: number, seconds?: number}} [options]
- * @returns {(string | null)[]}
+ * @param {{batch?: number, seconds?: number, log?: boolean}} [options]
+ * @returns {(string | null | {json: string, log: object[]})[]}
  */
-export function readAll(cases, { batch = 100, seconds = 30 } = {}) {
+export function readAll(
+  cases,
+  { batch = 100, seconds = 30, log = false } = {},
+) {
   const read = (part) => {
     const run = runLua(part, seconds);
-    if (run.status === 0) return JSON.parse(run.stdout);
+    if (run.status === 0) {
+      return JSON.parse(run.stdout).map((r) =>
+        log ? { json: r.json, log: listOf(JSON.parse(r.log)) } : r.json,
+      );
+    }
     if (part.length === 1) return [null];
     const half = Math.ceil(part.length / 2);
     return [...read(part.slice(0, half)), ...read(part.slice(half))];
@@ -59,6 +78,9 @@ export function readAll(cases, { batch = 100, seconds = 30 } = {}) {
   return out;
 }
 
+// Lua's JSON of an empty table is an object.
+const listOf = (x) => (Array.isArray(x) ? x : []);
+
 /**
  * The CLI's read of `text` as JSON, or `ERROR …`.
  *
@@ -69,6 +91,27 @@ export function readCli(text, { format = 'markdown', tabStop = 4 } = {}) {
   const args = ['-f', format, '-t', 'json', `--tab-stop=${tabStop}`];
   const run = spawnSync('pandoc', args, { input: text, encoding: 'utf8' });
   return run.status === 0 ? run.stdout : `ERROR ${run.stderr.trim()}`;
+}
+
+/**
+ * The CLI's log of reading `text`, as `--log` writes it.
+ *
+ * @param {string} text
+ * @param {{format?: string, tabStop?: number}} [options]
+ * @returns {object[]}
+ */
+export function logCli(text, { format = 'markdown', tabStop = 4 } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'log-'));
+  const file = join(dir, 'log.json');
+  try {
+    const args = ['-f', format, '-t', 'json', `--tab-stop=${tabStop}`];
+    spawnSync('pandoc', [...args, `--log=${file}`], { input: text });
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return [];
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
 }
 
 /**

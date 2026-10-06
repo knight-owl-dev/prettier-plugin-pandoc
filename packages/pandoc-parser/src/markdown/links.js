@@ -32,6 +32,7 @@ import {
   option,
 } from '../core.js';
 import { fromEntities } from '../entities.js';
+import { logMessage, message } from '../logging.js';
 import {
   blanklines,
   charsInBalanced,
@@ -674,9 +675,7 @@ const noBracket = notFollowedBy(openBracket);
 /**
  * A reference key's definition: its key in brackets, `:`, a URL, a title
  * and attributes. Recorded, the last of a key's definitions its target; no
- * block.
- *
- * Not ported yet: the warning of a key defined again.
+ * block. A key defined again to another target is logged.
  *
  * @see Text.Pandoc.Readers.Markdown.referenceKey
  * @param {Context} ctx
@@ -688,6 +687,7 @@ export function referenceKey(ctx) {
 const noCitation = notFollowedBy((ctx) => cite(ctx));
 
 const referenceKeyAt = attempt((ctx) => {
+  const pos = ctx.pos;
   if (skipNonindentSpaces(ctx) === FAIL || noCitation(ctx) === FAIL) {
     return FAIL;
   }
@@ -711,20 +711,25 @@ const referenceKeyAt = attempt((ctx) => {
   const attrSpan = spanOf(ctx.text, attrStart, ctx.pos);
   const end = ctx.pos;
   if (blanklines(ctx) === FAIL) return FAIL;
-  const target = [escapeURI(trimEnd(src)), title];
-  const keys = ctx.state.keys.set(toKey(ref.raw), [
-    target,
-    extractIdClass(attr),
-  ]);
+  const key = toKey(ref.raw);
+  const value = [[escapeURI(trimEnd(src)), title], extractIdClass(attr)];
+  const old = ctx.state.keys.get(key);
+  const keys = ctx.state.keys.set(key, value);
+  const definitionEnd = spanOf(ctx.text, start, end)[1];
+  if (old !== undefined && JSON.stringify(old) !== JSON.stringify(value)) {
+    const fields = { contents: ref.raw, pos };
+    const msg = message('DuplicateLinkReference', start, definitionEnd, fields);
+    logMessage(ctx, msg);
+  }
   const definition = {
     start,
-    end: spanOf(ctx.text, start, end)[1],
+    end: definitionEnd,
     label,
     url,
     title: titleSpan[0] === titleSpan[1] ? null : titleSpan,
     attributes: attrSpan[0] === attrSpan[1] ? null : attrSpan,
   };
-  const definitions = { definition, next: ctx.state.definitions };
+  const definitions = { item: definition, next: ctx.state.definitions };
   updateState(ctx, { keys, definitions });
   return [];
 });

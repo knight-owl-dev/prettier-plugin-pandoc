@@ -19,6 +19,7 @@ import {
   renderTags,
   VOID_TAGS,
 } from '../html.js';
+import { message, report } from '../logging.js';
 import {
   blankline,
   blockEnd,
@@ -279,7 +280,7 @@ const divContents = many((ctx) =>
 
 /**
  * `<div>`, blocks, `</div>`: a div of the tag's attributes. Its closing
- * tag ends the blocks in it.
+ * tag ends the blocks in it; with none, the blocks' end does, logged.
  *
  * @see Text.Pandoc.Readers.Markdown.divHtml
  * @param {Context} ctx
@@ -297,7 +298,8 @@ const divHtmlAt = attempt((ctx) => {
   optionalBlanklines(ctx);
   const contents = divContents(ctx);
   if (contents === FAIL) return FAIL;
-  divClose(ctx);
+  if (divClose(ctx) === FAIL)
+    report(ctx, message('UnclosedDiv', start, ctx.pos));
   updateState(ctx, { inHtmlBlock: outer });
   const blocks = contents.flat();
   const end = blockEnd(ctx.text, start, ctx.pos, blocks);

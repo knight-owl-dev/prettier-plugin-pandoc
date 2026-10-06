@@ -24,6 +24,7 @@ import {
   skipMany1,
 } from '../core.js';
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
+import { logOf } from '../logging.js';
 import { readInt } from '../parsing/lists.js';
 import { getPosition } from '../parsing/state.js';
 import { addMetaField, uniqueIdent } from '../shared.js';
@@ -1651,7 +1652,10 @@ export function setCaption(inline) {
  * identifier made from its text where it has none; either way recorded as
  * used. The LaTeX state's instance of `HasIdentifierList`.
  *
- * Not ported yet: `ascii_identifiers`, and the warning of a duplicate.
+ * Pandoc's logs nothing of an identifier used again: its LaTeX reader
+ * reports no message it holds.
+ *
+ * Not ported yet: `ascii_identifiers`.
  *
  * @see Text.Pandoc.Parsing.General.registerHeader
  * @param {{state: LPState}} ctx
@@ -1752,7 +1756,8 @@ const before = (a, b) =>
  * tokenizer drifts included: the text it reads, or with `latex_macros` the
  * tokens' text, macros expanded. Null where either parse fails.
  *
- * Its host reads no files: the other format's parse has none.
+ * Its host reads no files: the other format's parse has none. What it
+ * reports goes to that parse's log.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.rawLaTeXParser
  * @template A
@@ -1763,7 +1768,7 @@ const before = (a, b) =>
  */
 export const rawLaTeXParser = (toks, parser, valParser) => (ctx) => {
   const pstate = ctx.state;
-  const common = commonState();
+  const common = { ...commonState(), log: logOf(ctx) };
   const lstate = defaultLaTeXState(pstate.options);
   const extent = lpContext(toks, lstate, undefined, common);
   const first = withRaw((c) =>

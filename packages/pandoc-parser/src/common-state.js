@@ -36,6 +36,8 @@ const NO_FILES = {
  * @property {Host} host
  * @property {string[]} resourcePath Where resources such as images are
  *   looked for.
+ * @property {import('./logging.js').LogMessage[]} [log] What the run
+ *   reports.
  */
 
 /**
