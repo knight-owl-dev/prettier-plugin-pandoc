@@ -1,6 +1,6 @@
-// The rules: each message Pandoc's reader logs, as a diagnostic. Rule ids
-// are Pandoc's message types in kebab case; Pandoc's INFO messages are
-// `info`, off unless asked for.
+// The rules: each message Pandoc's reader logs, as a diagnostic, and each
+// misread (`misreads.js`). Rule ids are the types in kebab case; Pandoc's
+// INFO messages are `info`, off unless asked for.
 
 /**
  * What a rule reads a message against: where an offset is, as
@@ -20,7 +20,7 @@
  *
  * @typedef {object} Rule
  * @property {string} rule
- * @property {'warn' | 'info'} severity
+ * @property {'error' | 'warn' | 'info'} severity
  * @property {(msg: object, read: Read) => Record<string, string | string[]>} callouts
  */
 
@@ -139,6 +139,27 @@ export const RULES = {
     callouts: () => ({
       problem: 'raw TeX is skipped',
       effect: 'Pandoc leaves it out of the document.',
+    }),
+  },
+  BlockInParagraph: {
+    rule: 'block-in-paragraph',
+    severity: 'error',
+    callouts: (msg) => ({
+      problem: `${msg.block} is read as paragraph text`,
+      because: `A paragraph runs on to the next blank line: a ${msg.block} on the line after its text is part of it.`,
+      remedy:
+        'Put a blank line before it; if it is meant as text, escape its first character with a backslash.',
+    }),
+  },
+  DivFenceLength: {
+    rule: 'div-fence-length',
+    severity: 'warn',
+    callouts: (msg, read) => ({
+      problem: `closing fence ${':'.repeat(msg.colons)} closes a div opened with ${':'.repeat(msg.opener.colons)}`,
+      offenders: [offender(read, msg.opener)],
+      because:
+        'Any fence of three colons or more closes the innermost open div: its length pairs it with no opener.',
+      remedy: 'Make each closing fence as long as its opener.',
     }),
   },
 };
