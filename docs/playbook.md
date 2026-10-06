@@ -92,6 +92,17 @@ reads no slower per character than `corpus x10`; the plugin formats the corpus
 in under 200ms at every `proseWrap`. A case more than 10% slower than `main` at
 `RUNS=7` needs its reason in the PR.
 
+## Lint a manuscript
+
+```sh
+make pandoc-lint FILES="ch1.md ch2.md"
+make pandoc-lint FILES="ch1.md ch2.md" ARGS="--format=json --info"
+```
+
+Reads the files as Pandoc reads several, one document in the order given, and
+reports what Pandoc warns of at its file, line and column, in keystone's frame.
+`--info` adds Pandoc's INFO messages; `--strict` exits 1 on a warning.
+
 ## Add a tool
 
 A tool is a script under `tools/`. It takes positional arguments with defaults

@@ -14,7 +14,7 @@ DOCKER_TTY ?= $(if $(IS_TTY),-t)
 .PHONY: resolve test test-image lint lint-fix lint-actions lint-docker lint-js \
 	lint-js-fix lint-md lint-md-fix lint-md-fmt lint-md-fmt-fix lint-spell help \
 	fuzz-print fuzz-parser shrink probe snapshots-diff snapshots-write bench \
-	bench-compare
+	bench-compare pandoc-lint
 
 # Node, npm and Pandoc come from the compose services (docker-compose.yaml),
 # never the host. They run as the invoking user, so node_modules on the mount
@@ -75,6 +75,10 @@ snapshots-write: test-image node_modules/.package-lock.json
 bench: test-image node_modules/.package-lock.json
 	@$(RUN) env COMMIT=$$(git rev-parse --short HEAD) \
 		node tools/bench/run.mjs $(WHAT) HEAD $(RUNS)
+
+pandoc-lint: test-image node_modules/.package-lock.json
+	@test -n "$(FILES)" || { echo "FILES=<file.md ...> [ARGS]" >&2; exit 2; }
+	@$(RUN) node packages/pandoc-lint/src/cli.js $(ARGS) $(FILES)
 
 # The baseline runs in a worktree of REF; this checkout's documents feed both.
 bench-compare: test-image node_modules/.package-lock.json
@@ -160,4 +164,5 @@ help:
 	@echo "  make snapshots-write   Make the plugin's output its snapshots [KEYS]"
 	@echo "  make bench             Benchmark the parser and plugin [WHAT RUNS]"
 	@echo "  make bench-compare     Benchmark against REF (default main) [WHAT RUNS]"
+	@echo "  make pandoc-lint       Lint a manuscript (FILES=<file.md ...> [ARGS])"
 	@echo ""
