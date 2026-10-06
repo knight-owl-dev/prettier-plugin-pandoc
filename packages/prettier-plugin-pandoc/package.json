@@ -1,6 +1,6 @@
 {
   "name": "@knight-owl-llc/prettier-plugin-pandoc",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Format Pandoc markdown with prettier without changing what Pandoc reads",
   "keywords": [
     "prettier",
@@ -18,7 +18,7 @@
     "NOTICE.md"
   ],
   "dependencies": {
-    "@knight-owl-llc/pandoc-parser": "0.0.0"
+    "@knight-owl-llc/pandoc-parser": "0.1.0"
   },
   "peerDependencies": {
     "prettier": "^3"
