@@ -1,12 +1,12 @@
 # @knight-owl-llc/prettier-plugin-pandoc
 
-Format [Pandoc](https://pandoc.org/) markdown with
+Format [Pandoc](https://pandoc.org/) Markdown with
 [prettier](https://prettier.io/) without changing what Pandoc reads.
 
 The plugin reads a document with
 [`@knight-owl-llc/pandoc-parser`](https://www.npmjs.com/package/@knight-owl-llc/pandoc-parser),
-a port of Pandoc's own Markdown reader, and prints structure from that read and
-text as the source wrote it. It then reads its output again: what reads
+a port of Pandoc's Markdown reader. It prints structure from that read and text
+as the source wrote it, then reads its own output: a block that reads
 differently prints as written.
 
 ## Install
@@ -15,14 +15,23 @@ differently prints as written.
 npm install --save-dev prettier @knight-owl-llc/prettier-plugin-pandoc
 ```
 
-In `.prettierrc`:
+In `.prettierrc`, for the files Pandoc builds:
 
 ```json
-{ "plugins": ["@knight-owl-llc/prettier-plugin-pandoc"] }
+{
+  "overrides": [
+    {
+      "files": "manuscript/**/*.md",
+      "options": { "plugins": ["@knight-owl-llc/prettier-plugin-pandoc"] }
+    }
+  ]
+}
 ```
 
-The plugin takes over prettier's `markdown` parser, so every file prettier reads
-as Markdown is read as Pandoc's.
+Markdown GitHub renders, a README or a changelog, belongs on prettier's own
+parser. The plugin keeps what Pandoc reads, and a CommonMark reader such as
+GitHub's reads some Markdown differently: to Pandoc, a `- item` line right after
+paragraph text continues the paragraph, and the plugin may join the two lines.
 
 ## What it formats
 
@@ -35,38 +44,52 @@ as Markdown is read as Pandoc's.
 - Block quotes, lists, definition lists, divs and note definitions printed from
   their structure.
 
-Other blocks print as written.
-
-Markup Pandoc reads as broken stays as written. A fence a paragraph continues
-into is that paragraph's text to Pandoc, and an unclosed div runs to the end of
-the document; the plugin prints both as it finds them, since repairing either
-would change what the document means.
+Other blocks print as written, and so does markup Pandoc reads as broken. A
+fence a paragraph runs into is that paragraph's text, and an unclosed div runs
+to the document's end; repairing either would change what the document means.
 
 ## Options
 
-| Option          | Default | What it is                                                                                                                          |
-| --------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `pandocTabStop` | `4`     | Pandoc's `--tab-stop`: the columns a tab advances to, and the indentation that makes code. Match what the documents are built with. |
+| Option                       | What it does                                                                                                                        |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `pandocTabStop`              | Pandoc's `--tab-stop`, 4 by default: the columns a tab advances and the indent that makes code. Match the build's.                  |
+| `proseWrap`                  | `preserve` (the default) keeps line breaks as written; `always` fills to `printWidth`; `never` puts each paragraph on one line.     |
+| `embeddedLanguageFormatting` | `auto` (the default) reformats a fenced sample tagged with a language prettier formats, such as `yaml`; `off` prints it as written. |
+| `tabWidth`                   | Pads a list marker toward it, by up to three spaces, so every line of the item starts at one column: `-   item` at 4.               |
 
-For documents built with `pandoc --tab-stop=8`:
+For documents built with `pandoc --tab-stop=8`, the override's options take
+`"pandocTabStop": 8`.
 
-```json
-{ "plugins": ["@knight-owl-llc/prettier-plugin-pandoc"], "pandocTabStop": 8 }
+`<!-- prettier-ignore -->` keeps the next block as written;
+`<!-- prettier-ignore-start -->` and `<!-- prettier-ignore-end -->` keep
+everything between them.
+
+## markdownlint
+
+A few markdownlint rules trip on the plugin's output. A div's content sits
+against its fences, so a list or code fence there trips MD031 and MD032.
+Prettier's emphasis, `*` inside a word and `_` elsewhere, trips MD049's default.
+For the files the plugin formats:
+
+```yaml
+blanks-around-fences: false
+blanks-around-lists: false
+emphasis-style:
+  style: underscore
 ```
 
-Prettier's `proseWrap` reflows paragraphs: `preserve` (the default) keeps every
-line break where the author put it, `always` fills to `printWidth`, `never`
-joins each paragraph into one line. `embeddedLanguageFormatting` `auto`, the
-default, reformats a fenced sample tagged with a language prettier formats
-(`yaml`, `json`, …); `off` prints every sample as written.
+MD049 still reads a `*` inside raw TeX, which Pandoc passes to TeX, as emphasis.
 
-`tabWidth` aligns a list item's text: its marker padded toward that column, by
-up to three spaces, as Pandoc writes lists, every line of the item at one column
-(`-   item` at `4`).
+With `tabWidth` above 2, the padded markers trip MD030 and MD007 as well:
 
-`<!-- prettier-ignore -->` leaves the block after it as written, and
-`<!-- prettier-ignore-start -->` … `<!-- prettier-ignore-end -->` everything
-between.
+```yaml
+list-marker-space: false
+ul-indent:
+  indent: 4 # the tabWidth
+```
+
+A `.markdownlint.yaml` in the manuscript's directory holds these for those files
+alone: markdownlint-cli2 applies one to its own directory.
 
 ## License
 

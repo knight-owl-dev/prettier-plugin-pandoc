@@ -27,7 +27,7 @@ Recipes live in [docs/playbook.md](docs/playbook.md); reach for one when:
   document.
 - **A change moves the plugin's output** → § Snapshots.
 - **A change may cost speed** → § Benchmark.
-- **A manuscript may hold what Pandoc warns of** → § Lint a manuscript.
+- **A manuscript may draw Pandoc's warnings** → § Lint a manuscript.
 - **A release is due** → README § Releasing.
 - **A script is worth running again** → § Add a tool.
 

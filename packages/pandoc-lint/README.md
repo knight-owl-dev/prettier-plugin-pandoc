@@ -1,13 +1,23 @@
 # @knight-owl-llc/pandoc-lint
 
-What Pandoc warns of reading a manuscript, and what it misreads, at its file,
-line and column.
+Lint Pandoc Markdown: Pandoc's warnings and misreads, each at its file, line and
+column.
 
-The files are read as Pandoc reads several, one document in the order given: a
-definition in one file serves the others, and a div left open runs on into the
-next. Each warning Pandoc's reader logs becomes a diagnostic in the file it is
-in, once, however often Pandoc logs it; so does what Pandoc reads other than as
-written and logs nothing of.
+Pandoc joins its input files into one document, in the order given, and so does
+the linter: a definition in one file serves the others, and a div left open runs
+on into the next. Each warning Pandoc logs becomes one diagnostic in the file it
+falls in, however often Pandoc logs it. So does each misread, which Pandoc
+passes without a warning.
+
+## Install
+
+```sh
+npm install --save-dev @knight-owl-llc/pandoc-lint
+```
+
+Each
+[GitHub Release](https://github.com/knight-owl-dev/prettier-plugin-pandoc/releases)
+also carries a standalone binary, for Linux x64 and arm64, that needs no Node.
 
 ## CLI
 
@@ -20,20 +30,18 @@ pandoc-lint [--format=text|json|github] [--strict] [--info] [--no-metadata] [--t
 | --------------- | ------------------------------------------------------------------------------ |
 | `--format`      | `text` (the default) for people, `json` for tools, `github` for GitHub Actions |
 | `--strict`      | Exit 1 on a warning too                                                        |
-| `--info`        | Report Pandoc's INFO messages as well                                          |
+| `--info`        | Report Pandoc's INFO messages too                                              |
 | `--no-metadata` | Report metadata in the Markdown, for a project that keeps it elsewhere         |
 | `--tab-stop`    | Pandoc's `--tab-stop`, 4 by default                                            |
-| `--shortcuts`   | A keystone shortcuts file whose bodies to lint; repeatable                     |
-
-It also compiles with Bun to a standalone binary that needs no Node: CI checks
-that binary lints as Node does (`make bun-check`).
+| `--shortcuts`   | A keystone shortcuts file to lint ([Shortcuts](#shortcuts)); repeatable        |
 
 Diagnostics go to stdout. The exit status is 1 on an error, or on a warning with
-`--strict`; 2 on a usage error.
+`--strict`, and 2 on a usage error.
 
-Text output frames each diagnostic as
-[keystone](https://keystone.knight-owl.dev/engine/diagnostics/) does, after a
-location editors read:
+Text output starts each diagnostic with a location editors open
+(`file:line:column`) and frames it as
+[keystone's diagnostics](https://keystone.knight-owl.dev/engine/diagnostics/)
+do:
 
 ```text
 ch2.md:3:1: WARN: link reference [a] is defined again
@@ -43,20 +51,20 @@ ch2.md:3:1: WARN: link reference [a] is defined again
   Links use the last definition.
 ```
 
-Its layout follows keystone's. For a tool, read the JSON.
-
-In GitHub Actions, `--format=github` writes each diagnostic as a workflow
-command, so the run and a pull request's diff show it on its line.
+`--format=github` writes each diagnostic as a workflow command, which GitHub
+shows on its line in the run and in a pull request's diff.
 
 ## Shortcuts
 
-`--shortcuts=FILE` lints a keystone shortcuts file, as its
-[manual](https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/) lays one
-out: each shortcut's `body` read as a document of its own, every rule applied,
-each diagnostic at its line and column in the YAML. A folded or quoted body,
-whose lines are not the file's, reports at its start. What is no YAML
-(`yaml-syntax`), no mapping of shortcuts (`shortcut-file`) or a body that is no
-text (`shortcut-body`) is an error.
+`--shortcuts=FILE` lints a keystone shortcuts file, laid out as its
+[manual](https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/)
+describes. Each shortcut's `body` is read as a document of its own, under every
+rule, and each diagnostic lands at its line and column in the YAML. A folded or
+quoted body, whose lines are not the file's, reports at its start.
+
+Three errors are about the file itself: `yaml-syntax` for invalid YAML,
+`shortcut-file` for anything other than a mapping of shortcuts, and
+`shortcut-body` for a body that is not text.
 
 ## JSON
 
@@ -85,47 +93,56 @@ text (`shortcut-body`) is an error.
 }
 ```
 
-| Field                  | What it is                                                              |
-| ---------------------- | ----------------------------------------------------------------------- |
-| `version`              | The format's version; a change that breaks a reader raises it           |
-| `rule`                 | Pandoc's message type in kebab case                                     |
-| `severity`             | `warn`, or `info` for Pandoc's INFO messages                            |
-| `source`               | The file, as given                                                      |
-| `start`, `end`         | Offsets into the file, in UTF-16 code units; the end exclusive          |
-| `line`, `column`       | Where it starts, from 1; a column a code point                          |
-| `endLine`, `endColumn` | Where it ends, exclusive; within the file it starts in                  |
-| `callouts`             | The message in keystone's callouts: `problem` always, the others as apt |
+| Field                  | What it is                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `version`              | The format's version, raised by a change that breaks a reader                     |
+| `rule`                 | The rule, from [Rules](#rules)                                                    |
+| `severity`             | `error`, `warn`, or `info` for Pandoc's INFO messages                             |
+| `source`               | The file, as given                                                                |
+| `start`, `end`         | Offsets into the file in UTF-16 code units; `end` exclusive                       |
+| `line`, `column`       | Where it starts, from 1; columns count code points                                |
+| `endLine`, `endColumn` | Where it ends, exclusive, in the file it starts in                                |
+| `callouts`             | The message in keystone's callouts: `problem` always, the others where they apply |
 
-Diagnostics come by file in the order given, then by where they start.
+Diagnostics are ordered by file, as given, then by where they start.
 
 ## Rules
 
-The first four are what Pandoc reads other than as written, the fifth a
-project's own rule; the rest are Pandoc's messages. A shortcut `[text]` nothing
-defines goes unreported: prose writes `[sic]` so.
+`block-in-paragraph`, `div-fence-length`, `undefined-reference` and
+`undefined-note` find misreads Pandoc gives no warning for.
+`metadata-in-markdown` holds a project to keeping metadata out of its Markdown.
+The rest are Pandoc's own messages, in kebab case. A shortcut reference `[text]`
+nothing defines goes unreported, since prose writes `[sic]` that way.
 
-| Rule                        | Severity | What it finds                                                                          |
-| --------------------------- | -------- | -------------------------------------------------------------------------------------- |
-| `block-in-paragraph`        | error    | A div or code fence, heading, quote or list on the line after paragraph text           |
-| `div-fence-length`          | warn     | A closing fence whose length differs from its opener's, in a nest of differing lengths |
-| `undefined-reference`       | warn     | A reference link or image, `[t][r]` or `[t][]`, whose label nothing defines            |
-| `undefined-note`            | warn     | A note reference whose label nothing defines                                           |
-| `metadata-in-markdown`      | error    | A YAML metadata block or title block, with `--no-metadata` alone                       |
-| `unclosed-div`              | warn     | A div closed only by the document's end                                                |
-| `duplicate-link-reference`  | warn     | A reference defined again, elsewhere                                                   |
-| `duplicate-note-reference`  | warn     | A note defined again                                                                   |
-| `note-defined-but-not-used` | warn     | A note no reference uses                                                               |
-| `duplicate-identifier`      | warn     | An identifier given that one already has                                               |
-| `yaml-warning`              | warn     | A metadata key given again                                                             |
-| `macro-already-defined`     | warn     | A macro or environment defined again                                                   |
-| `undefined-toggle`          | warn     | `\iftoggle` of a toggle not defined                                                    |
-| `parsing-unescaped`         | info     | A TeX special character left unescaped                                                 |
-| `skipped-content`           | info     | Raw TeX Pandoc drops                                                                   |
+| Rule                        | Severity | What it finds                                                                     |
+| --------------------------- | -------- | --------------------------------------------------------------------------------- |
+| `block-in-paragraph`        | error    | A div or code fence, heading, quote or list on the line after paragraph text      |
+| `div-fence-length`          | warn     | A closing fence whose length differs from its opener's, in a nest of such lengths |
+| `undefined-reference`       | warn     | A reference link or image, `[t][r]` or `[t][]`, whose label nothing defines       |
+| `undefined-note`            | warn     | A note reference whose label nothing defines                                      |
+| `metadata-in-markdown`      | error    | A YAML metadata block or title block; with `--no-metadata` only                   |
+| `unclosed-div`              | warn     | A div closed only by the document's end                                           |
+| `duplicate-link-reference`  | warn     | A reference defined again                                                         |
+| `duplicate-note-reference`  | warn     | A note defined again                                                              |
+| `note-defined-but-not-used` | warn     | A note no reference uses                                                          |
+| `duplicate-identifier`      | warn     | An identifier already in use                                                      |
+| `yaml-warning`              | warn     | A metadata key given again                                                        |
+| `macro-already-defined`     | warn     | A macro or environment defined again                                              |
+| `undefined-toggle`          | warn     | `\iftoggle` on a toggle nothing defines                                           |
+| `parsing-unescaped`         | info     | A TeX special character left unescaped                                            |
+| `skipped-content`           | info     | Raw TeX Pandoc drops                                                              |
 
 ## API
 
-`lint(files, options)` lints `[{path, text}]` as one manuscript;
-`lintSnippet(text, {source, line, column, indent, file})` lints markdown taken
-from another file, placed where it is there; `lintShortcuts(path, text)` lints a
-shortcuts file. `formatText`, `formatJson` and `formatGithub` print what either
-returns.
+| Export                                                    | What it does                                                     |
+| --------------------------------------------------------- | ---------------------------------------------------------------- |
+| `lint(files, options)`                                    | Lints `[{path, text}]` as one manuscript                         |
+| `lintSnippet(text, {source, line, column, indent, file})` | Lints Markdown taken from another file, placed where it is there |
+| `lintShortcuts(path, text, options)`                      | Lints a shortcuts file                                           |
+| `formatText`, `formatJson`, `formatGithub`                | Print diagnostics in the CLI's formats                           |
+
+`options` takes `tabStop`, `info` and `noMetadata`, the CLI's flags.
+
+## License
+
+GPL-2.0-or-later, as Pandoc's: [LICENSE](LICENSE), [NOTICE.md](NOTICE.md).
