@@ -15,14 +15,24 @@ differently prints as written.
 npm install --save-dev prettier @knight-owl-llc/prettier-plugin-pandoc
 ```
 
-In `.prettierrc`:
+In `.prettierrc`, for the files Pandoc builds:
 
 ```json
-{ "plugins": ["@knight-owl-llc/prettier-plugin-pandoc"] }
+{
+  "overrides": [
+    {
+      "files": "manuscript/**/*.md",
+      "options": { "plugins": ["@knight-owl-llc/prettier-plugin-pandoc"] }
+    }
+  ]
+}
 ```
 
-The plugin replaces prettier's `markdown` parser: every file prettier treats as
-Markdown is read as Pandoc reads it.
+The plugin replaces prettier's `markdown` parser for those files, and keeps what
+Pandoc reads. A CommonMark reader, GitHub's among them, reads some Markdown
+differently: to Pandoc, a `- item` line right after paragraph text continues the
+paragraph, and the plugin may join the two lines. A README or a changelog stays
+on prettier's own parser.
 
 ## What it formats
 
@@ -57,6 +67,33 @@ For documents built with `pandoc --tab-stop=8`:
 `<!-- prettier-ignore -->` keeps the next block as written;
 `<!-- prettier-ignore-start -->` and `<!-- prettier-ignore-end -->` keep
 everything between them.
+
+## markdownlint
+
+The plugin's output trips markdownlint where Pandoc and CommonMark part ways. A
+div's content sits against its fences, so a list or code fence there trips MD031
+and MD032; prettier's emphasis, `*` inside a word and `_` elsewhere, trips
+MD049's default. For the files the plugin formats:
+
+```yaml
+blanks-around-fences: false
+blanks-around-lists: false
+emphasis-style:
+  style: underscore
+```
+
+With `tabWidth` above 2, the padded markers trip MD030 and MD007 as well:
+
+```yaml
+list-marker-space: false
+ul-indent:
+  indent: 4 # the tabWidth
+```
+
+MD049 still reads a `*` inside raw TeX, which Pandoc passes to TeX, as emphasis.
+
+markdownlint-cli2 applies a `.markdownlint.yaml` to its own directory, so one in
+the manuscript's directory holds these for those files alone.
 
 ## License
 
