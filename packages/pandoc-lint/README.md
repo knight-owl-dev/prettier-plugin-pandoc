@@ -3,11 +3,11 @@
 Lint Pandoc Markdown: Pandoc's warnings and misreads, each at its file, line and
 column.
 
-The files are read as Pandoc reads several: one document, in the order given. A
-definition in one file serves the others, and a div left open runs on into the
-next. Each warning Pandoc logs becomes one diagnostic in the file it falls in,
-however often Pandoc logs it. So does each misread, which Pandoc passes without
-a warning.
+Pandoc joins its input files into one document, in the order given, and so does
+the linter: a definition in one file serves the others, and a div left open runs
+on into the next. Each warning Pandoc logs becomes one diagnostic in the file it
+falls in, however often Pandoc logs it. So does each misread, which Pandoc
+passes without a warning.
 
 ## Install
 

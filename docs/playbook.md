@@ -100,7 +100,7 @@ make pandoc-lint FILES="ch1.md ch2.md" ARGS="--format=json --info"
 make pandoc-lint FILES="ch1.md" ARGS="--shortcuts=shortcuts.yaml"
 ```
 
-Reads the files as Pandoc reads several, one document in the order given, and
+Joins the files into one document, in the order given, as Pandoc does, and
 reports Pandoc's warnings and misreads at file, line and column, in keystone's
 frame. `--info` adds Pandoc's INFO messages; `--strict` exits 1 on a warning;
 `--shortcuts` lints a keystone shortcuts file's bodies.
