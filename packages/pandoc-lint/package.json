@@ -1,0 +1,22 @@
+{
+  "name": "@knight-owl-dev/pandoc-lint",
+  "version": "0.0.0",
+  "description": "Lint Pandoc markdown: what Pandoc warns of, at its file, line and column",
+  "license": "GPL-2.0-or-later",
+  "type": "module",
+  "exports": "./src/index.js",
+  "bin": {
+    "pandoc-lint": "./src/cli.js"
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@knight-owl-dev/pandoc-parser": "0.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/knight-owl-dev/prettier-plugin-pandoc.git",
+    "directory": "packages/pandoc-lint"
+  }
+}

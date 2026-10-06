@@ -4,6 +4,7 @@
   "type": "module",
   "workspaces": [
     "packages/pandoc-parser",
+    "packages/pandoc-lint",
     "packages/prettier-plugin-pandoc"
   ],
   "devDependencies": {

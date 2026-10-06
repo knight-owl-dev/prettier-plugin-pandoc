@@ -1,0 +1,139 @@
+// The diagnostics of a manuscript of several files: Pandoc's messages, each
+// once, in the file Pandoc's names, on the line it names where its position
+// is the construct's own.
+
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { pandocFiles } from '../../pandoc-parser/test/helpers/oracle.js';
+import { formatJson, formatText, lint, lintSnippet } from '../src/index.js';
+
+const MANUSCRIPTS = {
+  'definitions across files': [
+    '[a]: /a\n\n[^n]: Used.\n',
+    'See [a].[^n]\n\n[A]: /b\n\n[^u]: Unused.\n',
+  ],
+  'a div open to the end': ['::: aside\nOpen.\n', 'More.\n', '# End\n'],
+  'an HTML div open': ['<div>\ntext\n', '\n'],
+  'identifiers across files': ['# One {#a}\n', '# Two {#a}\n\n# a\n'],
+  'metadata in the second file': ['Text.\n', '---\nk: 1\nk: 2\n---\n'],
+  'macros and toggles': [
+    '\\newcommand{\\x}{1}\n',
+    '\\newcommand{\\x}{2}\n\nA \\iftoggle{t}{x}{y} b.\n',
+  ],
+  'in a list item': ['- x\n\n  [b]: /b\n  [b]: /c\n'],
+  'no final newlines': ['[a]: /a', '[a]: /b', '::: d\nx'],
+};
+
+// Where Pandoc's position is where the construct starts.
+const AT_START = new Set([
+  'UnclosedDiv',
+  'DuplicateLinkReference',
+  'DuplicateNoteReference',
+  'NoteDefinedButNotUsed',
+  'MacroAlreadyDefined',
+]);
+
+for (const [name, texts] of Object.entries(MANUSCRIPTS)) {
+  test(name, () => {
+    const files = texts.map((text, k) => ({ path: `f${k + 1}.md`, text }));
+    const ours = lint(files, { info: true }).map((d) => ({
+      rule: d.rule,
+      source: d.source,
+      line: d.line,
+    }));
+    const unique = new Map();
+    for (const m of pandocFiles(files).log) {
+      const { pretty, ...rest } = m;
+      unique.set(JSON.stringify(rest), m);
+    }
+    const theirs = [...unique.values()].map((m) => {
+      const at = m.openpos ?? m;
+      const exact = AT_START.has(m.type) && !at.source.endsWith('chunk');
+      return {
+        rule: m.type.replace(/[a-z](?=[A-Z])/g, '$&-').toLowerCase(),
+        source: at.source.replace(/_?chunk$/, ''),
+        line: exact ? at.line : undefined,
+      };
+    });
+    // Our line, where Pandoc's is exact.
+    const exact = (d) =>
+      theirs.some((t) => t.rule === d.rule && t.source === d.source && t.line);
+    const comparable = ours.map((d) =>
+      exact(d) ? d : { ...d, line: undefined },
+    );
+    const sorted = (xs) => xs.map((x) => JSON.stringify(x)).sort();
+    assert.deepEqual(sorted(comparable), sorted(theirs));
+  });
+}
+
+test('a diagnostic, framed', () => {
+  const files = [
+    { path: 'a.md', text: '[a]: /a\n' },
+    { path: 'b.md', text: 'Text.\n\n  [a]: /b\n' },
+  ];
+  assert.equal(
+    formatText(lint(files)),
+    [
+      'b.md:3:3: WARN: link reference [a] is defined again',
+      '  a.md:1:1: [a]: /a',
+      '  │ 3 |   [a]: /b',
+      '  │   |   ^^^^^^^',
+      '  Links use the last definition.',
+      '',
+    ].join('\n'),
+  );
+});
+
+test('a span ends in the file it starts in', () => {
+  const files = [
+    { path: 'a.md', text: '::: d\ntext\n' },
+    { path: 'b.md', text: 'more\n' },
+  ];
+  const [d] = lint(files);
+  assert.deepEqual(
+    [d.source, d.line, d.column, d.endLine, d.endColumn, d.callouts.effect],
+    ['a.md', 1, 1, 1, 6, 'Pandoc closes it at b.md:2:1.'],
+  );
+});
+
+test('INFO messages only when asked for', () => {
+  const files = [{ path: 'a.md', text: 'A \\textbf{a & b} c.\n' }];
+  assert.deepEqual(lint(files), []);
+  assert.deepEqual(
+    lint(files, { info: true }).map((d) => [d.rule, d.column]),
+    [['parsing-unescaped', 13]],
+  );
+});
+
+test('a snippet placed in its file', () => {
+  const body = 'Line one.\n\n::: d\nopen\n';
+  const [d] = lintSnippet(body, {
+    source: 'shortcuts.yaml',
+    line: 7,
+    column: 11,
+    indent: 6,
+  });
+  assert.deepEqual(
+    [d.source, d.line, d.column, d.callouts.verbatim],
+    ['shortcuts.yaml', 9, 7, ['9 | ::: d', '  | ^^^^^']],
+  );
+});
+
+test('JSON: versioned, the callouts apart from where a diagnostic is', () => {
+  const files = [{ path: 'a.md', text: '::: d\n' }];
+  const { version, diagnostics } = JSON.parse(formatJson(lint(files)));
+  assert.equal(version, 1);
+  assert.deepEqual(Object.keys(diagnostics[0]), [
+    'rule',
+    'severity',
+    'source',
+    'start',
+    'end',
+    'line',
+    'column',
+    'endLine',
+    'endColumn',
+    'callouts',
+  ]);
+  assert.equal(diagnostics[0].callouts.problem, 'div is never closed');
+});

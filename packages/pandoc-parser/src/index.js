@@ -10,4 +10,6 @@ export * from './core.js';
 export { readLaTeX } from './latex/reader.js';
 export { continuesParagraph, readMarkdown } from './markdown/index.js';
 export { DEFAULT_TAB_STOP } from './options.js';
+export { toKey } from './parsing/state.js';
 export * from './position.js';
+export { toSources } from './sources.js';

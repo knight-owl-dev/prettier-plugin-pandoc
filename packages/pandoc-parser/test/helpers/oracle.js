@@ -2,7 +2,7 @@
 // spans left out. Each format reads with Pandoc's default extensions.
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -56,6 +56,36 @@ export function pandocLog(text, format = 'markdown', tabStop = 4) {
     rmSync(dir, { recursive: true });
   }
 }
+
+/**
+ * Pandoc's AST and log of `files`, read together as its CLI reads several,
+ * at `tabStop`.
+ *
+ * @param {{path: string, text: string}[]} files
+ * @param {number} [tabStop]
+ * @returns {{ast: object, log: object[]}}
+ */
+export function pandocFiles(files, tabStop = 4) {
+  const dir = mkdtempSync(join(tmpdir(), 'files-'));
+  try {
+    for (const { path, text } of files) writeFileSync(join(dir, path), text);
+    const args = ['-f', 'markdown', '-t', 'json', `--tab-stop=${tabStop}`];
+    const paths = files.map((f) => f.path);
+    const out = pandoc([...args, '--log=log.json', ...paths], '', dir);
+    const log = JSON.parse(readFileSync(join(dir, 'log.json'), 'utf8'));
+    return { ast: JSON.parse(out), log };
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+}
+
+/**
+ * Pandoc's AST of `files`, read together as its CLI reads several.
+ *
+ * @param {{path: string, text: string}[]} files
+ * @returns {object}
+ */
+export const pandocFilesAst = (files) => pandocFiles(files).ast;
 
 /**
  * Pandoc's display width of each of `texts`, by doclayout as its Lua API

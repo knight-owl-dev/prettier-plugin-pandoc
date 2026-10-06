@@ -17,10 +17,11 @@ formatting.
 
 ## Packages
 
-| Package                                                                     | What it is                                                   |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [`@knight-owl-dev/prettier-plugin-pandoc`](packages/prettier-plugin-pandoc) | The prettier plugin                                          |
-| [`@knight-owl-dev/pandoc-parser`](packages/pandoc-parser)                   | Pandoc's Markdown reader, ported: its AST, with source spans |
+| Package                                                                     | What it is                                                              |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [`@knight-owl-dev/prettier-plugin-pandoc`](packages/prettier-plugin-pandoc) | The prettier plugin                                                     |
+| [`@knight-owl-dev/pandoc-parser`](packages/pandoc-parser)                   | Pandoc's Markdown reader, ported: its AST, with source spans            |
+| [`@knight-owl-dev/pandoc-lint`](packages/pandoc-lint)                       | What Pandoc warns of reading a manuscript, at its file, line and column |
 
 ## Options
 
