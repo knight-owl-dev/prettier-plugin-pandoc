@@ -1,7 +1,7 @@
 {
   "name": "@knight-owl-llc/pandoc-lint",
   "version": "0.2.0",
-  "description": "Lint Pandoc markdown: what Pandoc warns of, at its file, line and column",
+  "description": "Lint Pandoc Markdown: Pandoc's warnings and misreads, each at its file, line and column",
   "keywords": [
     "pandoc",
     "markdown",
