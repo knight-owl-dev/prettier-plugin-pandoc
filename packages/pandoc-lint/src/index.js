@@ -11,6 +11,7 @@ import { RULES } from './rules.js';
 
 export { frame } from './frame.js';
 export { RULES } from './rules.js';
+export { lintShortcuts } from './shortcuts.js';
 
 /**
  * A diagnostic: its rule and severity, where it is (offsets into its file,
@@ -72,23 +73,30 @@ export function lint(files, options = {}) {
 /**
  * The diagnostics of a snippet: markdown taken from a file, a shortcut's
  * body in YAML, placed where it is there. Its first line starts at `line`
- * and `column`; each after it is indented `indent` columns.
+ * and `column`; each after it is indented `indent` columns. Given `file`,
+ * the text it was taken from, offsets are that text's, else the snippet's.
  *
  * @param {string} text
- * @param {Options & {source?: string, line?: number, column?: number, indent?: number}} [options]
+ * @param {Options & {source?: string, line?: number, column?: number, indent?: number, file?: string}} [options]
  * @returns {Diagnostic[]}
  */
 export function lintSnippet(text, options = {}) {
-  const { source = '<snippet>', line = 1, column = 1, indent = 0 } = options;
+  const {
+    source = '<snippet>',
+    line = 1,
+    column = 1,
+    indent = 0,
+    file,
+  } = options;
   const place = (offset) => {
     const at = Math.min(offset, text.length);
     const local = lineAndColumn(text, at);
-    return {
-      path: source,
-      offset: at,
+    const there = {
       line: line + local.line - 1,
       column: local.column + (local.line === 1 ? column - 1 : indent),
     };
+    const outer = file === undefined ? at : offsetAt(file, there);
+    return { path: source, offset: outer, ...there };
   };
   return diagnose(text, place, options).sort((a, b) => a.start - b.start);
 }
@@ -272,6 +280,25 @@ function codeFrame(text, start, end, line) {
     `${number} | ${content}`,
     `${pad} | ${' '.repeat(before)}${'^'.repeat(width)}`,
   ];
+}
+
+// The offset of a line and column in `text`, from 1, a column a code point.
+function offsetAt(text, { line, column }) {
+  let at = 0;
+  for (let k = 1; k < line && at !== -1; k++) {
+    at = text.indexOf('\n', at);
+    if (at !== -1) at++;
+  }
+  if (at === -1) return text.length;
+  let offset = at;
+  for (
+    let c = 1;
+    c < column && offset < text.length && text[offset] !== '\n';
+    c++
+  ) {
+    offset += text.codePointAt(offset) > 0xffff ? 2 : 1;
+  }
+  return offset;
 }
 
 // The line and column of `offset` in `text`, from 1, a column a code point.
