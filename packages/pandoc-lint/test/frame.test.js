@@ -75,7 +75,7 @@ test('a word wider than a line takes one of its own', () => {
 });
 
 test('columns are code points', () => {
-  assert.deepEqual(wrap('é'.repeat(8) + ' 😀😀', 11, '', ''), [
+  assert.deepEqual(wrap(`${'é'.repeat(8)} 😀😀`, 11, '', ''), [
     `${'é'.repeat(8)} 😀😀`,
   ]);
 });
