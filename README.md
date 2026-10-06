@@ -60,6 +60,19 @@ unchanged, and that parse is the oracle. The plugin's `test/expected/` holds the
 output aimed at. [docs/playbook.md](docs/playbook.md) has the recipes for
 fuzzing, probing, snapshots and benchmarks.
 
+## Releasing
+
+The three packages share one version. `make release RELEASE=patch` (or `minor`,
+`major`, an explicit `X.Y.Z`; `AUTOMERGE=1` to queue it), or the Release
+workflow, stamps it into every package and opens a `release/vX.Y.Z` PR. Merging
+it tags `vX.Y.Z`, which publishes: the `pandoc-lint` binaries for linux x64 and
+arm64, each with `LICENSE`, `NOTICE.md` and the source it was built from,
+attested and on a GitHub Release with checksums; then the packages on npm, with
+provenance. `publish.yml` refuses a tag the packages' version does not match.
+
+`gh attestation verify <tarball> --repo knight-owl-dev/prettier-plugin-pandoc`
+proves a binary was built by that workflow from its tag.
+
 ## License
 
 GPL-2.0-or-later, as Pandoc's: [LICENSE](LICENSE). The parser ports Pandoc's

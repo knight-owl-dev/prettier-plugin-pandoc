@@ -16,7 +16,8 @@ permissions:
   contents: read
 
 # One architecture: the packages are plain JavaScript, and Pandoc's reader
-# parses alike on either.
+# parses alike on either. main's ruleset requires each job by its name: rename
+# one only with the ruleset.
 #
 # No cache: a cold test image is two pulls and a copy, and the lockfile holds
 # prettier alone. Restoring either would cost what building it does.
@@ -44,6 +45,9 @@ jobs:
 
       - name: Test
         run: make test
+
+      - name: Pack check
+        run: make pack-check
 
   bun:
     name: Bun build
