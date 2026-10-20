@@ -6,7 +6,7 @@
 
 FROM pandoc/minimal:3.11.0.0@sha256:fc17da3ba8f0a70b2ad5d7d4d61fed7d25da2e091cc3139f4d371f03b18641df AS pandoc
 
-FROM node:26-alpine@sha256:143494b1da2945f061539253adc65e4f1569ddf07da2d384c022c791a9d90a4a
+FROM node:26-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5
 
 COPY --from=pandoc /usr/local/bin/pandoc /usr/local/bin/pandoc
 
