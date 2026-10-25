@@ -7,6 +7,7 @@
 import { doc } from '../ast/document.js';
 import { mapSpans } from '../ast/spans.js';
 import { FAIL, optional } from '../core.js';
+import { PandocParseError } from '../error.js';
 import { readerInput } from '../input.js';
 import { readerOptions } from '../options.js';
 import { mapItemSpans } from '../parsing/general.js';
@@ -17,8 +18,18 @@ import { titleBlock } from './metadata.js';
 import { checkNotes } from './notes.js';
 import { readResolved } from './references.js';
 
+// `f`'s value; a parse error it throws spanning the source.
+function inSource(toSource, f) {
+  try {
+    return f();
+  } catch (e) {
+    throw e instanceof PandocParseError ? e.map(toSource, toSource) : e;
+  }
+}
+
 /**
- * Read `source` as Pandoc's markdown.
+ * Read `source` as Pandoc's markdown: a `PandocParseError` where Pandoc
+ * fails to.
  *
  * @see Text.Pandoc.Readers.Markdown.readMarkdown
  * @see Text.Pandoc.Readers.Markdown.parseMarkdown
@@ -28,25 +39,27 @@ import { readResolved } from './references.js';
 export function readMarkdown(source, options) {
   const opts = readerOptions(options);
   const { text, toSource, input } = readerInput(source, opts.tabStop);
-  const [blocks, meta, definitions, log, missed, metadataBlocks] = readResolved(
-    (references) => {
-      const state = defaultParserState(opts);
-      const ctx = { text, pos: 0, state, references, log: [] };
-      optional(titleBlock)(ctx);
-      const value = parseBlocks(ctx);
-      if (value === FAIL) throw new Error('the markdown reader failed');
-      checkNotes(ctx);
-      const held = inOrder(ctx.state.logMessages);
-      const read = [
-        value,
-        ctx.state.meta,
-        inOrder(ctx.state.definitions),
-        [...ctx.log, ...held],
-        inOrder(ctx.state.unresolved),
-        inOrder(ctx.state.metadataBlocks),
-      ];
-      return { value: read, state: ctx.state };
-    },
+  const [blocks, meta, definitions, log, missed, metadataBlocks] = inSource(
+    toSource,
+    () =>
+      readResolved((references) => {
+        const state = defaultParserState(opts);
+        const ctx = { text, pos: 0, state, references, log: [] };
+        optional(titleBlock)(ctx);
+        const value = parseBlocks(ctx);
+        if (value === FAIL) throw new Error('the markdown reader failed');
+        checkNotes(ctx);
+        const held = inOrder(ctx.state.logMessages);
+        const read = [
+          value,
+          ctx.state.meta,
+          inOrder(ctx.state.definitions),
+          [...ctx.log, ...held],
+          inOrder(ctx.state.unresolved),
+          inOrder(ctx.state.metadataBlocks),
+        ];
+        return { value: read, state: ctx.state };
+      }),
   );
   const result = doc(
     mapSpans(blocks, toSource, toSource, input),

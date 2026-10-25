@@ -7,6 +7,7 @@ export * from './ast/document.js';
 export * from './ast/nodes.js';
 export * from './char.js';
 export * from './core.js';
+export { PandocParseError } from './error.js';
 export { readLaTeX } from './latex/reader.js';
 export { continuesParagraph, readMarkdown } from './markdown/index.js';
 export { DEFAULT_TAB_STOP } from './options.js';

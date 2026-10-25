@@ -6,6 +6,7 @@
 // its block starts.
 
 import { decodeAll, YamlError } from './data-yaml/decode.js';
+import { PandocParseError } from './error.js';
 import { blocksToInlines } from './shared.js';
 import { SourceText } from './source-text.js';
 
@@ -21,28 +22,35 @@ import { SourceText } from './source-text.js';
 /**
  * The metadata of a YAML block's text: null where it is no mapping, which
  * makes it no metadata block. Text that is no YAML fails the whole read,
- * as it does Pandoc's. Each key given again is passed to `warn`, its path
- * and its span in `text`.
+ * as it does Pandoc's: a `PandocParseError` spanning what fails, else its
+ * opening `---`. Each key given again is passed to `warn`, its path and
+ * its span. `place` maps a span in `text` out to the reader's.
  *
  * @see Text.Pandoc.Readers.Metadata.yamlBsToMeta
  * @param {ReadBlocks} readBlocks
  * @param {string} text
  * @param {number} at Where the block starts.
+ * @param {(offset: number) => number} place
  * @param {(path: string, start: number, end: number) => void} [warn]
  * @returns {Record<string, MetaValue> | null}
  */
-export function yamlBsToMeta(readBlocks, text, at, warn = () => {}) {
+export function yamlBsToMeta(readBlocks, text, at, place, warn = () => {}) {
   let xs;
   const warnings = [];
   try {
     xs = decodeAll(text, warnings);
   } catch (e) {
     if (!(e instanceof YamlError)) throw e;
-    throw new Error(
-      `Error parsing YAML metadata at offset ${at}: ${e.message}`,
+    const [start, end] = e.span ?? [0, 3];
+    throw new PandocParseError(
+      `Error parsing YAML metadata: ${e.message}`,
+      place(start),
+      place(end),
     );
   }
-  for (const { path, start, end } of warnings) warn(path, start, end);
+  for (const { path, start, end } of warnings) {
+    warn(path, place(start), place(end));
+  }
   if (xs.length === 0 || (xs.length === 1 && xs[0] === null)) return {};
   const [first] = xs;
   // expected YAML object

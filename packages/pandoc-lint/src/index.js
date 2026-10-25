@@ -4,7 +4,12 @@
 // Files are read as Pandoc's CLI reads several, joined into one document in
 // the order given; each diagnostic is mapped back to the file it is in.
 
-import { readMarkdown, toKey, toSources } from '@knight-owl-llc/pandoc-parser';
+import {
+  PandocParseError,
+  readMarkdown,
+  toKey,
+  toSources,
+} from '@knight-owl-llc/pandoc-parser';
 import { frame } from './frame.js';
 import { misreads } from './misreads.js';
 import { RULES } from './rules.js';
@@ -187,7 +192,16 @@ const SEVERITY = { warn: 'WARN', info: 'INFO', error: 'ERROR' };
 // The diagnostics of the read of `text`, `place` giving where an offset in
 // it is: one per message, a message Pandoc logs twice once.
 function diagnose(text, place, { tabStop, info = false, noMetadata = false }) {
-  const doc = readMarkdown(text, { tabStop });
+  let doc;
+  try {
+    doc = readMarkdown(text, { tabStop });
+  } catch (e) {
+    if (!(e instanceof PandocParseError)) throw e;
+    // Pandoc reads nothing: its failure is all there is to report.
+    const { message, start, end } = e;
+    const msg = { type: 'PandocParseError', message, start, end };
+    return [diagnostic(RULES.PandocParseError, msg, null, place, text)];
+  }
   const where = (offset) => {
     const p = place(offset);
     return `${p.path}:${p.line}:${p.column}`;

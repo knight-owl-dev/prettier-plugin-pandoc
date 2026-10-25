@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readMarkdown, withoutSpans } from '../src/index.js';
+import { PandocParseError, readMarkdown, withoutSpans } from '../src/index.js';
 import { pandocAst, TAB_STOPS } from './helpers/oracle.js';
 import { assertNested } from './helpers/spans.js';
 
@@ -68,7 +68,33 @@ const UNREADABLE = {
 for (const [name, text] of Object.entries(UNREADABLE)) {
   test(`${name} fails the read, as it does Pandoc's`, () => {
     assert.throws(() => pandocAst(text), /pandoc failed/);
-    assert.throws(() => readMarkdown(text), /YAML/);
+    assert.throws(() => readMarkdown(text), PandocParseError);
+  });
+}
+
+// Where a parse error spans in the source: what fails, through a
+// container's prefixes and a tab.
+const FAILING = {
+  'an unclosed flow sequence': ['---\na: [b\n...\n\nBody.', '...'],
+  'an unknown alias': ['---\na: *x\n...\n', '*x'],
+  'an unknown alias in a quote': ['> ---\n> a: *x\n> ---\n', '*x'],
+  'after a tab in a list item': ['+ ---\n\ta: [b\n  ---\n', '---\n'],
+};
+
+test('a parse error in a value read again spans its block', () => {
+  const text = 'Text.\n\n---\na: |\n  ---\n  b: *x\n  ---\n---\n';
+  assert.throws(
+    () => readMarkdown(text),
+    (e) => e.start === text.indexOf('---') && e.end === e.start,
+  );
+});
+
+for (const [name, [text, at]] of Object.entries(FAILING)) {
+  test(`a parse error spans what fails: ${name}`, () => {
+    assert.throws(
+      () => readMarkdown(text),
+      (e) => e.start === text.lastIndexOf(at) && e.end > e.start,
+    );
   });
 }
 

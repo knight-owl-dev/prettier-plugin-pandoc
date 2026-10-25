@@ -101,6 +101,14 @@ export const RULES = {
       effect: 'The metadata reads the last value.',
     }),
   },
+  PandocParseError: {
+    rule: 'pandoc-parse-error',
+    severity: 'error',
+    callouts: (msg) => ({
+      problem: msg.message.replace(/^Error parsing YAML metadata: /, ''),
+      effect: 'Pandoc fails to read the manuscript.',
+    }),
+  },
   MacroAlreadyDefined: {
     rule: 'macro-already-defined',
     severity: 'warn',

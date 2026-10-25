@@ -174,6 +174,21 @@ test('references and notes nothing in the manuscript defines', () => {
   );
 });
 
+test('a metadata block that is no YAML, the only diagnostic', () => {
+  const files = [
+    { path: 'a.md', text: '[a]: /a\n\n[a]: /b\n' },
+    { path: 'b.md', text: '---\nkeywords: [unclosed\n---\n\n# One\n' },
+  ];
+  for (const noMetadata of [false, true]) {
+    const [d, ...rest] = lint(files, { noMetadata });
+    assert.deepEqual(rest, []);
+    assert.deepEqual(
+      [d.rule, d.severity, d.source, d.line, d.column],
+      ['pandoc-parse-error', 'error', 'b.md', 3, 1],
+    );
+  }
+});
+
 test('metadata in the Markdown, with noMetadata alone', () => {
   const files = [
     { path: 'a.md', text: '% Title\n\nText.\n' },

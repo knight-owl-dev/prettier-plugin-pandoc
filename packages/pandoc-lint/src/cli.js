@@ -4,7 +4,7 @@
 //
 // Lints the files as one manuscript, read in the order given, as Pandoc
 // reads several, and each shortcuts file's bodies. Exits 1 on an error,
-// or on any warning with `--strict`; 2 on a usage error.
+// or on any warning with `--strict`; 2 where it cannot lint.
 
 import { readFileSync } from 'node:fs';
 import {
@@ -53,10 +53,19 @@ const read = (path) => {
     process.exit(2);
   }
 };
-const diagnostics = [
-  ...shortcuts.map(read).flatMap((f) => lintShortcuts(f.path, f.text, options)),
-  ...(paths.length > 0 ? lint(paths.map(read), options) : []),
-];
+let diagnostics;
+try {
+  diagnostics = [
+    ...shortcuts
+      .map(read)
+      .flatMap((f) => lintShortcuts(f.path, f.text, options)),
+    ...(paths.length > 0 ? lint(paths.map(read), options) : []),
+  ];
+} catch (e) {
+  // A parse error is a diagnostic: what reaches here is a bug, to report.
+  console.error(`pandoc-lint: ${e.stack}`);
+  process.exit(2);
+}
 process.stdout.write(FORMATS[options.format](diagnostics));
 const fails = diagnostics.some(
   (d) => d.severity === 'error' || (options.strict && d.severity === 'warn'),
