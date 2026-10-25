@@ -15,26 +15,27 @@ import { printReference } from './references.js';
  * @typedef {object} Definition
  * @property {number} start
  * @property {number} end
- * @property {(context: Context, options: object) => string | null} print
+ * @property {(view: View, context: Context, options: object) => string | null} print
  */
 
 /**
  * The notes' and references' definitions in `root`, in source order.
  *
  * @param {{blocks: object[], definitions?: object[]}} root
- * @param {string} text The source.
+ * @param {string} text The source, which notes print from; a reference
+ *   prints from its container's view.
  * @returns {Definition[]}
  */
 export function definitionsIn(root, text) {
   const notes = definitionsOf(root.blocks, text).map((note) => ({
     start: note.start,
     end: note.end,
-    print: (context, options) => printDefinition(note, context, options),
+    print: (_view, context, options) => printDefinition(note, context, options),
   }));
   const references = (root.definitions ?? []).map((reference) => ({
     start: reference.start,
     end: reference.end,
-    print: () => printReference(reference, text),
+    print: (view) => printReference(reference, view),
   }));
   return [...notes, ...references].sort((a, b) => a.start - b.start);
 }
@@ -58,7 +59,7 @@ export function withDefinitions(view, from, to, context, options) {
     const start = view.start(definition.start);
     const end = view.end(definition.end);
     if (start < at || end > to || start >= end) continue;
-    const printed = definition.print(context, options);
+    const printed = definition.print(view, context, options);
     if (printed === null) continue;
     out += text.slice(at, start) + printed;
     at = end;
