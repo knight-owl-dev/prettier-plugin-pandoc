@@ -137,7 +137,7 @@ export function widthsFromIndices(columns, indices) {
     if (lengths[n - 2] - lengths[n - 1] <= 2) lengths[n - 1] = lengths[n - 2];
   }
   const total = lengths.reduce((sum, l) => sum + l, 0);
-  const quotient = total > textWidth ? total : textWidth;
+  const quotient = Math.max(total, textWidth);
   return lengths.slice(1).map((l) => l / quotient);
 }
 
