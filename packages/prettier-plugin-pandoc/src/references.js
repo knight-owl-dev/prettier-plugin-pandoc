@@ -16,14 +16,18 @@
  */
 
 /**
- * A definition printed, its parts from `text`.
+ * A definition printed, its parts from `view`: a part on several lines
+ * without the prefixes its container rebuilds.
  *
  * @param {Definition} definition
- * @param {string} text
+ * @param {import('./wrap.js').View} view
  * @returns {string}
  */
-export function printReference(definition, text) {
-  const part = (span) => (span === null ? null : text.slice(span[0], span[1]));
+export function printReference(definition, view) {
+  const part = (span) =>
+    span === null
+      ? null
+      : view.text.slice(view.start(span[0]), view.end(span[1]));
   const parts = [
     part(definition.label),
     part(definition.url),
