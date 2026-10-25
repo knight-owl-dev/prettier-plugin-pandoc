@@ -6,6 +6,7 @@
 
 import {
   continuesParagraph,
+  PandocParseError,
   readMarkdown,
 } from '@knight-owl-llc/pandoc-parser';
 import { util } from 'prettier';
@@ -164,8 +165,9 @@ function isPara(text, read) {
   try {
     const { blocks } = readMarkdown(text, read);
     return blocks.length === 1 && blocks[0].t === 'Para';
-  } catch {
-    return false;
+  } catch (e) {
+    if (e instanceof PandocParseError) return false;
+    throw e;
   }
 }
 
