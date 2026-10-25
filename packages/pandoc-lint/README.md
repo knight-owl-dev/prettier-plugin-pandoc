@@ -36,7 +36,8 @@ pandoc-lint [--format=text|json|github] [--strict] [--info] [--no-metadata] [--t
 | `--shortcuts`   | A keystone shortcuts file to lint ([Shortcuts](#shortcuts)); repeatable        |
 
 Diagnostics go to stdout. The exit status is 1 on an error, or on a warning with
-`--strict`, and 2 on a usage error.
+`--strict`, and 2 where it cannot lint: a usage error, a file it cannot read, or
+a failure of its own.
 
 Text output starts each diagnostic with a location editors open
 (`file:line:column`) and frames it as
@@ -111,8 +112,9 @@ Diagnostics are ordered by file, as given, then by where they start.
 `block-in-paragraph`, `div-fence-length`, `undefined-reference` and
 `undefined-note` find misreads Pandoc gives no warning for.
 `metadata-in-markdown` holds a project to keeping metadata out of its Markdown.
-The rest are Pandoc's own messages, in kebab case. A shortcut reference `[text]`
-nothing defines goes unreported, since prose writes `[sic]` that way.
+The rest are Pandoc's own messages, in kebab case; `pandoc-parse-error`, where
+Pandoc stops reading, is reported alone. A shortcut reference `[text]` nothing
+defines goes unreported, since prose writes `[sic]` that way.
 
 | Rule                        | Severity | What it finds                                                                     |
 | --------------------------- | -------- | --------------------------------------------------------------------------------- |
@@ -121,6 +123,7 @@ nothing defines goes unreported, since prose writes `[sic]` that way.
 | `undefined-reference`       | warn     | A reference link or image, `[t][r]` or `[t][]`, whose label nothing defines       |
 | `undefined-note`            | warn     | A note reference whose label nothing defines                                      |
 | `metadata-in-markdown`      | error    | A YAML metadata block or title block; with `--no-metadata` only                   |
+| `pandoc-parse-error`        | error    | A YAML metadata block Pandoc cannot read                                          |
 | `unclosed-div`              | warn     | A div closed only by the document's end                                           |
 | `duplicate-link-reference`  | warn     | A reference defined again                                                         |
 | `duplicate-note-reference`  | warn     | A note defined again                                                              |
