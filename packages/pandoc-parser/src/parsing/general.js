@@ -17,6 +17,7 @@ import {
   skipMany,
 } from '../core.js';
 import { lookupEntity } from '../entities.js';
+import { PandocParseError } from '../error.js';
 import { logMessage, logOf, message } from '../logging.js';
 import { NBSP, uniqueIdent } from '../shared.js';
 import { SourceText } from '../source-text.js';
@@ -379,8 +380,9 @@ export function lineEnd(text, pos) {
  * `parser` run on `source`, text extracted to be parsed again, in its own
  * offsets; the nodes it returns spanning the text `source` was extracted
  * from, carriage returns left out of it as Pandoc's `toSources` leaves them.
- * A failure leaves the position where the extraction left it. The chunk is
- * one level deeper: Parsec's source name, which positions compare by.
+ * A failure leaves the position where the extraction left it; a parse
+ * error is thrown spanning that text too. The chunk is one level deeper:
+ * Parsec's source name, which positions compare by.
  *
  * @see Text.Pandoc.Parsing.General.parseFromString
  * @template T
@@ -398,14 +400,21 @@ export function parseFromString(ctx, parser, extracted) {
   ctx.pos = 0;
   ctx.depth = depth + 1;
   ctx.notesDefined = [];
-  const x = parser(ctx);
-  const defined = ctx.notesDefined;
-  ctx.text = text;
-  ctx.pos = pos;
-  ctx.depth = depth;
-  ctx.notesDefined = notesDefined;
   const toStart = (offset) => source.toOuterStart(offset);
   const toEnd = (offset) => source.toOuterEnd(offset);
+  let x;
+  let defined;
+  try {
+    x = parser(ctx);
+    defined = ctx.notesDefined;
+  } catch (e) {
+    throw e instanceof PandocParseError ? e.map(toStart, toEnd) : e;
+  } finally {
+    ctx.text = text;
+    ctx.pos = pos;
+    ctx.depth = depth;
+    ctx.notesDefined = notesDefined;
+  }
   mapLogged(ctx, logged, toStart, toEnd);
   if (x === FAIL) return FAIL;
   mapNotes(ctx, defined, toStart, toEnd, source);

@@ -181,12 +181,12 @@ const yamlMetaBlock = attempt((ctx) => {
   // Values span nothing where the block starts: in a container, in its
   // text's offsets.
   // The lines are as written, after `---\n`.
+  const place = (offset) => (offset < 4 ? at + offset : body + offset - 4);
   const warn = (path, start, end) => {
-    const [from, to] = [body + start - 4, body + end - 4];
     const fields = { message: `Duplicate key: ${path}`, pos: at };
-    report(ctx, message('YamlWarning', from, to, fields));
+    report(ctx, message('YamlWarning', start, end, fields));
   };
-  const meta = yamlBsToMeta(readBlocks(ctx), raw, at, warn);
+  const meta = yamlBsToMeta(readBlocks(ctx), raw, at, place, warn);
   return meta === null ? FAIL : meta;
 });
 

@@ -21,8 +21,23 @@ import { isAlias, isMap, isScalar, isSeq, parseAllDocuments } from 'yaml';
  * @typedef {null | boolean | string | {number: Scientific} | Value[] | Map<string, Value>} Value
  */
 
-/** A document `Data.Yaml` cannot decode: Pandoc's parse error. */
-export class YamlError extends Error {}
+/**
+ * A document `Data.Yaml` cannot decode: Pandoc's parse error, with the span
+ * in the text of what fails, null where nothing does.
+ */
+export class YamlError extends Error {
+  /**
+   * @param {string} message
+   * @param {[number, number] | null} [span]
+   */
+  constructor(message, span = null) {
+    super(message);
+    this.span = span;
+  }
+}
+
+// A node's span, its value's.
+const spanOf = (node) => (node?.range ? [node.range[0], node.range[1]] : null);
 
 const STR_TAG = 'tag:yaml.org,2002:str';
 
@@ -53,9 +68,13 @@ export function decodeAll(text, warnings = []) {
   if (!Array.isArray(docs)) return [];
   const found = [];
   const values = docs.map((doc) => {
-    if (doc.errors.length > 0) throw new YamlError(doc.errors[0].message);
+    if (doc.errors.length > 0)
+      throw new YamlError(doc.errors[0].message, doc.errors[0].pos);
     if (atColumnZero(doc.contents, text)) {
-      throw new YamlError('did not find expected <document start>');
+      throw new YamlError(
+        'did not find expected <document start>',
+        spanOf(doc.contents),
+      );
     }
     if (doc.contents === null) return null;
     return parseO(doc.contents, { doc, path: [], warnings: found });
@@ -160,7 +179,7 @@ function parseO(node, at) {
   if (isAlias(node)) {
     const target = node.resolve(at.doc);
     if (target === undefined)
-      throw new YamlError(`Unknown alias ${node.source}`);
+      throw new YamlError(`Unknown alias ${node.source}`, spanOf(node));
     return parseO(target, { ...at, warnings: null });
   }
   if (isScalar(node)) return textToValue(node.type, node.tag, scalarText(node));
@@ -170,7 +189,7 @@ function parseO(node, at) {
     );
   }
   if (isMap(node)) return parseM(node, at);
-  throw new YamlError('Unexpected node');
+  throw new YamlError('Unexpected node', spanOf(node));
 }
 
 /**
@@ -237,7 +256,7 @@ function keyText(key, at) {
   if (isAlias(key)) {
     const v = parseO(key, at);
     if (typeof v === 'string') return v;
-    throw new YamlError('Non-string key alias');
+    throw new YamlError('Non-string key alias', spanOf(key));
   }
-  throw new YamlError('Non-string keys are not supported');
+  throw new YamlError('Non-string keys are not supported', spanOf(key));
 }
