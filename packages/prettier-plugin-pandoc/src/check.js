@@ -3,7 +3,11 @@
 // change. Where it reads differently, those blocks print as written; if it
 // still does, the source is the output.
 
-import { readMarkdown, withoutSpans } from '@knight-owl-llc/pandoc-parser';
+import {
+  PandocParseError,
+  readMarkdown,
+  withoutSpans,
+} from '@knight-owl-llc/pandoc-parser';
 import { languageOf, parserFor } from './code.js';
 
 const SPACE = { t: 'Space' };
@@ -80,8 +84,9 @@ export function heldBlocks(root, options, render) {
   const read = (text) => {
     try {
       return readMarkdown(text, { tabStop: options.pandocTabStop });
-    } catch {
-      return null;
+    } catch (e) {
+      if (e instanceof PandocParseError) return null;
+      throw e;
     }
   };
   const held = new Set();
