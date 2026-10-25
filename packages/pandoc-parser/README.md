@@ -25,6 +25,7 @@ doc.blocks[0].start; // where the first block starts in `text`
 | `toSources(files)`                  | Files joined as Pandoc's CLI joins them, with a lookup from an offset to its file |
 | `continuesParagraph(next, options)` | Whether Pandoc reads a paragraph on into the line `next`                          |
 | `DEFAULT_TAB_STOP`                  | Pandoc's default `--tab-stop`, 4                                                  |
+| `PandocParseError`                  | The error a read throws where Pandoc's fails, spanning its cause: `start`, `end`  |
 
 A Markdown read also carries four properties outside its JSON:
 

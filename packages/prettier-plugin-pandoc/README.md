@@ -48,6 +48,9 @@ Other blocks print as written, and so does markup Pandoc reads as broken. A
 fence a paragraph runs into is that paragraph's text, and an unclosed div runs
 to the document's end; repairing either would change what the document means.
 
+Pandoc reads no document whose YAML metadata block is invalid, and neither does
+the plugin: prettier reports the error, framed at its cause.
+
 ## Options
 
 | Option                       | What it does                                                                                                                        |
