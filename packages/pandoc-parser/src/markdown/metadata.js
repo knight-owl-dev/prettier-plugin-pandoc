@@ -17,7 +17,6 @@ import {
   option,
   sepEndBy,
 } from '../core.js';
-import { message, report } from '../logging.js';
 import { yamlBsToMeta } from '../metadata.js';
 import {
   anyLine,
@@ -182,11 +181,7 @@ const yamlMetaBlock = attempt((ctx) => {
   // text's offsets.
   // The lines are as written, after `---\n`.
   const place = (offset) => (offset < 4 ? at + offset : body + offset - 4);
-  const warn = (path, start, end) => {
-    const fields = { message: `Duplicate key: ${path}`, pos: at };
-    report(ctx, message('YamlWarning', start, end, fields));
-  };
-  const meta = yamlBsToMeta(readBlocks(ctx), raw, at, place, warn);
+  const meta = yamlBsToMeta(readBlocks(ctx), raw, at, place);
   return meta === null ? FAIL : meta;
 });
 

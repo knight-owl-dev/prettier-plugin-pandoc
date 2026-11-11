@@ -5,12 +5,12 @@
 // text of the source as written: what it is read into spans nothing, where
 // its block starts.
 
-import { decodeAll, YamlError } from './data-yaml/decode.js';
 import { PandocParseError } from './error.js';
 import { blocksToInlines } from './shared.js';
 import { SourceText } from './source-text.js';
+import { decodeAll, YamlError } from './yamlet/decode.js';
 
-/** @typedef {import('./data-yaml/decode.js').Value} Value */
+/** @typedef {import('./yamlet/aeson.js').Value} Value */
 /** @typedef {{t: string, c?: unknown}} MetaValue */
 /**
  * Read text again as blocks: Pandoc's `parseFromString'` of the reader's
@@ -22,34 +22,28 @@ import { SourceText } from './source-text.js';
 /**
  * The metadata of a YAML block's text: null where it is no mapping, which
  * makes it no metadata block. Text that is no YAML fails the whole read,
- * as it does Pandoc's: a `PandocParseError` spanning what fails, else its
- * opening `---`. Each key given again is passed to `warn`, its path and
- * its span. `place` maps a span in `text` out to the reader's.
+ * as it does Pandoc's: a `PandocParseError` spanning what fails. `place`
+ * maps a span in `text` out to the reader's.
  *
  * @see Text.Pandoc.Readers.Metadata.yamlBsToMeta
  * @param {ReadBlocks} readBlocks
  * @param {string} text
  * @param {number} at Where the block starts.
  * @param {(offset: number) => number} place
- * @param {(path: string, start: number, end: number) => void} [warn]
  * @returns {Record<string, MetaValue> | null}
  */
-export function yamlBsToMeta(readBlocks, text, at, place, warn = () => {}) {
+export function yamlBsToMeta(readBlocks, text, at, place) {
   let xs;
-  const warnings = [];
   try {
-    xs = decodeAll(text, warnings);
+    xs = decodeAll(text);
   } catch (e) {
     if (!(e instanceof YamlError)) throw e;
-    const [start, end] = e.span ?? [0, 3];
+    const [start, end] = e.span;
     throw new PandocParseError(
       `Error parsing YAML metadata: ${e.message}`,
       place(start),
       place(end),
     );
-  }
-  for (const { path, start, end } of warnings) {
-    warn(path, place(start), place(end));
   }
   if (xs.length === 0 || (xs.length === 1 && xs[0] === null)) return {};
   const [first] = xs;
@@ -108,7 +102,7 @@ const INT_MAX = 2n ** 63n - 1n;
  * shows a `Scientific`.
  *
  * @see Text.Pandoc.Readers.Metadata.yamlToMetaValue
- * @param {import('./data-yaml/decode.js').Scientific} s
+ * @param {import('./yamlet/schema.js').Scientific} s
  */
 export function showNumber({ coefficient, exponent }) {
   let [c, e] = [coefficient, exponent];

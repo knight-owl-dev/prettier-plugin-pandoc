@@ -45,7 +45,7 @@
     "data/translations": "3.11"
   },
   "libraries": {
-    "aeson": { "version": "2.2.5.0", "modules": ["Data.Aeson.Types"] },
+    "aeson": { "version": "2.2.5.1", "modules": [] },
     "commonmark": { "version": "0.3.1", "modules": ["Commonmark.Entity"] },
     "doclayout": { "version": "0.6", "modules": ["Text.DocLayout"] },
     "emojis": { "version": "0.1.5", "modules": [] },
@@ -60,7 +60,6 @@
         "Text.GridTable.Trace"
       ]
     },
-    "libyaml": { "version": "0.1.4", "modules": [] },
     "pandoc-types": {
       "version": "1.23.1.2",
       "modules": [
@@ -78,7 +77,7 @@
         "Text.Parsec.Prim"
       ]
     },
-    "scientific": { "version": "0.3.8.1", "modules": ["Data.Scientific"] },
+    "scientific": { "version": "0.3.10.0", "modules": ["Data.Scientific"] },
     "skylighting-core": {
       "version": "0.15",
       "modules": ["Skylighting.Core"]
@@ -101,6 +100,21 @@
       "version": "0.1.3.7",
       "modules": ["Text.Collate.Lang"]
     },
-    "yaml": { "version": "0.11.11.2", "modules": ["Data.Yaml.Internal"] }
+    "yamlet": {
+      "version": "1.0.0.1",
+      "modules": [
+        "Yamlet",
+        "Yamlet.Error",
+        "Yamlet.Internal.Compose",
+        "Yamlet.Internal.FromYaml",
+        "Yamlet.Internal.Parser",
+        "Yamlet.Internal.Schema",
+        "Yamlet.Internal.Syntax",
+        "Yamlet.Internal.Utils",
+        "Yamlet.Internal.View",
+        "Yamlet.Value"
+      ]
+    },
+    "yamlet-aeson": { "version": "1.0.0.1", "modules": ["Yamlet.Aeson"] }
   }
 }

@@ -73,11 +73,11 @@ Beyond Pandoc's own modules:
 Each verdict goes into the PR's review log, one row per change:
 
 ```markdown
-| Upstream                       | Change                  | Verdict  | Port                  |
-| ------------------------------ | ----------------------- | -------- | --------------------- |
-| `Text.Pandoc.Readers.Markdown` | span keeps inner spaces | behavior | `markdown/links.js`   |
-| `Text.Pandoc.Readers.Markdown` | more `takeWhile1P`      | speed    | —                     |
-| yaml → yamlet                  | `yes`, `no` are strings | behavior | `data-yaml/decode.js` |
+| Upstream                       | Change                  | Verdict  | Port                |
+| ------------------------------ | ----------------------- | -------- | ------------------- |
+| `Text.Pandoc.Readers.Markdown` | span keeps inner spaces | behavior | `markdown/links.js` |
+| `Text.Pandoc.Readers.Markdown` | more `takeWhile1P`      | speed    | —                   |
+| yaml → yamlet                  | `yes`, `no` are strings | behavior | `yamlet/schema.js`  |
 ```
 
 ## 3. Restamp
