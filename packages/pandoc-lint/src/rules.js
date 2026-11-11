@@ -6,8 +6,9 @@
  * What a rule reads a message against: where an offset is, as
  * `path:line:column`; the source's text between two offsets; and the
  * read's reference definitions and AST, for the place a duplicate repeats;
- * whether it is a span's template, which is one paragraph; and whether its
- * lines are not the file's, every place in it at its start.
+ * whether it is a span's template, which is one paragraph; whether its
+ * lines are not the file's, every place in it at its start; and Markdown
+ * as the file writes it, for a remedy to quote.
  *
  * @typedef {object} Read
  * @property {(offset: number) => string} where
@@ -17,6 +18,7 @@
  * @property {(label: string) => string} toKey
  * @property {boolean} spanTemplate
  * @property {boolean} pinned
+ * @property {(markdown: string) => string} written
  */
 
 /**
@@ -28,11 +30,6 @@
  * @property {'error' | 'warn' | 'info'} [spanSeverity] In a span's template.
  * @property {(msg: object, read: Read) => Record<string, string | string[]>} callouts
  */
-
-// Where a backslash makes a block's opening line text: a digit or letter
-// takes none, so a numbered line's goes after its number.
-const ESCAPE_AT =
-  'before its marker, or before the period or parenthesis after its number or letter';
 
 // The characters TeX escapes with a backslash alone.
 const ESCAPED = new Set('&#%$_{}');
@@ -125,32 +122,32 @@ export const RULES = {
   MacroAlreadyDefined: {
     rule: 'macro-already-defined',
     severity: 'warn',
-    callouts: (msg) => {
+    callouts: (msg, read) => {
       const macro = msg.name.startsWith('\\');
       return {
         problem: `${macro ? 'macro' : 'environment'} ${msg.name.trim()} is defined again`,
         effect: 'Pandoc keeps the first definition.',
-        remedy: `Use \\${macro ? 'renewcommand' : 'renewenvironment'} to replace it.`,
+        remedy: `Use ${read.written(`\\${macro ? 'renewcommand' : 'renewenvironment'}`)} to replace it.`,
       };
     },
   },
   UndefinedToggle: {
     rule: 'undefined-toggle',
     severity: 'warn',
-    callouts: (msg) => ({
+    callouts: (msg, read) => ({
       problem: `toggle ${msg.contents} is not defined`,
       effect: 'Pandoc reads neither branch.',
-      remedy: `Define it first with \\newtoggle{${msg.contents}}.`,
+      remedy: `Define it first with ${read.written(`\\newtoggle{${msg.contents}}`)}.`,
     }),
   },
   ParsingUnescaped: {
     rule: 'parsing-unescaped',
     severity: 'info',
-    callouts: (msg) => ({
+    callouts: (msg, read) => ({
       problem: `${msg.contents} in raw TeX is not escaped`,
       effect: 'Pandoc reads it as text.',
       remedy: ESCAPED.has(msg.contents)
-        ? `Escape it as \\${msg.contents}.`
+        ? `Escape it as ${read.written(`\\${msg.contents}`)}.`
         : [],
     }),
   },
@@ -170,10 +167,9 @@ export const RULES = {
     callouts: (msg, read) => ({
       problem: `${msg.block} is read as paragraph text`,
       because: `A paragraph runs on to the next blank line: a ${msg.block} on the line after its text is part of it.`,
-      // A span is one paragraph: a blank line would split it.
       remedy: read.spanTemplate
-        ? `Escape it with a backslash: ${ESCAPE_AT}. A span is one paragraph.`
-        : `Put a blank line before it; if it is meant as text, escape it with a backslash: ${ESCAPE_AT}.`,
+        ? `A span is one paragraph: write ${read.written(msg.escaped)} instead.`
+        : `Put a blank line before it; if it is meant as text, write ${read.written(msg.escaped)} instead.`,
     }),
   },
   DivFenceLength: {

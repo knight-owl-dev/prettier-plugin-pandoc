@@ -10,42 +10,50 @@ import {
 } from '../../pandoc-parser/test/helpers/oracle.js';
 import { lint } from '../src/index.js';
 
-// Each: the text, the problem at each line it reports, and the text fixed.
+// Each: the text, the problem at each line it reports, the text fixed,
+// and the marker the first's remedy escapes.
 const SWALLOWED = {
   'a div fence after text': [
     'Some text\n::: d\nx\n:::\n',
     { 2: 'div fence is read as paragraph text' },
     'Some text\n\n::: d\nx\n:::\n',
+    '\\:::',
   ],
   'a div fence after text in a div': [
     '::: top\nSome text\n::: nested\nx\n:::\n:::\n',
     { 3: 'div fence is read as paragraph text' },
     '::: top\nSome text\n\n::: nested\nx\n:::\n:::\n',
+    '\\:::',
   ],
   'a div fence in a list item': [
     '- item\n  ::: d\n  x\n  :::\n',
     { 2: 'div fence is read as paragraph text' },
     '- item\n\n  ::: d\n  x\n  :::\n',
+    '\\:::',
   ],
   'a div fence in a quote': [
     '> quote\n> ::: d\n> x\n> :::\n',
     { 2: 'div fence is read as paragraph text' },
     '> quote\n>\n> ::: d\n> x\n> :::\n',
+    '\\:::',
   ],
   'a tilde fence': [
     'Text\n~~~ {.js}\ncode\n~~~\n',
     { 2: 'code fence is read as paragraph text' },
     'Text\n\n~~~ {.js}\ncode\n~~~\n',
+    '\\~\\~\\~',
   ],
   'a heading': [
     'Text\n# Heading\n',
     { 2: 'heading is read as paragraph text' },
     'Text\n\n# Heading\n',
+    '\\#',
   ],
   'a block quote': [
     'Text\n> quote\n',
     { 2: 'block quote is read as paragraph text' },
     'Text\n\n> quote\n',
+    '\\>',
   ],
   'a list': [
     'Text\n- a\n- b\n',
@@ -54,11 +62,13 @@ const SWALLOWED = {
       3: 'list is read as paragraph text',
     },
     'Text\n\n- a\n- b\n',
+    '\\-',
   ],
   'an ordered list': [
     'Text\n1. a\n',
     { 2: 'list is read as paragraph text' },
     'Text\n\n1. a\n',
+    '1\\.',
   ],
 };
 
@@ -84,10 +94,14 @@ const problems = (text, tabStop) =>
       .map((d) => [d.line, d.callouts.problem]),
   );
 
-for (const [name, [text, expected, fixed]] of Object.entries(SWALLOWED)) {
+for (const [name, [text, expected, fixed, marker]] of Object.entries(
+  SWALLOWED,
+)) {
   for (const tabStop of TAB_STOPS) {
     test(`${name} (tab stop ${tabStop})`, () => {
       assert.deepEqual(problems(text, tabStop), expected);
+      const [d] = lint([{ path: 'a.md', text }], { tabStop });
+      assert.ok(d.callouts.remedy.endsWith(`write ${marker} instead.`));
       assert.notDeepEqual(pandocAst(text, tabStop), pandocAst(fixed, tabStop));
       assert.deepEqual(problems(fixed, tabStop), {});
     });
@@ -100,6 +114,49 @@ for (const [name, text] of Object.entries(SILENT)) {
       assert.deepEqual(problems(text, tabStop), {});
     });
   }
+}
+
+// Each: what a paragraph swallows, and the marker its remedy escapes,
+// which leaves its line text, as written, even after a blank line.
+const ESCAPES = {
+  'a div fence': ['::: aside\nx\n:::', '\\:::'],
+  'a div fence, its attributes attached': [':::{#id .a}\nx\n:::', '\\:::'],
+  'a tilde fence': ['~~~ {.js}\ncode\n~~~', '\\~\\~\\~'],
+  'a heading': ['## Heading', '\\##'],
+  'a block quote, its text attached': ['>quote', '\\>'],
+  'a dash': ['- item', '\\-'],
+  'an asterisk': ['* item', '\\*'],
+  'a plus': ['+ item', '\\+'],
+  'a year': ['1984. A reissue', '1984\\.'],
+  'a letter': ['a) item', 'a\\)'],
+  'a roman numeral': ['iv. item', 'iv\\.'],
+  'a number in parentheses': ['(1) item', '(1\\)'],
+  'a hash': ['#. item', '#\\.'],
+  'an example': ['(@) item', '(@\\)'],
+};
+
+// Inlines as the text they read: any but a word or space by its name.
+const plain = (inlines) =>
+  inlines
+    .map((i) => (i.t === 'Str' ? i.c : i.t === 'Space' ? ' ' : `<${i.t}>`))
+    .join('');
+
+for (const [name, [after, marker]] of Object.entries(ESCAPES)) {
+  test(`the remedy's escape: ${name}`, () => {
+    const [d] = lint([{ path: 'a.md', text: `Text\n${after}\n` }]);
+    assert.equal(d.rule, 'block-in-paragraph');
+    assert.ok(d.callouts.remedy.endsWith(`write ${marker} instead.`));
+    const [line] = after.split('\n');
+    const unescaped = marker.replaceAll('\\', '');
+    const { blocks } = pandocAst(
+      `Text\n\n${marker}${line.slice(unescaped.length)}\n`,
+    );
+    assert.deepEqual(
+      blocks.map((b) => b.t),
+      ['Para', 'Para'],
+    );
+    assert.equal(plain(blocks[1].c), line);
+  });
 }
 
 test('a tab-indented heading in a list item, by tab stop', () => {
