@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { stripVTControlCharacters } from 'node:util';
 import * as prettier from 'prettier';
 import plugin from '../src/index.js';
 
@@ -15,7 +16,11 @@ test('a metadata block Pandoc fails to read is framed where it fails', async () 
       start: { line: 4, column: 6 },
       end: { line: 4, column: 6 },
     });
-    assert.match(e.message, /a: undefined alias \*x\n[\s\S]*> 4 \| > a: \*x/);
+    // prettier colors its frame on a terminal.
+    assert.match(
+      stripVTControlCharacters(e.message),
+      /a: undefined alias \*x\n[\s\S]*> 4 \| > a: \*x/,
+    );
     return true;
   });
 });
