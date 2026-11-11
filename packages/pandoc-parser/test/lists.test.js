@@ -13,6 +13,8 @@ const CASES = {
   'ordered lists': '1. one\n2. two\n\n3. three\n4. four',
   'fancy markers': 'a) x\nb) y\n\n(i) r\n(ii) s\n\nI. A\nII. B\n\n#. d\n#. e',
   'a delimiter change': '1) a\n2. b',
+  'a parenthesis opening a period marker':
+    '- a\n  (1. b\n\n(1. c\n\n(i. d\n(A. e',
   'initials, not markers': 'A. Smith\nB. Jones',
   'example lists': '(@) ex\n(@lab) two\n\nsee\n\n(@) three\n\n3@. counted',
   'task lists': '- [ ] todo\n- [x] done\n- [X] also\n- [ ]\n- [ ] a\n\n  b',
