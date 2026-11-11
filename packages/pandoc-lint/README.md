@@ -76,9 +76,12 @@ YAML metadata block, and no identifier a heading didn't write. A span's lone
 image stays an image, not a figure. Templates are read at `--tab-stop`, as files
 are.
 
-Four errors are about the file itself: `yaml-syntax` for invalid YAML,
-`shortcut-file` for anything other than a mapping of shortcuts, and
-`shortcut-body` and `shortcut-span` for a template that is not text.
+Five errors are about the file itself: `yaml-syntax` for invalid YAML,
+`shortcut-file` for anything other than a mapping of shortcuts, `shortcut-null`
+for a null anywhere, at the key that holds it, since a layer
+[only overrides](https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#shadowing-a-system-shortcut),
+and `shortcut-body` and `shortcut-span` for a template that is some other
+non-text.
 
 ## JSON
 

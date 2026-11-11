@@ -1,11 +1,12 @@
 // Keystone's shortcuts files: each top-level key a shortcut, its `body`
 // and `span` the Markdown it injects as a div and as a span. Each template
-// is linted as a document of its own, placed where it is in the YAML.
+// is linted as a document of its own, placed where it is in the YAML, and
+// a null anywhere is refused, as keystone refuses it.
 //
 // @see https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/
 
-import { isAlias, isMap, isScalar, parseDocument } from 'yaml';
-import { lintSnippet } from './index.js';
+import { isAlias, isMap, isScalar, isSeq, parseDocument } from 'yaml';
+import { codeFrame, lintSnippet } from './index.js';
 
 /** @typedef {import('./index.js').Diagnostic} Diagnostic */
 
@@ -54,7 +55,9 @@ export function lintShortcuts(path, text, options = {}) {
       ),
     ];
   }
-  const out = [];
+  const out = nulls(doc, doc.contents, []).map(({ at, start, end, ...how }) =>
+    error(path, text, 'shortcut-null', nullCallouts(at, how), start, end),
+  );
   // Each node's findings by the template it is read as: an alias repeats
   // a template, linted where its anchor is.
   const reads = new Map();
@@ -63,7 +66,8 @@ export function lintShortcuts(path, text, options = {}) {
     const name = isScalar(key) ? String(key.value) : '?';
     for (const template of TEMPLATES) {
       const written = value.get(template.key, true);
-      if (written === undefined) continue;
+      // A null template is the null walk's to report.
+      if (written == null || isNull(doc, written)) continue;
       const markdown = isAlias(written) ? written.resolve(doc) : written;
       if (markdown === undefined) {
         out.push(
@@ -157,7 +161,62 @@ function lineAndColumn(text, offset) {
 
 const firstLine = (message) => message.split('\n')[0].replace(/\.$/, '');
 
-// An error at the span from `start` to `end` of the file.
+// Whether `node` is a null, written so or through an alias.
+const isNull = (doc, node) =>
+  node == null ||
+  (isAlias(node) ? isNull(doc, node.resolve(doc) ?? {}) : false) ||
+  (isScalar(node) && node.value === null);
+
+// Each null under `node`, at `path`: the key that holds it, or the list
+// item it is, spanning from there to the null's end. A key that is null
+// itself counts too.
+function nulls(doc, node, path) {
+  const out = [];
+  if (isMap(node)) {
+    for (const { key, value } of node.items) {
+      const name =
+        isScalar(key) && key.value !== null ? String(key.value) : '~';
+      const at = [...path, name];
+      const [start, keyEnd] = key?.range ?? [0, 0];
+      if (isScalar(key) && key.value === null) {
+        out.push({ at, key: true, start, end: keyEnd });
+      } else if (isNull(doc, value)) {
+        out.push({ at, start, end: Math.max(keyEnd, value?.range?.[1] ?? 0) });
+      } else {
+        out.push(...nulls(doc, value, at));
+      }
+    }
+  } else if (isSeq(node)) {
+    node.items.forEach((item, k) => {
+      const at = [...path, `[${k}]`];
+      if (isNull(doc, item)) {
+        out.push({ at, item: true, start: item.range[0], end: item.range[1] });
+      } else {
+        out.push(...nulls(doc, item, at));
+      }
+    });
+  }
+  return out;
+}
+
+// What a null's error says: its path, why a layer can't take it, and what
+// does instead.
+//
+// @see https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#shadowing-a-system-shortcut
+function nullCallouts(at, { key, item } = {}) {
+  const name = at.join('.').replaceAll('.[', '[');
+  return {
+    problem: key ? `${name} is a null key` : `${name} has no value`,
+    because:
+      'A layer only overrides: a null removes nothing, and stops the build.',
+    remedy: item
+      ? 'Give it a value, or delete the item.'
+      : 'Give it a value, or delete the key. To reach a state a default excludes, write the value that names it.',
+  };
+}
+
+// An error at the span from `start` to `end` of the file: its problem, or
+// its callouts, framed by the line it starts on.
 function error(path, text, rule, problem, start, end) {
   const from = lineAndColumn(text, start);
   const to = lineAndColumn(text, Math.max(start, end));
@@ -171,6 +230,23 @@ function error(path, text, rule, problem, start, end) {
     column: from.column,
     endLine: to.line,
     endColumn: to.column,
-    callouts: { problem },
+    callouts:
+      typeof problem === 'string'
+        ? { problem }
+        : {
+            ...problem,
+            verbatim: codeFrame(
+              text,
+              start,
+              Math.min(end, lineEnd(text, start)),
+              from.line,
+            ),
+          },
   };
+}
+
+// Where the line `offset` is on ends.
+function lineEnd(text, offset) {
+  const end = text.indexOf('\n', offset);
+  return end === -1 ? text.length : end;
 }

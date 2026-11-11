@@ -319,7 +319,7 @@ const withoutEmpty = (callouts) =>
 
 // The line `start` is on, numbered `line`, carets under `start` to `end`;
 // a tab a space, so that they line up.
-function codeFrame(text, start, end, line) {
+export function codeFrame(text, start, end, line) {
   const lineStart = text.lastIndexOf('\n', start - 1) + 1;
   const lineEnd = text.indexOf('\n', start);
   const content = text

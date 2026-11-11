@@ -271,3 +271,83 @@ test('what makes it no shortcuts file', () => {
     ['shortcut-span', 2, 9, '[1, 2]'],
   ]);
 });
+
+// A layer only overrides: a null anywhere stops keystone's build, each
+// reported at the key that holds it, or the list item it is.
+// https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#shadowing-a-system-shortcut
+const NULLS = {
+  'a shortcut': ['a: ~\n', [1, 1, 'a: ~', 'a has no value']],
+  'its class': ['a:\n  class: ~\n', [2, 3, 'class: ~', 'a.class has no value']],
+  'its content': [
+    'a:\n  class: font\n  content: ~\n',
+    [3, 3, 'content: ~', 'a.content has no value'],
+  ],
+  'its span': [
+    'a:\n  class: font\n  span: ~\n',
+    [3, 3, 'span: ~', 'a.span has no value'],
+  ],
+  'an interface entry': [
+    'a:\n  class: font\n  interface:\n    family: ~\n',
+    [4, 5, 'family: ~', 'a.interface.family has no value'],
+  ],
+  "an entry's field": [
+    'a:\n  class: font\n  interface:\n    family:\n      default: ~\n',
+    [5, 7, 'default: ~', 'a.interface.family.default has no value'],
+  ],
+  'an empty value': ['a:\n  body:\n', [2, 3, 'body:', 'a.body has no value']],
+  'the word null': [
+    'a:\n  class: Null\n',
+    [2, 3, 'class: Null', 'a.class has no value'],
+  ],
+  'a list item': [
+    'a:\n  classes: [x, ~]\n',
+    [2, 16, '~', 'a.classes[1] has no value'],
+  ],
+  'an alias to one': [
+    'n: &n ~\nb:\n  class: *n\n',
+    [1, 1, 'n: &n ~', 'n has no value'],
+    [3, 3, 'class: *n', 'b.class has no value'],
+  ],
+  'a key': ['~: x\n', [1, 1, '~', '~ is a null key']],
+};
+
+for (const [name, [text, ...expected]] of Object.entries(NULLS)) {
+  test(`a null: ${name}`, () => {
+    const nulls = lintShortcuts('s.yaml', text).filter(
+      (d) => d.rule === 'shortcut-null',
+    );
+    assert.deepEqual(
+      nulls.map((d) => [
+        d.line,
+        d.column,
+        text.slice(d.start, d.end),
+        d.callouts.problem,
+      ]),
+      expected,
+    );
+    assert.ok(nulls.every((d) => d.severity === 'error'));
+  });
+}
+
+test('a null template: a null, not a template that is no text', () => {
+  assert.deepEqual(
+    found('a:\n  body: ~\n  span: ~\n').map(([rule]) => rule),
+    ['shortcut-null', 'shortcut-null'],
+  );
+  assert.deepEqual(
+    found('a:\n  span: [1, ~]\n').map(([rule]) => rule),
+    ['shortcut-span', 'shortcut-null'],
+  );
+});
+
+test("a null's callouts: why, and what to write instead", () => {
+  const [d] = lintShortcuts('s.yaml', 'a:\n  interface:\n    family: ~\n');
+  assert.deepEqual(d.callouts, {
+    problem: 'a.interface.family has no value',
+    because:
+      'A layer only overrides: a null removes nothing, and stops the build.',
+    remedy:
+      'Give it a value, or delete the key. To reach a state a default excludes, write the value that names it.',
+    verbatim: ['3 |     family: ~', '  |     ^^^^^^^^^'],
+  });
+});
