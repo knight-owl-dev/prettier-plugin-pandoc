@@ -41,7 +41,7 @@ jobs:
         # The image itself, by its manifest-list digest so the arm64 runner
         # resolves its platform: the org's supply-chain policy rules out
         # wrapper actions.
-        uses: docker://ghcr.io/renovatebot/renovate:44.203.0@sha256:b73de45335668ba0357f74607947548d760c883109e9ad658ac5fc20f3ca45a0
+        uses: docker://ghcr.io/renovatebot/renovate:44.233.0@sha256:93fdfc394e1315f63aeb0e581f0d4670b962cd7cbec5a2495751f713afefa207
         env:
           RENOVATE_TOKEN: ${{ steps.app-token.outputs.token }}
           RENOVATE_REPOSITORIES: ${{ github.repository }}
