@@ -24,10 +24,11 @@ import {
   skipMany1,
 } from '../core.js';
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
-import { logOf } from '../logging.js';
+import { logOf, message, report } from '../logging.js';
 import { readInt } from '../parsing/lists.js';
 import { getPosition } from '../parsing/state.js';
-import { addMetaField, uniqueIdent } from '../shared.js';
+import { addMetaField, strip, uniqueIdent } from '../shared.js';
+import { evalFpeval, evalInteval } from './eval.js';
 
 /** @typedef {import('../tex.js').Tok} Tok */
 
@@ -617,17 +618,32 @@ export const withRaw = (parser) => (ctx) => {
 // Macros
 
 /**
- * A macro: its scope, when its body expands, its arguments (a number, or
- * tokens to match), the default of an optional first argument, and its
- * body.
+ * A macro: its scope, when its body expands, its arguments, the default
+ * of an optional first argument, and its body.
  *
  * @see Text.Pandoc.TeX.Macro
  * @typedef {object} Macro
  * @property {'GlobalScope' | 'GroupScope'} scope
  * @property {'ExpandWhenDefined' | 'ExpandWhenUsed'} expansionPoint
- * @property {({num: number} | {pattern: Tok[]})[]} argspecs
+ * @property {ArgSpec[]} argspecs
  * @property {Tok[] | null} optarg
  * @property {Tok[]} body
+ */
+
+/**
+ * A macro's argument: numbered, or tokens to match; xparse's kinds bind
+ * the next number. `skipSp` false and `trim` false are the `!` modifier.
+ *
+ * @see Text.Pandoc.TeX.ArgSpec
+ * @typedef {{kind: 'ArgNum', num: number}
+ *   | {kind: 'Pattern', toks: Tok[]}
+ *   | {kind: 'BoolArg', skipSp: boolean, tok: Tok}
+ *   | {kind: 'DelimArg', skipSp: boolean, open: Tok, close: Tok, dflt: Tok[] | null}
+ *   | {kind: 'VerbArg'}
+ *   | {kind: 'EmbellishArg', embs: [Tok, Tok[] | null][]}
+ *   | {kind: 'ProcessedArg', procs: Tok[][], spec: ArgSpec}
+ *   | {kind: 'BodyArg', trim: boolean, num: number}
+ *   | {kind: 'VerbBodyArg', trim: boolean, num: number}} ArgSpec
  */
 
 // A token at another's position, as Pandoc's line and column; its text no
@@ -743,12 +759,12 @@ function handleMacros(ctx, n, at, name, rest) {
   const read = (c) => {
     const args =
       macro.optarg === null
-        ? getargs(new Map(), macro.argspecs)(c)
+        ? getargs(1, new Map(), macro.argspecs)(c)
         : (() => {
             const x = option(macro.optarg, bracketedToks)(c);
             return x === FAIL
               ? FAIL
-              : getargs(new Map([[1, x]]), macro.argspecs.slice(1))(c);
+              : getargs(2, new Map([[1, x]]), macro.argspecs.slice(1))(c);
           })();
     return args;
   };
@@ -808,41 +824,142 @@ const matchPattern = (toks) =>
     return undefined;
   });
 
-// A macro's arguments by their specs: a numbered one up to the pattern
-// after it, or braced or a single token; a pattern matched.
-function getargs(argmap, specs) {
+// A control sequence at another token's position.
+const ctrlSeqAt = (at, name) =>
+  setpos(at, { type: 'CtrlSeq', name, text: `\\${name} ` });
+
+const rawBracedOrOneTok = alt(
+  (ctx) => {
+    const r = withRaw(attempt(braced))(ctx);
+    return r === FAIL ? FAIL : r[1];
+  },
+  (ctx) => {
+    const t = anyTok(ctx);
+    return t === FAIL ? FAIL : [t];
+  },
+);
+// The tokens up to `pattern`, each part read by `part`.
+const upTo = (part, pattern) =>
+  attempt((ctx) => {
+    const parts = manyTill(part, matchPattern(pattern))(ctx);
+    return parts === FAIL ? FAIL : parts.flat();
+  });
+const spacedBracedOrToken = attempt((ctx) =>
+  spaces(ctx) === FAIL ? FAIL : bracedOrToken(ctx),
+);
+// `p` after `sp`, or with no spaces skipped where `skipSp` is false (`!`).
+const afterSp = (skipSp, p) =>
+  attempt((ctx) => (skipSp && sp(ctx) === FAIL ? FAIL : p(ctx)));
+
+/**
+ * A macro's arguments by their specs, into `argmap`: `num` the number the
+ * next one binds where its spec carries none.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.doMacros'
+ * @param {number} num
+ * @param {Map<number, Tok[]>} argmap
+ * @param {ArgSpec[]} specs
+ */
+function getargs(num, argmap, specs) {
   return (ctx) => {
-    let map = argmap;
+    const map = new Map(argmap);
     for (let k = 0; k < specs.length; k++) {
       const spec = specs[k];
-      if ('pattern' in spec) {
-        if (attempt(matchPattern(spec.pattern))(ctx) === FAIL) return FAIL;
-        continue;
-      }
       const next = specs[k + 1];
-      if (next !== undefined && 'pattern' in next) {
-        const x = attempt((c) => {
-          const parts = manyTill(
-            alt(braced, (d) => {
-              const t = anyTok(d);
-              return t === FAIL ? FAIL : [t];
-            }),
-            matchPattern(next.pattern),
-          )(c);
-          return parts === FAIL ? FAIL : parts.flat();
-        })(ctx);
-        if (x === FAIL) return FAIL;
-        map = new Map(map).set(spec.num, x);
-        k++;
-        continue;
+      switch (spec.kind) {
+        case 'Pattern':
+          if (matchPattern(spec.toks)(ctx) === FAIL) return FAIL;
+          break;
+        case 'ArgNum':
+        case 'BodyArg':
+        case 'VerbBodyArg': {
+          let x;
+          if (next?.kind === 'Pattern') {
+            // A body to `\end{name}`, its groups kept whole.
+            const part =
+              spec.kind === 'ArgNum' ? bracedOrOne : rawBracedOrOneTok;
+            x = upTo(part, next.toks)(ctx);
+            if (x === FAIL) return FAIL;
+            if (spec.kind === 'BodyArg' && spec.trim) x = trimSpaceToks(x);
+            if (spec.kind === 'VerbBodyArg') x = verbatimBodyToks(spec.trim, x);
+            k++;
+          } else {
+            x = spacedBracedOrToken(ctx);
+            if (x === FAIL) return FAIL;
+          }
+          map.set(spec.num, x);
+          num = spec.num + 1;
+          break;
+        }
+        case 'BoolArg': {
+          const yes = option(false, (c) =>
+            afterSp(spec.skipSp, matchTok(spec.tok))(c) === FAIL ? FAIL : true,
+          )(ctx);
+          const value = yes ? 'BooleanTrue' : 'BooleanFalse';
+          map.set(num++, [ctrlSeqAt(spec.tok, value)]);
+          break;
+        }
+        case 'DelimArg': {
+          const missing = spec.dflt ?? [ctrlSeqAt(spec.open, 'NoValue')];
+          const delimited = delimitedToks(spec.open, spec.close);
+          map.set(num++, option(missing, afterSp(spec.skipSp, delimited))(ctx));
+          break;
+        }
+        case 'VerbArg': {
+          const x = verbatimArg(ctx);
+          if (x === FAIL) return FAIL;
+          map.set(num++, x);
+          break;
+        }
+        case 'EmbellishArg': {
+          const seen = grabEmbellishments(spec.embs)(ctx);
+          spec.embs.forEach(([t, dflt], i) => {
+            map.set(num + i, seen.get(i) ?? dflt ?? [ctrlSeqAt(t, 'NoValue')]);
+          });
+          num += spec.embs.length;
+          break;
+        }
+        case 'ProcessedArg': {
+          const newargs = getargs(num, new Map(), [spec.spec])(ctx);
+          if (newargs === FAIL) return FAIL;
+          for (const [i, x] of newargs) {
+            const y = applyArgProcessors(ctx, spec.procs, x);
+            map.set(i, y);
+          }
+          num += newargs.size;
+          break;
+        }
       }
-      const x = attempt((c) => (spaces(c) === FAIL ? FAIL : bracedOrToken(c)))(
-        ctx,
-      );
-      if (x === FAIL) return FAIL;
-      map = new Map(map).set(spec.num, x);
     }
     return map;
+  };
+}
+
+// Embellishments, in any order, each once: their arguments by index.
+function grabEmbellishments(embs) {
+  return (ctx) => {
+    const seen = new Map();
+    while (seen.size < embs.length) {
+      const got = attempt((c) => {
+        if (sp(c) === FAIL) return FAIL;
+        const i = alt(
+          ...embs
+            .map(([t], j) => [t, j])
+            .filter(([, j]) => !seen.has(j))
+            .map(
+              ([t, j]) =>
+                (d) =>
+                  matchTok(t)(d) === FAIL ? FAIL : j,
+            ),
+        )(c);
+        if (i === FAIL) return FAIL;
+        const x = bracedOrOne(c);
+        return x === FAIL ? FAIL : [i, x];
+      })(ctx);
+      if (got === FAIL) break;
+      seen.set(got[0], got[1]);
+    }
+    return seen;
   };
 }
 
@@ -900,8 +1017,24 @@ function trySpecialMacro(ctx, name, rest) {
       return doIf(ctx, ctx.state.s.mathMode, rest);
     case 'ifstrequal':
       return handleIf(ctx, ifStrequalParser, rest);
-    default:
-      return null;
+    case 'ProcessList':
+      return handleIf(ctx, processListParser, rest);
+    case 'UseName':
+      return handleIf(ctx, useNameParser, rest);
+    case 'ExpandArgs':
+      return handleIf(ctx, expandArgsParser, rest);
+    case 'inteval':
+      return handleEval(ctx, evalInteval, rest);
+    case 'fpeval':
+      return handleEval(ctx, evalFpeval, rest);
+    // Dimensions are not evaluated: the expression in their place.
+    case 'dimeval':
+    case 'skipeval':
+      return handleEval(ctx, strip, rest);
+    default: {
+      const xparseIf = XPARSE_IFS.get(name);
+      return xparseIf === undefined ? null : handleIf(ctx, xparseIf, rest);
+    }
   }
 }
 
@@ -1030,6 +1163,202 @@ function ifStrequalParser(ctx) {
   if (no === FAIL) return FAIL;
   const equal = untokenize(str1) === untokenize(str2);
   return prepend(equal ? yes : no, ctx.state.input);
+}
+
+// Where the parse is: Pandoc's `getPosition`, as a token's position.
+const here = (ctx) => ({
+  line: ctx.state.line,
+  column: ctx.state.column,
+  start: ctx.state.at,
+});
+const braceGroupAt = (at, ts) => [
+  setpos(at, { type: 'Symbol', text: '{' }),
+  ...ts,
+  setpos(at, { type: 'Symbol', text: '}' }),
+];
+
+const isSpaceLike = (t) =>
+  t.type === 'Spaces' || t.type === 'Newline' || t.type === 'Comment';
+const nonSpace = (ts) => ts.filter((t) => !isSpaceLike(t));
+
+/**
+ * An xparse conditional, `\IfNoValueTF` and its kin: the branch the test
+ * of its first argument takes; `hasTrue` and `hasFalse` whether it has a
+ * true and a false branch.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.xparseIf
+ * @param {(arg: Tok[]) => boolean} test
+ * @param {boolean} hasTrue
+ * @param {boolean} hasFalse
+ */
+function xparseIf(test, hasTrue, hasFalse) {
+  // Spaces and comments may come between the arguments.
+  const grabArg = withVerbatimMode((ctx) =>
+    spaces(ctx) === FAIL ? FAIL : bracedOrOne(ctx),
+  );
+  const branch = (has) => (has ? grabArg : () => []);
+  const [yes, no] = [branch(hasTrue), branch(hasFalse)];
+  return (ctx) => {
+    const arg = grabArg(ctx);
+    if (arg === FAIL) return FAIL;
+    const trueToks = yes(ctx);
+    if (trueToks === FAIL) return FAIL;
+    const falseToks = no(ctx);
+    if (falseToks === FAIL) return FAIL;
+    return prepend(test(arg) ? trueToks : falseToks, ctx.state.input);
+  };
+}
+
+/** @see Text.Pandoc.Readers.LaTeX.Parsing.isNoValueArg */
+function isNoValueArg(toks) {
+  const ts = nonSpace(toks);
+  if (ts.length === 1)
+    return ts[0].type === 'CtrlSeq' && ts[0].name === 'NoValue';
+  return (
+    ts.length === 3 &&
+    ts[0].type === 'Symbol' &&
+    ts[0].text === '-' &&
+    ts[1].type === 'Word' &&
+    ts[1].text === 'NoValue' &&
+    ts[2].type === 'Symbol' &&
+    ts[2].text === '-'
+  );
+}
+
+/** @see Text.Pandoc.Readers.LaTeX.Parsing.isBooleanTrueArg */
+function isBooleanTrueArg(toks) {
+  const ts = nonSpace(toks);
+  return (
+    ts.length === 1 && ts[0].type === 'CtrlSeq' && ts[0].name === 'BooleanTrue'
+  );
+}
+
+/**
+ * Whether an argument is empty or blanks only, as `\IfBlankTF` tests.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.isBlankArg
+ */
+const isBlankArg = (toks) => toks.every(isSpaceLike);
+
+const XPARSE_IFS = new Map(
+  [
+    ['NoValue', isNoValueArg],
+    ['Value', (ts) => !isNoValueArg(ts)],
+    ['Boolean', isBooleanTrueArg],
+    ['Blank', isBlankArg],
+  ].flatMap(([kind, test]) => [
+    [`If${kind}TF`, xparseIf(test, true, true)],
+    [`If${kind}T`, xparseIf(test, true, false)],
+    [`If${kind}F`, xparseIf(test, false, true)],
+  ]),
+);
+
+/**
+ * `\ProcessList{list}{tokens}`: the tokens before each item of the list,
+ * braced.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.processListParser
+ */
+const processListParser = withVerbatimMode((ctx) => {
+  const pos = here(ctx);
+  if (spaces(ctx) === FAIL) return FAIL;
+  const list = bracedOrOne(ctx);
+  if (list === FAIL || spaces(ctx) === FAIL) return FAIL;
+  const fn = bracedOrOne(ctx);
+  if (fn === FAIL) return FAIL;
+  const out = [];
+  for (let g = tokGroup(list); g !== null; g = tokGroup(g[1])) {
+    out.push(...fn, ...braceGroupAt(pos, g[0]));
+  }
+  return prepend(out, ctx.state.input);
+});
+
+/**
+ * `\UseName{string}`: the control sequence the string names.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.useNameParser
+ */
+function useNameParser(ctx) {
+  const pos = here(ctx);
+  const name = withVerbatimMode(spacedBraced)(ctx);
+  if (name === FAIL) return FAIL;
+  return { tok: ctrlSeqAt(pos, untokenize(name)), next: ctx.state.input };
+}
+const spacedBraced = (ctx) => (spaces(ctx) === FAIL ? FAIL : braced(ctx));
+const EXPAND_ARG = {
+  // a string made a control sequence
+  c: (ctx) => {
+    const pos = here(ctx);
+    const name = spacedBraced(ctx);
+    return name === FAIL ? FAIL : [ctrlSeqAt(pos, untokenize(name))];
+  },
+  // a braced argument as it is
+  n: (ctx) => {
+    const pos = here(ctx);
+    const toks = spacedBraced(ctx);
+    return toks === FAIL ? FAIL : braceGroupAt(pos, toks);
+  },
+  // a single token as it is
+  N: (ctx) => {
+    if (spaces(ctx) === FAIL) return FAIL;
+    const t = anyTok(ctx);
+    return t === FAIL ? FAIL : [t];
+  },
+};
+
+/**
+ * `\ExpandArgs{spec}\cmd{arg1}…`: the command before its arguments, each
+ * made as its letter of the spec says.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.expandArgsParser
+ */
+const expandArgsParser = withVerbatimMode((ctx) => {
+  const spec = spacedBraced(ctx);
+  if (spec === FAIL || spaces(ctx) === FAIL) return FAIL;
+  const cmd = anyTok(ctx);
+  if (cmd === FAIL) return FAIL;
+  const args = [];
+  for (const c of untokenize(spec)) {
+    const transform = EXPAND_ARG[c];
+    const x = transform === undefined ? FAIL : transform(ctx);
+    if (x === FAIL) return FAIL;
+    args.push(...x);
+  }
+  return { tok: cmd, next: prepend(args, ctx.state.input) };
+});
+
+/**
+ * A LaTeX3 evaluator, `\inteval` and its kin: its braced argument, macros
+ * in it expanded as it is read, evaluated in its place; where it will not
+ * evaluate, its text, logged as skipped.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.handleEval
+ * @param {(arg: string) => string | null} evaluator
+ * @param {TokList} rest
+ */
+function handleEval(ctx, evaluator, rest) {
+  const sub = {
+    pos: 0,
+    state: { ...ctx.state, input: rest, expanded: false },
+    common: ctx.common,
+  };
+  const { line, column, at, source } = sub.state;
+  const toks = braced(sub);
+  if (toks === FAIL) return null;
+  const arg = untokenize(toks);
+  let result = evaluator(arg);
+  if (result === null) {
+    const fields = { contents: `evaluation of ${arg}`, pos: at };
+    report(ctx, message('SkippedContent', at, sub.state.at, fields));
+    result = arg;
+  }
+  const made = [...tokenize(result, 0, { line, column })].map((t) => ({
+    ...t,
+    source,
+    start: at,
+    end: at,
+  }));
+  return prepend(made, sub.state.input);
 }
 
 // ---------------------------------------------------------------------
@@ -1424,6 +1753,254 @@ export const verbTok = (stopchar) => (ctx) => {
   setInput(ctx, prepend([stop, ...rest], ctx.state.input), ctx.state.expanded);
   return { ...t, text: t1, end: stopAt };
 };
+
+/**
+ * The tokens between `open` and `close`, delimiters nested in them
+ * balanced and groups kept whole; tokens matched by type and text.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.delimitedToks
+ * @param {Tok} open
+ * @param {Tok} close
+ */
+function delimitedToks(open, close) {
+  const [opening, closing] = [matchTok(open), matchTok(close)];
+  // A part and how it moves the depth.
+  const part = alt(
+    (ctx) => {
+      const r = withRaw(attempt(braced))(ctx);
+      return r === FAIL ? FAIL : [0, r[1]];
+    },
+    (ctx) => {
+      const t = closing(ctx);
+      return t === FAIL ? FAIL : [-1, [t]];
+    },
+    (ctx) => {
+      const t = opening(ctx);
+      return t === FAIL ? FAIL : [1, [t]];
+    },
+    (ctx) => {
+      const t = anyTok(ctx);
+      return t === FAIL ? FAIL : [0, [t]];
+    },
+  );
+  return (ctx) => {
+    if (opening(ctx) === FAIL) return FAIL;
+    const out = [];
+    for (let n = 1; ; ) {
+      const r = part(ctx);
+      if (r === FAIL) return FAIL;
+      if (r[0] === -1 && n === 1) return out;
+      n += r[0];
+      out.push(...r[1]);
+    }
+  };
+}
+
+const notNewline = notFollowedBy(newlineTok);
+
+/**
+ * A verbatim argument, xparse's `v`: braced, or between two of one
+ * character; one word of its text, so nothing in it is read again.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.verbatimArg
+ */
+const verbatimArg = attempt((ctx) => {
+  if (optional(sp)(ctx) === FAIL) return FAIL;
+  const toks = alt(braced, verbDelimited)(ctx);
+  if (toks === FAIL) return FAIL;
+  if (toks.length === 0) return [];
+  const [first, last] = [toks[0], toks.at(-1)];
+  const text = untokenize(toks);
+  return [{ ...setpos(first, { type: 'Word', text }), end: last.end }];
+});
+
+function verbDelimited(ctx) {
+  const t = anySymbol(ctx);
+  if (t === FAIL) return FAIL;
+  const marker = [...t.text];
+  if (marker.length !== 1) return FAIL;
+  const tok = verbTok(marker[0]);
+  return manyTill(
+    (c) => (notNewline(c) === FAIL ? FAIL : tok(c)),
+    symbol(marker[0]),
+  )(ctx);
+}
+
+/**
+ * A verbatim body, xparse's `c`, as LaTeX typesets it: a word per line,
+ * spaces made visible (U+2423), lines joined by `\\`; blank lines at
+ * either end dropped where `doTrim`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.verbatimBodyToks
+ * @param {boolean} doTrim
+ * @param {Tok[]} toks
+ * @returns {Tok[]}
+ */
+function verbatimBodyToks(doTrim, toks) {
+  if (toks.length === 0) return [];
+  const at = toks[0];
+  let ls = lines(untokenize(toks));
+  if (doTrim) {
+    const isBlank = (l) => /^[ \t]*$/.test(l);
+    let [from, to] = [0, ls.length];
+    while (from < to && isBlank(ls[from])) from++;
+    while (to > from && isBlank(ls[to - 1])) to--;
+    ls = ls.slice(from, to);
+  }
+  const out = [];
+  ls.forEach((l, k) => {
+    if (k > 0)
+      out.push(setpos(at, { type: 'CtrlSeq', name: '\\', text: '\\\\' }));
+    if (l !== '') {
+      out.push(setpos(at, { type: 'Word', text: l.replaceAll(' ', '␣') }));
+    }
+  });
+  return out;
+}
+
+// Haskell's `T.lines`: no line after a final newline.
+const lines = (t) => {
+  if (t === '') return [];
+  const ls = t.split('\n');
+  return t.endsWith('\n') ? ls.slice(0, -1) : ls;
+};
+
+/**
+ * An argument through xparse's processors, the one nearest its spec
+ * first.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.applyArgProcessors
+ * @param {Tok[][]} procs
+ * @param {Tok[]} x
+ */
+function applyArgProcessors(ctx, procs, x) {
+  let y = x;
+  for (let k = procs.length - 1; k >= 0; k--) {
+    y = applyArgProcessor(ctx, procs[k], y);
+  }
+  return y;
+}
+
+/**
+ * An argument through one processor: `\TrimSpaces`, `\ReverseBoolean`,
+ * `\SplitArgument` or `\SplitList`; any other logged as skipped, the
+ * argument kept.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.applyArgProcessor
+ * @param {Tok[]} proc
+ * @param {Tok[]} x
+ */
+function applyArgProcessor(ctx, proc, x) {
+  const k = proc.findIndex((t) => !isSpaceLike(t));
+  if (k === -1) return x;
+  const [p, ts] = [proc[k], proc.slice(k + 1)];
+  const missing = () => [ctrlSeqAt(p, 'NoValue')];
+  const delimOf = (g) => g?.[0].find((t) => !isSpaceLike(t));
+  if (p.type === 'CtrlSeq') {
+    switch (p.name) {
+      case 'TrimSpaces':
+        return trimSpaceToks(x);
+      case 'ReverseBoolean': {
+        const bs = x.filter((t) => !isSpaceLike(t));
+        const b = bs.length === 1 && bs[0].type === 'CtrlSeq' ? bs[0].name : '';
+        if (b === 'BooleanTrue') return [ctrlSeqAt(p, 'BooleanFalse')];
+        if (b === 'BooleanFalse') return [ctrlSeqAt(p, 'BooleanTrue')];
+        return x;
+      }
+      case 'SplitArgument': {
+        const num = tokGroup(ts);
+        const numparts = num && readIntArg(untokenize(num[0]));
+        const d = num && delimOf(tokGroup(num[1]));
+        if (numparts !== null && d !== undefined) {
+          const pieces = splitToksOn(d, x).map(trimSpaceToks);
+          const out = [];
+          for (let i = 0; i <= numparts; i++) {
+            out.push(...braceGroupAt(p, pieces[i] ?? missing()));
+          }
+          return out;
+        }
+        break;
+      }
+      case 'SplitList': {
+        const d = delimOf(tokGroup(ts));
+        if (d !== undefined) {
+          return splitToksOn(d, x).flatMap((piece) =>
+            braceGroupAt(p, trimSpaceToks(piece)),
+          );
+        }
+        break;
+      }
+    }
+  }
+  // An unknown or malformed processor: the argument as it is.
+  const fields = { contents: `processor ${untokenize(proc)}`, pos: p.start };
+  report(ctx, message('SkippedContent', p.start, p.end, fields));
+  return x;
+}
+
+// Haskell's `read` of an `Int`; null where it is none.
+const readIntArg = (s) => (/^\s*-?\d+\s*$/.test(s) ? Number(s) : null);
+
+/**
+ * Tokens without the spaces and newlines at either end.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.trimSpaceToks
+ * @param {Tok[]} ts
+ */
+function trimSpaceToks(ts) {
+  const isSp = (t) => t.type === 'Spaces' || t.type === 'Newline';
+  let [from, to] = [0, ts.length];
+  while (from < to && isSp(ts[from])) from++;
+  while (to > from && isSp(ts[to - 1])) to--;
+  return ts.slice(from, to);
+}
+
+/**
+ * The first group of a token list, its spaces before skipped: a brace
+ * group's contents or a single token, and the tokens after it; null where
+ * there is none.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.tokGroup
+ * @param {Tok[]} ts
+ * @returns {[Tok[], Tok[]] | null}
+ */
+function tokGroup(ts) {
+  const k = ts.findIndex((t) => !isSpaceLike(t));
+  if (k === -1) return null;
+  if (!isSym(ts[k], '{')) return [[ts[k]], ts.slice(k + 1)];
+  for (let j = k + 1, depth = 1; j < ts.length; j++) {
+    if (isSym(ts[j], '{')) depth++;
+    else if (isSym(ts[j], '}') && --depth === 0) {
+      return [ts.slice(k + 1, j), ts.slice(j + 1)];
+    }
+  }
+  return null;
+}
+
+const isSym = (t, s) => t.type === 'Symbol' && t.text === s;
+
+/**
+ * A token list split at each `d` outside braces, matched by type and text.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.splitToksOn
+ * @param {Tok} d
+ * @param {Tok[]} ts
+ * @returns {Tok[][]}
+ */
+function splitToksOn(d, ts) {
+  const out = [[]];
+  let depth = 0;
+  for (const t of ts) {
+    if (depth === 0 && t.type === d.type && t.text === d.text) {
+      out.push([]);
+      continue;
+    }
+    if (isSym(t, '{')) depth++;
+    else if (isSym(t, '}')) depth = Math.max(0, depth - 1);
+    out.at(-1).push(t);
+  }
+  return out;
+}
 
 /**
  * `parser`'s values in parentheses, joined by `mconcat`.

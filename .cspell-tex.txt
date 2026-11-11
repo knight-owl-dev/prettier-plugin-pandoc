@@ -19,10 +19,15 @@ abbrv
 abstractname
 acfp
 aclp
+acosd
+acot
+acotd
 acrfull
 acrlong
 acro
 acrshort
+acsc
+acscd
 acsp
 addabbrvspace
 addbibresource
@@ -43,8 +48,12 @@ arcsecond
 argmap
 argspec
 argspecs
+asec
+asecd
+asind
 astronomicalunit
 asturian
+atand
 atomicmassunit
 atsign
 atto
@@ -94,7 +103,10 @@ colorbox
 colspecs
 contentsname
 conv
+cosd
+cotd
 cref
+cscd
 csquotes
 cvariant
 darray
@@ -103,8 +115,10 @@ deci
 defmacro
 defn
 deka
+dflt
 dgroup
 dimenarg
+dimeval
 displaymath
 divehi
 dmath
@@ -126,6 +140,8 @@ egroup
 electronmass
 electronvolt
 elementarycharge
+embs
+embtoks
 enclname
 endcontents
 endenvname
@@ -144,6 +160,7 @@ etoolbox
 expandableinput
 expandafter
 expl
+expt
 extratitle
 fancybreak
 fancyverb
@@ -170,6 +187,7 @@ foreignblockcquote
 foreignblockquote
 foreignlanguage
 foreignquote
+fpeval
 framesubtitle
 frametitle
 friulan
@@ -236,6 +254,7 @@ includegraphics
 includesvg
 infile
 inputminted
+inteval
 itemindent
 itshape
 ixpt
@@ -251,6 +270,7 @@ lastline
 lbreak
 ldots
 letmacro
+letterize
 lettrine
 lettrines
 lilypond
@@ -314,6 +334,7 @@ mzero
 natbib
 naustrian
 nauticalmile
+newargs
 newcommand
 newenvironment
 newif
@@ -335,8 +356,11 @@ norsk
 nrows
 nswissgerman
 numargs
+numexpr
 numlist
+numparts
 numrange
+numslots
 obeylines
 occitan
 ogonek
@@ -344,6 +368,7 @@ optarg
 otherlanguage
 pagebreak
 pandocbounded
+pandocxparseenvend
 parbox
 parencite
 parencites
@@ -369,6 +394,7 @@ prefacename
 prefsufs
 prenote
 privateuse
+procs
 proofname
 providecommand
 provideenvironment
@@ -386,6 +412,7 @@ rawcommand
 rawcontents
 rawopt
 rawopts
+recip
 refstr
 renewcommand
 renewenvironment
@@ -395,6 +422,7 @@ rozaj
 samin
 scriptsize
 scshape
+secd
 seealsoname
 seename
 serbianc
@@ -404,8 +432,10 @@ setfontsize
 setlength
 setmainlanguage
 setpos
+showv
 sievert
 siunitx
+skipeval
 skipopts
 skylighting
 sloppypar
@@ -441,6 +471,7 @@ syms
 tablename
 tabularnewline
 tabularx
+tand
 tera
 texinputs
 texmath
@@ -525,6 +556,7 @@ tspec
 ttfamily
 uline
 umol
+unrad
 untoken
 untokenize
 uppersorbian
