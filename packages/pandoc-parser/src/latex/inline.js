@@ -464,7 +464,7 @@ export const charCommands = new Map([
   ['}', lit('}')],
   ['-', lit('\u00ad')], // soft hyphen
   // Haskell reads Pandoc's "\a0\x25FB" as BEL, `0` and the sign.
-  ['qed', lit('\u00070\u25fb')],
+  ['qed', lit('\u00a0\u25fb')],
   ['lq', lit('‘')],
   ['rq', lit('’')],
   ['textquoteleft', lit('‘')],
