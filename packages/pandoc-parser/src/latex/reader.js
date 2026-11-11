@@ -579,7 +579,7 @@ const hyphens = (ctx) => {
 const apostrophe = (ctx) => {
   const start = ctx.state.at;
   anyTok(ctx);
-  const double = ctx.state.s.ligatures && symbol("'")(ctx) !== FAIL;
+  const double = symbol("'")(ctx) !== FAIL;
   return B.str(double ? '”' : '’', start, ctx.state.at);
 };
 
@@ -634,12 +634,12 @@ export function inline(ctx) {
           if (ligatures) return hyphens(ctx);
           break;
         case "'":
-          return apostrophe(ctx);
+          return ligatures ? apostrophe(ctx) : symbolAsString(ctx);
         case '~':
           anyTok(ctx);
           return B.str(NBSP, tk.start, tk.end);
         case '`':
-          return ligatures ? quotesOr(backtick)(ctx) : backtick(ctx);
+          return ligatures ? quotesOr(backtick)(ctx) : symbolAsString(ctx);
         case '"':
           if (ligatures) return quotesOr(symbolAsString)(ctx);
           break;
