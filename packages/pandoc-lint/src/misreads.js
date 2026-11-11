@@ -113,6 +113,10 @@ function visit(blocks, view, open, at) {
       if (fence !== null) closerOf(block, fence, view, at);
       const inside = fence === null ? open : [...open, fence];
       children(block.c, view, inside, at);
+    } else if (block?.t === 'Figure') {
+      // A lone image's figure: its caption is the alt text, read inside
+      // the image, where its body reads it.
+      children(block.c[2], view, open, at);
     } else if (block?.t !== undefined) {
       children(block.c, view, open, at);
     }
