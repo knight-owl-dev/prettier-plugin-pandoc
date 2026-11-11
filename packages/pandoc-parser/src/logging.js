@@ -2,7 +2,7 @@
 // each here with the span of what it is about where Pandoc's carries a
 // position.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Logging`, the messages the
+// Ported from Pandoc's `Text.Pandoc.Logging`, the messages the
 // Markdown, metadata and LaTeX readers raise, and the two ways they raise
 // them: `report`, logged at once and kept through backtracking, as
 // `PandocMonad`'s log is; `logMessage`, held in the parser's state, so

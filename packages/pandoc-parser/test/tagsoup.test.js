@@ -1,4 +1,4 @@
-// TagSoup's tokenizer, against TagSoup 0.14.8's own tests (`test/TagSoup/
+// TagSoup's tokenizer, against TagSoup's own tests (`test/TagSoup/
 // Test.hs`): `parseTests`, `entityTests`, and `optionsTests`' invariants.
 
 import assert from 'node:assert/strict';

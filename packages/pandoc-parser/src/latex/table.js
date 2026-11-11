@@ -1,7 +1,7 @@
 // Tables in LaTeX: `tabular` and its kin, their column specs, rules,
 // multirow and multicolumn cells, and the `table` float's caption.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX.Table`. Each
+// Ported from Pandoc's `Text.Pandoc.Readers.LaTeX.Table`. Each
 // environment reads what follows `\begin{name}`, which starts at `start`;
 // a table spans to its `\end`.
 

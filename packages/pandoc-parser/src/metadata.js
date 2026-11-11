@@ -1,7 +1,7 @@
 // YAML metadata as Pandoc reads it into a document's metadata: each text
 // value read again by the reader's own parser.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Metadata`. A value is no
+// Ported from Pandoc's `Text.Pandoc.Readers.Metadata`. A value is no
 // text of the source as written: what it is read into spans nothing, where
 // its block starts.
 

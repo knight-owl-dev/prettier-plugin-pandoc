@@ -1,4 +1,4 @@
-// Pandoc 3.11's default abbreviations (`data/abbreviations`): with `smart`,
+// Pandoc's default abbreviations (`data/abbreviations`): with `smart`,
 // the space after one is a non-breaking space.
 
 // cspell:disable

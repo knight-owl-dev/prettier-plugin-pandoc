@@ -5,7 +5,7 @@
 // without names in `!` and `?` tags; no case changes, no entity names
 // checked, and no RCDATA, CDATA or escape modes but `<script>`'s.
 //
-// Ported from TagSoup 0.14.8's `Text.HTML.TagSoup.Specification` and the
+// Ported from TagSoup's `Text.HTML.TagSoup.Specification` and the
 // bottom layer of `Text.HTML.TagSoup.Implementation`. The tokens come on
 // demand, as Haskell's laziness gives them: a consumer that needs the first
 // tag lexes no further.

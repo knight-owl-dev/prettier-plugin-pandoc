@@ -1,7 +1,7 @@
 // The markdown reader's inline parsers: each returns its inlines, every node
 // spanning what it read.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. Its parsers
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`. Its parsers
 // return `F Inlines`, read once the whole document is; the port's return the
 // inlines themselves. A parser not ported yet keeps its place as a comment.
 

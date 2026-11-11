@@ -2,7 +2,7 @@
 // spanning what it read. A block's span runs to the end of its last line,
 // its newline left out.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. A parser not
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`. A parser not
 // ported yet keeps its place in `block`'s choice as a comment.
 
 import * as B from '../ast/builder.js';

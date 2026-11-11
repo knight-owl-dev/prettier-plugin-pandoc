@@ -1,4 +1,4 @@
-// Character references resolved as Pandoc 3.11 resolves them, through
+// Character references resolved as Pandoc resolves them, through
 // commonmark's `Commonmark.Entity.lookupEntity`.
 
 import { NAMED_REFERENCES } from './entities-table.js';

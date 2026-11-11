@@ -1,7 +1,7 @@
 // Pandoc's markdown reader: the source to Pandoc's AST, each block and
 // inline with the span of the source it was read from.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown.readMarkdown`,
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown.readMarkdown`,
 // reading what Pandoc's CLI hands it: `input.js`.
 
 import { doc } from '../ast/document.js';

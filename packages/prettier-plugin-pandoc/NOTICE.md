@@ -14,20 +14,21 @@ version. The license's text is in [LICENSE](LICENSE).
 ## Pandoc
 
 Copyright (C) 2006-2024 John MacFarlane, released under the GPL, version 2 or
-later. `packages/pandoc-parser` ports Pandoc 3.11's Markdown and LaTeX readers,
-the parsing modules they use, and its translation data; each ported function's
+later. `packages/pandoc-parser` ports Pandoc's Markdown and LaTeX readers, the
+parsing modules they use, and its translation data; each ported function's
 documentation names the Pandoc function it ports.
+`packages/pandoc-parser/upstream.json` names the release of Pandoc and of each
+library below that the port follows.
 
 ## Ported libraries
 
 These libraries, which Pandoc builds on, are ported in part, under the licenses
-below, reproduced as published: BSD-3-Clause, unicode-collation's BSD-2-Clause,
-and gridtables' MIT.
+below, reproduced as published: BSD-3-Clause, parsec's and unicode-collation's
+BSD-2-Clause, and gridtables' MIT.
 
 ### pandoc-types
 
-The AST and its builder, from pandoc-types 1.23.1.2:
-`packages/pandoc-parser/src/ast/`.
+The AST and its builder, from pandoc-types: `packages/pandoc-parser/src/ast/`.
 
 ```text
 Copyright (c) 2006-2023, John MacFarlane
@@ -62,10 +63,39 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+### parsec
+
+The parser combinators, from parsec: `packages/pandoc-parser/src/core.js` and
+`packages/pandoc-parser/src/char.js`.
+
+```text
+Copyright 1999-2000, Daan Leijen; 2007, Paolo Martini. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+This software is provided by the copyright holders "as is" and any express or
+implied warranties, including, but not limited to, the implied warranties of
+merchantability and fitness for a particular purpose are disclaimed. In no
+event shall the copyright holders be liable for any direct, indirect,
+incidental, special, exemplary, or consequential damages (including, but not
+limited to, procurement of substitute goods or services; loss of use, data,
+or profits; or business interruption) however caused and on any theory of
+liability, whether in contract, strict liability, or tort (including
+negligence or otherwise) arising in any way out of the use of this software,
+even if advised of the possibility of such damage.
+```
+
 ### doclayout
 
-Display width, from doclayout 0.5.0.3:
-`packages/pandoc-parser/src/text-width.js` and its table.
+Display width, from doclayout: `packages/pandoc-parser/src/text-width.js` and
+its table.
 
 ```text
 Copyright John MacFarlane (c) 2016-2019
@@ -102,7 +132,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### emojis
 
-The base emoji, from emojis 0.1.5: in
+The base emoji, from emojis: in
 `packages/pandoc-parser/src/text-width-table.js`.
 
 ```text
@@ -205,7 +235,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### TagSoup
 
-The HTML tokenizer, from TagSoup 0.14.8: `packages/pandoc-parser/src/tagsoup/`.
+The HTML tokenizer, from TagSoup: `packages/pandoc-parser/src/tagsoup/`.
 
 ```text
 Copyright Neil Mitchell 2006-2019.
@@ -242,7 +272,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### gridtables
 
-Grid tables, from gridtables 0.1.1.0: `packages/pandoc-parser/src/gridtables/`.
+Grid tables, from gridtables: `packages/pandoc-parser/src/gridtables/`.
 
 ```text
 MIT License
@@ -270,7 +300,7 @@ SOFTWARE.
 
 ### unicode-collation
 
-BCP 47 language tags, from unicode-collation 0.1.3.7:
+BCP 47 language tags, from unicode-collation:
 `packages/pandoc-parser/src/collate/`.
 
 ```text
@@ -303,7 +333,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### skylighting
 
-Syntaxes' names and file-name patterns, from skylighting-core 0.14.7:
+Syntaxes' names and file-name patterns, from skylighting-core:
 `packages/pandoc-parser/src/skylighting/`. The syntax definitions they are taken
 from are KDE's, each under its own license (GPL, LGPL, MIT and others), as
 skylighting bundles them; only these two attributes are taken.
@@ -343,7 +373,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### yaml
 
-YAML decoding as `Data.Yaml` does it, from yaml 0.11.11.2:
+YAML decoding as `Data.Yaml` does it, from yaml:
 `packages/pandoc-parser/src/data-yaml/`. It runs on the npm `yaml` package, a
 dependency under its own ISC license.
 

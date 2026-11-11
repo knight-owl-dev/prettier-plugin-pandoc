@@ -1,7 +1,7 @@
-// Unicode's display widths and the base emoji, as doclayout 0.5.0.3 reads
-// them: its `unicodeSpec`, each range by its first code point and width
-// (Narrow, Wide, Combining, Control, Ambiguous), and emojis 0.1.5's
-// `baseEmojis`. Generated from those packages' tables.
+// Unicode's display widths and the base emoji, as doclayout reads them: its
+// `unicodeSpec`, each range by its first code point and width (Narrow, Wide,
+// Combining, Control, Ambiguous), and emojis' `baseEmojis`. Generated from
+// those packages' tables.
 
 // cspell:disable
 

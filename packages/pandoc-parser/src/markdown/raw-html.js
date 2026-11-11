@@ -2,7 +2,7 @@
 // as raw blocks, markdown inside block tags read as blocks, `<span>` and
 // `<div>` as spans and divs, and what an open HTML block's closing tag ends.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. `blocks.js` and
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`. `blocks.js` and
 // `inlines.js` import this module, which imports them: what they import
 // from here is a function declaration, and what this reads from them, it
 // reads when called.

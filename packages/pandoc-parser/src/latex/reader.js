@@ -1,7 +1,7 @@
 // Pandoc's LaTeX reader: TeX to Pandoc's AST, each block and inline with
 // the span of the source it was read from.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX`. What it reads
+// Ported from Pandoc's `Text.Pandoc.Readers.LaTeX`. What it reads
 // outside the text it reads through its host's hooks: `common-state.js`.
 
 import * as B from '../ast/builder.js';

@@ -2,7 +2,7 @@
 // `\newif` and `\newenvironment`; recorded where `latex_macros` is on, kept
 // raw where it is off.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX.Macro`.
+// Ported from Pandoc's `Text.Pandoc.Readers.LaTeX.Macro`.
 
 import { alt, attempt, FAIL, many, many1, option, optional } from '../core.js';
 import { message, report } from '../logging.js';

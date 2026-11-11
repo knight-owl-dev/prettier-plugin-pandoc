@@ -1,7 +1,7 @@
 // Citations, `[see @key, p. 3; -@other]` in brackets or `@key [p. 3]` in
 // text, and example references, `@label`.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. `inlines.js`
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`. `inlines.js`
 // and `links.js` import this module, which imports them: what they import
 // from here is a function declaration, and what this reads from them, it
 // reads when called.

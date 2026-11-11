@@ -1,6 +1,6 @@
 // Skylighting's syntaxes looked up by file name.
 //
-// Ported from skylighting-core 0.14.7's `Skylighting.Core`: the lookups by
+// Ported from skylighting-core's `Skylighting.Core`: the lookups by
 // extension. The syntaxes are `syntaxes.js`.
 
 import { SYNTAXES } from './syntaxes.js';

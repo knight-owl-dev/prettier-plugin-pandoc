@@ -1,7 +1,7 @@
 // Character references as TagSoup resolves them: HTML5's named references,
 // and the numeric ones.
 //
-// Ported from TagSoup 0.14.8's `Text.HTML.TagSoup.Entity`. Its table is
+// Ported from TagSoup's `Text.HTML.TagSoup.Entity`. Its table is
 // commonmark's, already ported, and these names besides, which HTML5 lets
 // stand without their `;`.
 

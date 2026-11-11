@@ -1,8 +1,7 @@
 // Parsec's combinators, with Parsec's semantics, as the port of Pandoc's
 // reader composes them.
 //
-// Ported from parsec 3.1.17's `Text.Parsec.Prim` and
-// `Text.Parsec.Combinator`, the parsec Pandoc 3.11 builds with.
+// Ported from parsec's `Text.Parsec.Prim` and `Text.Parsec.Combinator`.
 //
 // A parser is a function of one context per parse, `{text, pos, state}`: it
 // returns its value and moves `pos` past what it read, or returns `FAIL`. A

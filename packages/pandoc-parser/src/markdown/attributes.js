@@ -1,7 +1,7 @@
 // Attributes in braces, `{#id .class key=value -}`, and the raw attribute
 // `{=format}`.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`.
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`.
 
 import {
   alphaNum,

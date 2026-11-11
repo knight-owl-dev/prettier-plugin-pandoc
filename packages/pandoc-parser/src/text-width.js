@@ -2,7 +2,7 @@
 // 2, a combining mark or a control 0, any other character 1, an ambiguous
 // one too. Simple and multiline tables split their lines into columns by it.
 //
-// Ported from doclayout 0.5.0.3's `Text.DocLayout`, its narrow context.
+// Ported from doclayout's `Text.DocLayout`, its narrow context.
 
 import { BASE_EMOJIS, UNICODE_SPEC } from './text-width-table.js';
 

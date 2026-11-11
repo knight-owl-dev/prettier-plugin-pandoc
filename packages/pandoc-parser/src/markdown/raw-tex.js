@@ -1,7 +1,7 @@
 // Raw TeX in Markdown: LaTeX blocks and inlines, which end where Pandoc's
 // LaTeX reader's parse of them ends, and ConTeXt environments.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. The LaTeX
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`. The LaTeX
 // side is `latex/reader.js`.
 
 import * as B from '../ast/builder.js';

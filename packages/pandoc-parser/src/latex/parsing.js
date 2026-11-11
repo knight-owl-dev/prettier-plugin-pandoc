@@ -1,7 +1,7 @@
 // The LaTeX reader's parsing toolkit: TeX tokenized, and tokens written
 // back as text.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX.Parsing`.
+// Ported from Pandoc's `Text.Pandoc.Readers.LaTeX.Parsing`.
 
 import * as B from '../ast/builder.js';
 import { Node } from '../ast/nodes.js';

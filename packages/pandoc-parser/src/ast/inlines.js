@@ -3,7 +3,7 @@
 // emphasis of one kind merges. Only at the join: a list's own neighbors are
 // left as built.
 //
-// Ported from pandoc-types 1.23.1.2's `Text.Pandoc.Builder`: its `Many`
+// Ported from pandoc-types' `Text.Pandoc.Builder`: its `Many`
 // becomes a plain array, never mutated once built.
 
 import { Node } from './nodes.js';

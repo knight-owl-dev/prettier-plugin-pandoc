@@ -1,6 +1,6 @@
 // Transformations of the AST, bottom up: a node's children before the node.
 //
-// Ported from pandoc-types 1.23.1.2's `Text.Pandoc.Walk`. One traversal
+// Ported from pandoc-types' `Text.Pandoc.Walk`. One traversal
 // takes the instances' transformations as a visitor; nodes keep their spans.
 
 import { Node, Row } from './nodes.js';

@@ -52,6 +52,27 @@ services:
     volumes:
       - .:/work
 
+  # No network_mode: none — the drift tool fetches upstream sources.
+  fetch:
+    image: prettier-plugin-pandoc-test:local
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+
+    working_dir: /work
+
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    tmpfs:
+      - /tmp
+    environment:
+      HOME: /tmp
+
+    volumes:
+      - .:/work
+
   # No network_mode: none — a cross-target compile fetches that target's Bun.
   bun:
     image: prettier-plugin-pandoc-bun:local

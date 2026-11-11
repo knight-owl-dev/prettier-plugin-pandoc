@@ -1,7 +1,7 @@
 // Emphasis, strong emphasis, strikeout and highlighting: inlines between
 // delimiters. Where a delimiter never closes, it is text.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. Its `three`,
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`. Its `three`,
 // `two` and `one` read on from an opening delimiter; here each takes the
 // delimiter's offset, which gives the spans: of what each closes, and of a
 // delimiter left as text.

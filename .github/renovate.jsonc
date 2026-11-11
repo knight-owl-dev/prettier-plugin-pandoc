@@ -29,6 +29,15 @@
         "CI_TOOLS_IMAGE \\?= (?<depName>\\S+):(?<currentValue>[^:@\\s]+)@(?<currentDigest>sha256:[0-9a-f]{64})"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      // The test image's Pandoc: a release tarball, pinned per architecture
+      // by its digest.
+      "customType": "regex",
+      "managerFilePatterns": ["/^tools/Dockerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+ARG \\w+=(?<currentValue>[^@\\s]+)@sha256:(?<currentDigest>[0-9a-f]{64})"
+      ]
     }
   ],
 
@@ -53,12 +62,16 @@
       "labels": ["dependencies", "docker"]
     },
 
-    // The oracle's reader: a bump is a new Pandoc under test, which the
-    // corpus sweep on its PR either confirms or refutes.
+    // The oracle's reader. Pandoc tags a patch release with a fourth part
+    // (3.9.0.2), which the default versioning drops. No group: the port's
+    // review rides on its PR, which stays red until that lands.
     {
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["pandoc/minimal"],
-      "labels": ["dependencies", "pandoc"]
+      "matchPackageNames": ["jgm/pandoc"],
+      "versioning": "loose",
+      "labels": ["dependencies", "pandoc"],
+      "prBodyNotes": [
+        "The port follows the Pandoc it was reviewed on: run [Bumping Pandoc](https://github.com/knight-owl-dev/prettier-plugin-pandoc/blob/main/docs/bumping-pandoc.md) on this branch."
+      ]
     },
 
     {

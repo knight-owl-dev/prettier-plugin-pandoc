@@ -1,6 +1,6 @@
 // Small parsers the markdown reader shares across its constructs.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`.
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`.
 
 import { char, isAlphaNum, newline, noneOf, oneOf, satisfy } from '../char.js';
 import { alt, attempt, FAIL, notFollowedBy, optional } from '../core.js';

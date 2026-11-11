@@ -1,4 +1,4 @@
-// Pandoc 3.11's translations of terms (`data/translations`), by language
+// Pandoc's translations of terms (`data/translations`), by language
 // as its file names give it. Generated from those files.
 
 // cspell:disable

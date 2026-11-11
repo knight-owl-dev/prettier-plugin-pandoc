@@ -1,6 +1,6 @@
 // TeX math between delimiters: its text, as written but trimmed.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Parsing.Math`. `latex_macros` is
+// Ported from Pandoc's `Text.Pandoc.Parsing.Math`. `latex_macros` is
 // off (#74), so the reader's `applyMacros` keeps the text as it is.
 
 import {

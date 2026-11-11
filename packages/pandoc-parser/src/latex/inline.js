@@ -2,7 +2,7 @@
 // symbols and characters, accents, biblatex's, terms, references and
 // acronyms.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX.Inline`. Each
+// Ported from Pandoc's `Text.Pandoc.Readers.LaTeX.Inline`. Each
 // command reads what follows its name, which starts at `start`.
 
 import * as B from '../ast/builder.js';

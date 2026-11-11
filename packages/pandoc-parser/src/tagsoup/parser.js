@@ -1,7 +1,7 @@
 // HTML as TagSoup reads it: a stream of tags, opening and closing ones,
 // text, comments, warnings and positions, made from the lexer's tokens.
 //
-// Ported from TagSoup 0.14.8's `Text.HTML.TagSoup.Implementation` (its top
+// Ported from TagSoup's `Text.HTML.TagSoup.Implementation` (its top
 // layer), `Options`, `Parser` and `Type`, and `canonicalizeTags`. The tags
 // come on demand: a consumer of the first ones lexes no further, as
 // Haskell's laziness has it.

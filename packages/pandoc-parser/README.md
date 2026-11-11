@@ -1,12 +1,13 @@
 # @knight-owl-llc/pandoc-parser
 
-Pandoc 3.11's Markdown reader, ported to JavaScript: a document's AST as Pandoc
-reads it, each node with the span of source it was read from.
+Pandoc's Markdown reader, ported to JavaScript: a document's AST as Pandoc reads
+it, each node with the span of source it was read from.
 
 The AST is Pandoc's JSON with a `start` and `end` on each node:
 `JSON.stringify(withoutSpans(doc))` equals `pandoc -f markdown -t json` on the
-same text. The reader runs with Pandoc's default Markdown extensions and reads
-raw TeX with a port of Pandoc's LaTeX reader.
+same text, run by the Pandoc release [`upstream.json`](upstream.json) names. The
+reader runs with Pandoc's default Markdown extensions and reads raw TeX with a
+port of Pandoc's LaTeX reader.
 
 ## Use
 

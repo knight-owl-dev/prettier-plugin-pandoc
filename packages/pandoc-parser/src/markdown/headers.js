@@ -1,7 +1,7 @@
 // Headings: ATX (`# Title`) and setext (a title underlined by `=` or `-`),
 // with attributes, identifiers, and implicit reference keys.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`.
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`.
 
 import * as B from '../ast/builder.js';
 import { nullAttr } from '../ast/nodes.js';

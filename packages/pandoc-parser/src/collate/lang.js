@@ -1,6 +1,6 @@
 // BCP 47 language tags: parsed, rendered, and the best match for one.
 //
-// Ported from unicode-collation 0.1.3.7's `Text.Collate.Lang`. Its Parsec
+// Ported from unicode-collation's `Text.Collate.Lang`. Its Parsec
 // parser over the tag's subtags reads them directly here: each subtag
 // parser takes one subtag or none, so only `countBetween` backtracks.
 

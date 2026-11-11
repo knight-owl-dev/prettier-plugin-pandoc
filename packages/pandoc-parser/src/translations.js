@@ -1,7 +1,7 @@
 // Terms such as "Proof" and "Figure" in the document's language, from
 // Pandoc's translation data.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Translations` and
+// Ported from Pandoc's `Text.Pandoc.Translations` and
 // `Text.Pandoc.Translations.Types`. The data is `translations-table.js`;
 // the language and what was loaded live in a reader's common state.
 

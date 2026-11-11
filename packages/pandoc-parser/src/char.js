@@ -1,8 +1,7 @@
 // Parsec's character parsers, and the character predicates they test with.
 //
-// Ported from parsec 3.1.17's `Text.Parsec.Char`, the parsec Pandoc 3.11
-// builds with. Like Pandoc's input stream, they read a code point at a time;
-// offsets stay UTF-16 code units.
+// Ported from parsec's `Text.Parsec.Char`. Like Pandoc's input stream, they
+// read a code point at a time; offsets stay UTF-16 code units.
 
 import { codePointLength } from './code-points.js';
 import { FAIL, skipMany } from './core.js';

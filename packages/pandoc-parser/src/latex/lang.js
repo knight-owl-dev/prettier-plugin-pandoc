@@ -2,7 +2,7 @@
 // the commands and environments setting a passage's language, and quotes
 // by csquotes.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX.Lang`.
+// Ported from Pandoc's `Text.Pandoc.Readers.LaTeX.Lang`.
 
 import * as B from '../ast/builder.js';
 import { lang, renderLang } from '../collate/lang.js';

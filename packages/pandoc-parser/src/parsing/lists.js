@@ -1,6 +1,6 @@
 // Ordered list markers: a number of some style, and its delimiter.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Parsing.Lists`. A marker parser
+// Ported from Pandoc's `Text.Pandoc.Parsing.Lists`. A marker parser
 // returns its list attributes, `[start, style, delimiter]`, as Pandoc's
 // JSON writes them.
 

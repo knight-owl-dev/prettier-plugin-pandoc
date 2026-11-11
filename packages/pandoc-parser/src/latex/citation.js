@@ -1,7 +1,7 @@
 // Citations in LaTeX: natbib's and biblatex's commands, their pre- and
 // postnotes, and `\citetext`.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX.Citation`. Each
+// Ported from Pandoc's `Text.Pandoc.Readers.LaTeX.Citation`. Each
 // command reads what follows its name, which starts at `start`.
 
 import * as B from '../ast/builder.js';

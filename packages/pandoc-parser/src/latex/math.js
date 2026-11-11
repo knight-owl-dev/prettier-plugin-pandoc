@@ -1,7 +1,7 @@
 // Math in LaTeX: `$` and `$$`, the math environments, and the theorem
 // environments of amsthm.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX.Math`.
+// Ported from Pandoc's `Text.Pandoc.Readers.LaTeX.Math`.
 
 import * as B from '../ast/builder.js';
 import { Node } from '../ast/nodes.js';
