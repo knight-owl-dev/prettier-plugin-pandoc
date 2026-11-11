@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // pandoc-lint [--format=text|json|github] [--strict] [--info] [--no-metadata] [--tab-stop=N]
 //             [--shortcuts=FILE]... [FILE]...
+// pandoc-lint --version
 //
 // Lints the files as one manuscript, read in the order given, as Pandoc
 // reads several, and each shortcuts file's bodies. Exits 1 on an error,
 // or on any warning with `--strict`; 2 where it cannot lint.
 
 import { readFileSync } from 'node:fs';
+import { PANDOC_RELEASE } from '@knight-owl-llc/pandoc-parser/upstream';
+import manifest from '../package.json' with { type: 'json' };
 import {
   formatGithub,
   formatJson,
@@ -17,8 +20,8 @@ import {
 
 const FORMATS = { text: formatText, json: formatJson, github: formatGithub };
 
-const USAGE =
-  'usage: pandoc-lint [--format=text|json|github] [--strict] [--info] [--no-metadata] [--tab-stop=N] [--shortcuts=FILE]... [FILE]...';
+const USAGE = `usage: pandoc-lint [--format=text|json|github] [--strict] [--info] [--no-metadata] [--tab-stop=N] [--shortcuts=FILE]... [FILE]...
+       pandoc-lint --version`;
 
 const options = {
   format: 'text',
@@ -27,6 +30,14 @@ const options = {
   noMetadata: false,
   tabStop: 4,
 };
+// Wherever it falls: a tool adds it to its usual options.
+if (process.argv.slice(2).includes('--version')) {
+  process.stdout.write(
+    `pandoc-lint ${manifest.version}\npandoc ${PANDOC_RELEASE}\n`,
+  );
+  process.exit(0);
+}
+
 const paths = [];
 const shortcuts = [];
 for (const arg of process.argv.slice(2)) {

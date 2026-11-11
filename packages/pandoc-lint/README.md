@@ -24,6 +24,7 @@ also carries a standalone binary, for Linux x64 and arm64, that needs no Node.
 ```sh
 pandoc-lint [--format=text|json|github] [--strict] [--info] [--no-metadata] [--tab-stop=N]
             [--shortcuts=FILE]... [FILE]...
+pandoc-lint --version
 ```
 
 | Option          | What it does                                                                   |
@@ -34,6 +35,7 @@ pandoc-lint [--format=text|json|github] [--strict] [--info] [--no-metadata] [--t
 | `--no-metadata` | Report metadata in the Markdown, for a project that keeps it elsewhere         |
 | `--tab-stop`    | Pandoc's `--tab-stop`, 4 by default                                            |
 | `--shortcuts`   | A keystone shortcuts file to lint ([Shortcuts](#shortcuts)); repeatable        |
+| `--version`     | Print its version and the Pandoc release it follows, then exit                 |
 
 Diagnostics go to stdout. The exit status is 1 on an error, or on a warning with
 `--strict`, and 2 where it cannot lint: a usage error, a file it cannot read, or
@@ -54,6 +56,10 @@ ch2.md:3:1: WARN: link reference [a] is defined again
 
 `--format=github` writes each diagnostic as a workflow command, which GitHub
 shows on its line in the run and in a pull request's diff.
+
+`--version` prints `pandoc-lint <version>`, then `pandoc <release>` for the
+Pandoc release it follows: the line that release's `pandoc --version` opens
+with, so a tool that pins both checks they read alike by comparing the two.
 
 ## Shortcuts
 

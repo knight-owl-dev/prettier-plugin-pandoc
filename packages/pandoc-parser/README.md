@@ -39,6 +39,9 @@ A Markdown read also carries four properties outside its JSON:
 
 Offsets are UTF-16 code units, as JavaScript indexes a string.
 
+`@knight-owl-llc/pandoc-parser/upstream` exports `PANDOC_RELEASE`, the Pandoc
+release the port was last reviewed on.
+
 ## License
 
 GPL-2.0-or-later, as Pandoc's: [LICENSE](LICENSE). [NOTICE.md](NOTICE.md) gives

@@ -1,8 +1,9 @@
 #!/bin/sh
 # Compile pandoc-lint with Bun for linux x64 and arm64, and lint with the
-# binary for this machine: the JSON goes to $OUT/bun.json, for `make
-# bun-check` to compare with Node's. The other target's binary is checked
-# for its architecture alone: this machine cannot run it.
+# binary for this machine: the JSON goes to $OUT/bun.json and its
+# `--version` to $OUT/bun.version, for `make bun-check` to compare with
+# Node's. The other target's binary is checked for its architecture alone:
+# this machine cannot run it.
 set -eu
 
 OUT=.scratch/bun
@@ -32,6 +33,7 @@ want() { [ "$1" = x64 ] && echo 62 || echo 183; }
 start=$(date +%s%N)
 "$OUT/pandoc-lint-$native" --format=json --info "$@" >"$OUT/bun.json" || true
 end=$(date +%s%N)
+"$OUT/pandoc-lint-$native" --version >"$OUT/bun.version"
 
 for target in x64 arm64; do
   size=$(wc -c <"$OUT/pandoc-lint-$target")
