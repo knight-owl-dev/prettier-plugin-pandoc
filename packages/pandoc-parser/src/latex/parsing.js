@@ -35,14 +35,21 @@ import { addMetaField, uniqueIdent } from '../shared.js';
 const isSpaceOrTab = (c) => c === ' ' || c === '\t';
 
 /**
- * A letter, or `@` where `\makeatletter` made it one.
+ * A letter in a control word: `@` where `\makeatletter` made it one, `:`
+ * and `_` where `\ExplSyntaxOn` did.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.isLetter'
- * @param {boolean} atIsLetter
+ * @param {{atIsLetter: boolean, explSyntax: boolean}} st
  * @param {string} c
  */
-const isLetterOrAt = (atIsLetter, c) =>
-  (atIsLetter && c === '@') || isLetter(c);
+function isLetterIn(st, c) {
+  if (c === '@') return st.atIsLetter;
+  if (c === ':' || c === '_') return st.explSyntax;
+  return isLetter(c);
+}
+
+/** @see Text.Pandoc.Readers.LaTeX.Parsing.isLetterOrAt */
+const isLetterOrAt = (c) => isLetter(c) || c === '@';
 
 /** @see Text.Pandoc.Readers.LaTeX.Parsing.isLowerHex */
 const isLowerHex = (c) => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
@@ -65,7 +72,7 @@ const isDigit = (c) => c >= '0' && c <= '9';
 export function* tokenize(text, from = 0, start = { line: 1, column: 1 }) {
   let { line, column } = start;
   let at = from;
-  let atIsLetter = false;
+  const st = { atIsLetter: false, explSyntax: false };
   // The code point at `i`; null at the end.
   const charAt = (i) =>
     i < text.length ? String.fromCodePoint(text.codePointAt(i)) : null;
@@ -113,13 +120,15 @@ export function* tokenize(text, from = 0, start = { line: 1, column: 1 }) {
         yield tok('CtrlSeq', at, rest, { name: ' ' });
         return;
       }
-      if (isLetterOrAt(atIsLetter, d)) {
-        const [wordEnd, wn] = span(rest, (x) => isLetterOrAt(atIsLetter, x));
+      if (isLetterIn(st, d)) {
+        const [wordEnd, wn] = span(rest, (x) => isLetterIn(st, x));
         const [end, sn] = span(wordEnd, isSpaceOrTab);
         const name = text.slice(rest, wordEnd);
         yield tok('CtrlSeq', at, end, { name });
-        if (name === 'makeatletter') atIsLetter = true;
-        else if (name === 'makeatother') atIsLetter = false;
+        if (name === 'makeatletter') st.atIsLetter = true;
+        else if (name === 'makeatother') st.atIsLetter = false;
+        else if (name === 'ExplSyntaxOn') st.explSyntax = true;
+        else if (name === 'ExplSyntaxOff') st.explSyntax = false;
         [column, at] = [column + 1 + wn + sn, end];
       } else if (isSpaceOrTab(d) || d === '\n') {
         // A control space: `\`, spaces, a newline and the next line's
@@ -672,7 +681,7 @@ function combineTok(t, list) {
   if (
     t.type === 'CtrlSeq' &&
     w?.type === 'Word' &&
-    [...w.text].every((c) => isLetterOrAt(true, c))
+    [...w.text].every(isLetterOrAt)
   ) {
     const space = t.text.search(/[ \t]/);
     const [x1, x2] =
