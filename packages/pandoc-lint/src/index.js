@@ -57,13 +57,15 @@ export { lintShortcuts } from './shortcuts.js';
 
 /**
  * How a shortcut's template is read: the reader's extensions changed, as
- * Pandoc's `+name` and `-name`; whether it is a span's; and whether its
- * lines are not the file's, so that all of it is at its start.
+ * Pandoc's `+name` and `-name`; whether it is a span's; whether its lines
+ * are not the file's, so that all of it is at its start; and whether it is
+ * a double-quoted scalar, which writes a backslash twice.
  *
  * @typedef {object} TemplateOptions
  * @property {string[]} [extensions]
  * @property {boolean} [spanTemplate]
  * @property {boolean} [pinned]
+ * @property {boolean} [doubleQuoted]
  */
 
 /**
@@ -216,6 +218,7 @@ function diagnose(
     sources,
     spanTemplate = false,
     pinned = false,
+    doubleQuoted = false,
     info = false,
     noMetadata = false,
   },
@@ -244,6 +247,8 @@ function diagnose(
     definitions: doc.definitions,
     firstWithId: (id, before) => firstWithId(doc.blocks, id, before),
     toKey,
+    written: (markdown) =>
+      doubleQuoted ? markdown.replaceAll('\\', '\\\\') : markdown,
     ...how,
   };
   const seen = new Set();

@@ -209,8 +209,22 @@ test("a span's misread: escaped, not split", () => {
   assert.equal(d.severity, 'warn');
   assert.equal(
     d.callouts.remedy,
-    'Escape it with a backslash: before its marker, or before the period or parenthesis after its number or letter. A span is one paragraph.',
+    'A span is one paragraph: write 1984\\. instead.',
   );
+});
+
+// A remedy quotes Markdown as the file writes it: a double-quoted
+// scalar's backslash twice.
+test("a remedy's backslash, as the template's YAML writes it", () => {
+  const remedy = (text) =>
+    lintShortcuts('s.yaml', text).find((d) => d.rule === 'block-in-paragraph')
+      .callouts.remedy;
+  assert.match(remedy('q:\n  body: "a\\n::: d\\nx\\n"\n'), /write \\\\::: /);
+  assert.match(
+    remedy("q:\n  body: 'a\n\n    ::: d\n\n    x'\n"),
+    /write \\::: /,
+  );
+  assert.match(remedy('q:\n  body: |\n    a\n    ::: d\n'), /write \\::: /);
 });
 
 test('an aliased template: linted at its anchor, a finding once', () => {

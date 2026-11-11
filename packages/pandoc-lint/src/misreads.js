@@ -11,14 +11,22 @@ import { readMarkdown } from '@knight-owl-llc/pandoc-parser';
  * @typedef {{type: string, start: number, end: number} & Record<string, unknown>} Misread
  */
 
-// The blocks a paragraph swallows, by the name the problem gives them.
+// The blocks a paragraph swallows: the name the problem gives each, and
+// the marker of the line `s` opening it, escaped. A fence's every
+// character takes a backslash, as two tildes make a subscript; an ordered
+// list's period or parenthesis takes it, as one before a digit or letter
+// stays a backslash.
 const SWALLOWED = {
-  Div: (line) => (/^\s*:/.test(line) ? 'div fence' : 'div'),
-  CodeBlock: (line) => (/^\s*(```|~~~)/.test(line) ? 'code fence' : null),
-  Header: () => 'heading',
-  BlockQuote: () => 'block quote',
-  BulletList: () => 'list',
-  OrderedList: () => 'list',
+  Div: (s) =>
+    s.startsWith(':') ? ['div fence', `\\${/^:+/.exec(s)[0]}`] : ['div', '\\<'],
+  CodeBlock: (s) => {
+    const fence = /^(`{3,}|~{3,})/.exec(s)?.[0];
+    return fence && ['code fence', fence.replace(/./g, '\\$&')];
+  },
+  Header: (s) => ['heading', `\\${/^#*/.exec(s)[0]}`],
+  BlockQuote: () => ['block quote', '\\>'],
+  BulletList: (s) => ['list', `\\${s[0]}`],
+  OrderedList: (s) => ['list', s.split(/[ \t]/)[0].replace(/[.)]/, '\\$&')],
 };
 
 // What a line any of those blocks opens starts with: its marker or fence,
@@ -94,13 +102,14 @@ function outermost(value, firsts) {
 // A candidate the block `block` starts at, where it is one a paragraph
 // swallows.
 function report(out, c, block) {
-  const name = SWALLOWED[block.t]?.(c.line);
+  const [name, escaped] = SWALLOWED[block.t]?.(c.line.trimStart()) ?? [];
   if (name)
     out.push({
       type: 'BlockInParagraph',
       start: c.start,
       end: c.end,
       block: name,
+      escaped,
     });
 }
 

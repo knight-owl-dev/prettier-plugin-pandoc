@@ -133,6 +133,7 @@ function merged(read) {
 // text as written, is its line, inside any quotes. Any other's lines are
 // not the file's: it is all at its start.
 function placement(text, markdown) {
+  const doubleQuoted = markdown.type === 'QUOTE_DOUBLE';
   const [start, end] = markdown.range;
   if (markdown.type === 'BLOCK_LITERAL') {
     const contentStart = text.indexOf('\n', start) + 1;
@@ -148,8 +149,8 @@ function placement(text, markdown) {
   const written = text.slice(start + quoted, end - quoted);
   const at = lineAndColumn(text, start);
   return !written.includes('\n') && written === markdown.value
-    ? { ...at, column: at.column + quoted }
-    : { ...at, pinned: true };
+    ? { ...at, column: at.column + quoted, doubleQuoted }
+    : { ...at, pinned: true, doubleQuoted };
 }
 
 // The line and column of `offset`, from 1, a column a code point.
