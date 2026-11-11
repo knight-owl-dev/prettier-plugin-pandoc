@@ -52,6 +52,11 @@ function oneOfStringsCI(strings) {
   };
 }
 
+/**
+ * A scheme Pandoc recognizes, the longest, in either case.
+ *
+ * @see Text.Pandoc.Parsing.General.uriScheme
+ */
 const uriScheme = oneOfStringsCI(SCHEMES);
 
 const WORD_SYMBOLS = new Set('#$%+/@\\_-&=');
