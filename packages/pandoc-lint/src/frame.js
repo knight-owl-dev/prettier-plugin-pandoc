@@ -124,3 +124,23 @@ export function frame(severity, callouts, lead = '') {
   }
   return out.map(printable);
 }
+
+// The line `start` is on, numbered `line`, carets under `start` to `end`
+// or the line's end; a tab a space, so that they line up.
+export function codeFrame(text, start, end, line) {
+  const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+  const found = text.indexOf('\n', start);
+  const lineEnd = found === -1 ? text.length : found;
+  const content = text.slice(lineStart, lineEnd).replaceAll('\t', ' ');
+  const before = [...text.slice(lineStart, start)].length;
+  const width = Math.max(
+    1,
+    [...text.slice(start, Math.min(Math.max(start, end), lineEnd))].length,
+  );
+  const number = String(line);
+  const pad = ' '.repeat(number.length);
+  return [
+    `${number} | ${content}`,
+    `${pad} | ${' '.repeat(before)}${'^'.repeat(width)}`,
+  ];
+}

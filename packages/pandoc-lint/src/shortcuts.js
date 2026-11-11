@@ -6,7 +6,8 @@
 // @see https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/
 
 import { isAlias, isMap, isScalar, isSeq, parseDocument } from 'yaml';
-import { codeFrame, lintSnippet } from './index.js';
+import { codeFrame } from './frame.js';
+import { lintSnippet } from './index.js';
 
 /** @typedef {import('./index.js').Diagnostic} Diagnostic */
 
@@ -28,8 +29,9 @@ const TEMPLATES = [
 ];
 
 /**
- * The diagnostics of a shortcuts file: what is no YAML, a template that is
- * no text, and each template's Markdown as `lintSnippet` finds it.
+ * The diagnostics of a shortcuts file: what is no YAML, a null, a template
+ * that is some other non-text, and each template's Markdown as
+ * `lintSnippet` finds it.
  *
  * @param {string} path
  * @param {string} text
@@ -39,7 +41,7 @@ const TEMPLATES = [
 export function lintShortcuts(path, text, options = {}) {
   const doc = parseDocument(text, { uniqueKeys: false, prettyErrors: false });
   const fail = (rule, problem, [start, end]) =>
-    error(path, text, rule, problem, start, end);
+    error(path, text, rule, { problem }, start, end);
   if (doc.errors.length > 0) {
     return doc.errors.map((e) =>
       fail('yaml-syntax', firstLine(e.message), e.pos),
@@ -55,8 +57,8 @@ export function lintShortcuts(path, text, options = {}) {
       ),
     ];
   }
-  const out = nulls(doc, doc.contents, []).map(({ at, start, end, ...how }) =>
-    error(path, text, 'shortcut-null', nullCallouts(at, how), start, end),
+  const out = nulls(text, doc.contents, []).map(({ at, item, start, end }) =>
+    error(path, text, 'shortcut-null', nullCallouts(at, item), start, end),
   );
   // Each node's findings by the template it is read as: an alias repeats
   // a template, linted where its anchor is.
@@ -66,8 +68,8 @@ export function lintShortcuts(path, text, options = {}) {
     const name = isScalar(key) ? String(key.value) : '?';
     for (const template of TEMPLATES) {
       const written = value.get(template.key, true);
-      // A null template is the null walk's to report.
-      if (written == null || isNull(doc, written)) continue;
+      // A null template is the null walk's to report, where it is written.
+      if (isNull(written)) continue;
       const markdown = isAlias(written) ? written.resolve(doc) : written;
       if (markdown === undefined) {
         out.push(
@@ -79,6 +81,7 @@ export function lintShortcuts(path, text, options = {}) {
         );
         continue;
       }
+      if (isNull(markdown)) continue;
       if (!reads.has(markdown)) reads.set(markdown, new Map());
       const read = reads.get(markdown);
       if (read.has(template.key)) continue;
@@ -161,52 +164,65 @@ function lineAndColumn(text, offset) {
 
 const firstLine = (message) => message.split('\n')[0].replace(/\.$/, '');
 
-// Whether `node` is a null, written so or through an alias.
-const isNull = (doc, node) =>
-  node == null ||
-  (isAlias(node) ? isNull(doc, node.resolve(doc) ?? {}) : false) ||
-  (isScalar(node) && node.value === null);
+// Whether `node` is a null as written: an alias is one where its anchor is.
+const isNull = (node) =>
+  node == null || (isScalar(node) && node.value === null);
 
 // Each null under `node`, at `path`: the key that holds it, or the list
-// item it is, spanning from there to the null's end. A key that is null
-// itself counts too.
-function nulls(doc, node, path) {
+// item it is, spanning from there to the null's end.
+function nulls(text, node, path) {
   const out = [];
   if (isMap(node)) {
     for (const { key, value } of node.items) {
-      const name =
-        isScalar(key) && key.value !== null ? String(key.value) : '~';
-      const at = [...path, name];
-      const [start, keyEnd] = key?.range ?? [0, 0];
-      if (isScalar(key) && key.value === null) {
-        out.push({ at, key: true, start, end: keyEnd });
-      } else if (isNull(doc, value)) {
-        out.push({ at, start, end: Math.max(keyEnd, value?.range?.[1] ?? 0) });
+      const at = [...path, keyName(key)];
+      if (isNull(value)) {
+        const [start, keyEnd] = key.range;
+        out.push({ at, start, end: Math.max(keyEnd, value?.range[1] ?? 0) });
       } else {
-        out.push(...nulls(doc, value, at));
+        out.push(...nulls(text, value, at));
       }
     }
   } else if (isSeq(node)) {
     node.items.forEach((item, k) => {
-      const at = [...path, `[${k}]`];
-      if (isNull(doc, item)) {
-        out.push({ at, item: true, start: item.range[0], end: item.range[1] });
+      const at = [...path, k + 1];
+      if (isNull(item)) {
+        // An empty item of a block list is its dash.
+        const [from, to] = item.range;
+        const start = from === to ? text.lastIndexOf('-', from - 1) : from;
+        out.push({ at, item: true, start, end: Math.max(to, start + 1) });
       } else {
-        out.push(...nulls(doc, item, at));
+        out.push(...nulls(text, item, at));
       }
     });
   }
   return out;
 }
 
+// A key as a path names it: as written, an alias by its anchor, a list or
+// map as `?`.
+function keyName(key) {
+  if (isScalar(key)) return key.value === null ? key.source : String(key.value);
+  return isAlias(key) ? `*${key.source}` : '?';
+}
+
+// A path as keys and list items, an item counted from 1; a key that would
+// read otherwise is quoted.
+const pathOf = (at) =>
+  at
+    .map((step, k) =>
+      typeof step === 'number'
+        ? `[${step}]`
+        : `${k > 0 ? '.' : ''}${/^$|[.[\]"]/.test(step) ? JSON.stringify(step) : step}`,
+    )
+    .join('');
+
 // What a null's error says: its path, why a layer can't take it, and what
 // does instead.
 //
 // @see https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#shadowing-a-system-shortcut
-function nullCallouts(at, { key, item } = {}) {
-  const name = at.join('.').replaceAll('.[', '[');
+function nullCallouts(at, item) {
   return {
-    problem: key ? `${name} is a null key` : `${name} has no value`,
+    problem: `${pathOf(at)} has no value`,
     because:
       'A layer only overrides: a null removes nothing, and stops the build.',
     remedy: item
@@ -215,9 +231,9 @@ function nullCallouts(at, { key, item } = {}) {
   };
 }
 
-// An error at the span from `start` to `end` of the file: its problem, or
-// its callouts, framed by the line it starts on.
-function error(path, text, rule, problem, start, end) {
+// An error at the span from `start` to `end` of the file: its callouts,
+// framed by the line it starts on.
+function error(path, text, rule, callouts, start, end) {
   const from = lineAndColumn(text, start);
   const to = lineAndColumn(text, Math.max(start, end));
   return {
@@ -230,23 +246,9 @@ function error(path, text, rule, problem, start, end) {
     column: from.column,
     endLine: to.line,
     endColumn: to.column,
-    callouts:
-      typeof problem === 'string'
-        ? { problem }
-        : {
-            ...problem,
-            verbatim: codeFrame(
-              text,
-              start,
-              Math.min(end, lineEnd(text, start)),
-              from.line,
-            ),
-          },
+    callouts: {
+      ...callouts,
+      verbatim: codeFrame(text, start, end, from.line),
+    },
   };
-}
-
-// Where the line `offset` is on ends.
-function lineEnd(text, offset) {
-  const end = text.indexOf('\n', offset);
-  return end === -1 ? text.length : end;
 }

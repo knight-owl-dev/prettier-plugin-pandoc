@@ -299,17 +299,32 @@ const NULLS = {
     'a:\n  class: Null\n',
     [2, 3, 'class: Null', 'a.class has no value'],
   ],
-  'a list item': [
+  'a list item, counted from 1': [
     'a:\n  classes: [x, ~]\n',
-    [2, 16, '~', 'a.classes[1] has no value'],
+    [2, 16, '~', 'a.classes[2] has no value'],
   ],
-  'an alias to one': [
+  'an empty item of a block list, at its dash': [
+    'a:\n  classes:\n    - x\n    -\n',
+    [4, 5, '-', 'a.classes[2] has no value'],
+  ],
+  'an alias to one: where it is written': [
     'n: &n ~\nb:\n  class: *n\n',
     [1, 1, 'n: &n ~', 'n has no value'],
-    [3, 3, 'class: *n', 'b.class has no value'],
   ],
-  'a key': ['~: x\n', [1, 1, '~', '~ is a null key']],
+  'one under a key written as null': [
+    '~:\n  body: ~\n',
+    [2, 3, 'body: ~', '~.body has no value'],
+  ],
+  'one under a key that reads as a path': [
+    'a.b:\n  "[1]": ~\n',
+    [2, 3, '"[1]": ~', '"a.b"."[1]" has no value'],
+  ],
 };
+
+test('a key written as null: a key, not a null', () => {
+  assert.deepEqual(found('~: x\n'), []);
+  assert.deepEqual(found('a:\n  : x\n'), []);
+});
 
 for (const [name, [text, ...expected]] of Object.entries(NULLS)) {
   test(`a null: ${name}`, () => {
