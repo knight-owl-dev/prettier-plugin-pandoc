@@ -49,7 +49,7 @@ export const macroDef = (construct) => (ctx) => {
 
 const commandDefs = alt(
   newcommand,
-  checkGlobal(alt(letmacro, edefmacro, defmacro, newif)),
+  checkGlobal(alt(letmacro, edefmacro, defmacro, (ctx) => newif(ctx))),
 );
 
 function commandDef(ctx) {
@@ -225,11 +225,11 @@ function defmacro(ctx) {
  *
  * @see Text.Pandoc.Readers.LaTeX.Macro.newif
  */
-function newif(ctx) {
+const newif = attempt((ctx) => {
   if (controlSeq('newif')(ctx) === FAIL) return FAIL;
   return withVerbatimMode((c) => {
     const pos = anyControlSeq(c);
-    if (pos === FAIL) return FAIL;
+    if (pos === FAIL || !pos.name.startsWith('if')) return FAIL;
     const { name } = pos;
     const base = [...name].slice(2).join('');
     const define = (value) =>
@@ -251,7 +251,7 @@ function newif(ctx) {
       [`${base}false`, define('iffalse')],
     ];
   })(ctx);
-}
+});
 
 const argTok = satisfyTok(isArgTok);
 
