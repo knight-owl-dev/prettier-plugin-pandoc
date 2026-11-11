@@ -92,6 +92,15 @@ reads no slower per character than `corpus x10`; the plugin formats the corpus
 in under 200ms at every `proseWrap`. A case more than 10% slower than `main` at
 `RUNS=7` needs its reason in the PR.
 
+## Review a Pandoc bump
+
+```sh
+make pandoc-drift
+```
+
+What moved upstream since the Pandoc the port was reviewed on, for the review
+[Bumping Pandoc](bumping-pandoc.md) walks through.
+
 ## Lint a manuscript
 
 ```sh
