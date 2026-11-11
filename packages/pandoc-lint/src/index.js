@@ -10,7 +10,7 @@ import {
   toKey,
   toSources,
 } from '@knight-owl-llc/pandoc-parser';
-import { frame } from './frame.js';
+import { codeFrame, frame } from './frame.js';
 import { misreads } from './misreads.js';
 import { RULES } from './rules.js';
 
@@ -304,7 +304,7 @@ function diagnostic(rule, msg, read, place, text, { spanTemplate, pinned }) {
       ...withoutEmpty(callouts),
       ...(pinned
         ? {}
-        : { verbatim: codeFrame(text, msg.start, until, from.line) }),
+        : { verbatim: codeFrame(text, msg.start, msg.end, from.line) }),
     },
   };
 }
@@ -316,27 +316,6 @@ const withoutEmpty = (callouts) =>
       Array.isArray(v) ? v.length > 0 : v !== '',
     ),
   );
-
-// The line `start` is on, numbered `line`, carets under `start` to `end`;
-// a tab a space, so that they line up.
-function codeFrame(text, start, end, line) {
-  const lineStart = text.lastIndexOf('\n', start - 1) + 1;
-  const lineEnd = text.indexOf('\n', start);
-  const content = text
-    .slice(lineStart, lineEnd === -1 ? text.length : lineEnd)
-    .replaceAll('\t', ' ');
-  const before = [...text.slice(lineStart, start)].length;
-  const width = Math.max(
-    1,
-    [...text.slice(start, Math.max(start, end))].length,
-  );
-  const number = String(line);
-  const pad = ' '.repeat(number.length);
-  return [
-    `${number} | ${content}`,
-    `${pad} | ${' '.repeat(before)}${'^'.repeat(width)}`,
-  ];
-}
 
 // The offset of a line and column in `text`, from 1, a column a code point.
 function offsetAt(text, { line, column }) {
