@@ -130,6 +130,7 @@ export function pandocLinks(names) {
   const dir = process.env.PATH.split(':').find((d) =>
     existsSync(join(d, 'pandoc')),
   );
+  if (!dir) throw new Error('pandoc is not on PATH');
   const binary = readFileSync(join(dir, 'pandoc'), 'latin1');
   return new Map(
     names.map((name) => {

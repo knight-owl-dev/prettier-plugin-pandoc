@@ -8,7 +8,14 @@
 //   node tools/drift.mjs
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { load, ROOT } from './lib/run.mjs';
 
@@ -30,17 +37,24 @@ if (to === from) {
 const OUT = join(ROOT, `.scratch/pandoc-${to}`);
 const HACKAGE = join(OUT, 'hackage');
 
-/** A Hackage package's source, unpacked once into `hackage/<id>/`. */
+/**
+ * A Hackage package's source, unpacked once into `hackage/<id>/`: whole, or
+ * not at all, so a run cut short leaves nothing the next one trusts.
+ */
 async function unpack(id) {
   const dir = join(HACKAGE, id);
   if (existsSync(dir)) return dir;
   const url = `https://hackage.haskell.org/package/${id}/${id}.tar.gz`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url}: ${response.status}`);
-  mkdirSync(HACKAGE, { recursive: true });
+  const partial = join(HACKAGE, `.${id}`);
+  rmSync(partial, { recursive: true, force: true });
+  mkdirSync(partial, { recursive: true });
   const input = Buffer.from(await response.arrayBuffer());
-  const tar = spawnSync('tar', ['-xzf', '-', '-C', HACKAGE], { input });
+  const tar = spawnSync('tar', ['-xzf', '-', '-C', partial], { input });
   if (tar.status !== 0) throw new Error(`${id}: ${tar.stderr}`);
+  renameSync(join(partial, id), dir);
+  rmSync(partial, { recursive: true });
   return dir;
 }
 
@@ -64,15 +78,20 @@ function diff(a, b, file) {
   return `+${count('+')} -${count('-')}`;
 }
 
-// The packages every `build-depends` of a .cabal file names.
+// The packages the library's `build-depends` name, its common stanzas' too:
+// an entry runs on in lines indented past its field.
 function dependencies(cabal) {
   const names = new Set();
-  let listing = false;
+  let library = false;
+  let listing = -1;
   for (const line of readFileSync(cabal, 'utf8').split('\n')) {
-    const field = line.match(/^\s*([\w-]+):\s*(.*)$/);
-    if (field) listing = field[1] === 'build-depends';
-    const entry = (field ? field[2] : line).trim();
-    if (listing && /^[A-Za-z]/.test(entry)) {
+    const indent = line.search(/\S/);
+    if (indent === 0) library = /^(library|common)\b/.test(line);
+    if (indent >= 0 && indent <= listing) listing = -1;
+    const field = line.match(/^\s*build-depends:\s*(.*)$/);
+    if (library && field) listing = indent;
+    const entry = (field ? field[1] : line).trim();
+    if (listing >= 0 && /^[A-Za-z]/.test(entry)) {
       for (const part of entry.split(',')) {
         const name = part.trim().match(/^[A-Za-z][\w-]*/);
         if (name) names.add(name[0]);
@@ -102,24 +121,22 @@ const table = (header, rows) =>
 const pandocFrom = await unpack(`pandoc-${from}`);
 const pandocTo = await unpack(`pandoc-${to}`);
 
+// Each ported module and data path by its source path, and the name of its
+// diff.
+const ported = [
+  ...Object.keys(upstream.modules).map((m) => [
+    m,
+    `src/${m.replaceAll('.', '/')}.hs`,
+  ]),
+  ...Object.keys(upstream.data).map((p) => [p, p]),
+];
 const modules = [];
-for (const module of Object.keys(upstream.modules)) {
-  const path = `src/${module.replaceAll('.', '/')}.hs`;
-  const a = join(pandocFrom, path);
-  const b = join(pandocTo, path);
-  const moved = existsSync(b)
-    ? diff(a, b, join(OUT, 'pandoc', `${module}.diff`))
+for (const [name, path] of ported) {
+  const file = `pandoc/${name.replaceAll('/', '-')}.diff`;
+  const moved = existsSync(join(pandocTo, path))
+    ? diff(join(pandocFrom, path), join(pandocTo, path), join(OUT, file))
     : 'removed';
-  if (moved) modules.push([`\`${module}\``, moved, `pandoc/${module}.diff`]);
-}
-for (const path of Object.keys(upstream.data)) {
-  const name = path.replaceAll('/', '-');
-  const moved = diff(
-    join(pandocFrom, path),
-    join(pandocTo, path),
-    join(OUT, 'pandoc', `${name}.diff`),
-  );
-  if (moved) modules.push([`\`${path}\``, moved, `pandoc/${name}.diff`]);
+  if (moved) modules.push([`\`${name}\``, moved, file]);
 }
 
 const before = dependencies(join(pandocFrom, 'pandoc.cabal'));
@@ -161,9 +178,7 @@ writeFileSync(
   changelog(join(pandocTo, 'changelog.md')),
 );
 
-const paths = Object.keys(upstream.modules)
-  .map((m) => `src/${m.replaceAll('.', '/')}.hs`)
-  .concat(Object.keys(upstream.data));
+const paths = ported.map(([, path]) => path);
 
 writeFileSync(
   join(OUT, 'README.md'),
@@ -175,7 +190,7 @@ its own words in \`changelog.md\`.
 
 ## Ported modules and data that changed
 ${table(['Upstream', 'Lines', 'Diff'], modules)}
-${Object.keys(upstream.modules).length + Object.keys(upstream.data).length - modules.length} others unchanged.
+${ported.length - modules.length} others unchanged.
 
 ## Libraries the port follows, moved
 ${table(['Library', 'Follows', 'Linked', 'Diff'], libraries)}

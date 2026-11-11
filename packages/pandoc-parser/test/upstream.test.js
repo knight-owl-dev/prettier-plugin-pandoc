@@ -8,6 +8,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { API_VERSION } from '../src/ast/nodes.js';
 import { pandocLinks, pandocVersion } from './helpers/oracle.js';
 
 const PACKAGE = fileURLToPath(new URL('..', import.meta.url));
@@ -16,12 +17,10 @@ const upstream = JSON.parse(
 );
 const SOP = 'see docs/bumping-pandoc.md';
 
-const sources = (dir) =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) return sources(path);
-    return entry.name.endsWith('.js') ? [path] : [];
-  });
+const SRC = join(PACKAGE, 'src');
+const sources = readdirSync(SRC, { recursive: true })
+  .filter((f) => f.endsWith('.js'))
+  .map((f) => join(SRC, f));
 
 test('the port was reviewed on the Pandoc the oracle runs', () => {
   const runs = pandocVersion();
@@ -44,6 +43,13 @@ test('each library at the version the oracle links', () => {
   assert.deepEqual(moved, [], `${moved.join('; ')}: ${SOP}`);
 });
 
+test('the AST carries the pandoc-types version the port follows', () => {
+  assert.equal(
+    API_VERSION.join('.'),
+    upstream.libraries['pandoc-types'].version,
+  );
+});
+
 // A target falls under the longest listed module it starts with: past it, a
 // type or function.
 test('every module a port names is listed, each listed one named', () => {
@@ -53,7 +59,7 @@ test('every module a port names is listed, each listed one named', () => {
   ];
   const named = new Set();
   const unlisted = new Set();
-  for (const file of sources(join(PACKAGE, 'src'))) {
+  for (const file of sources) {
     const text = readFileSync(file, 'utf8');
     for (const [, target] of text.matchAll(/@see +`?([A-Z]\w*(?:\.\w+)+)/g)) {
       const module = listed
