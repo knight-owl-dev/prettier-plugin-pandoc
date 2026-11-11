@@ -6,8 +6,10 @@ Pandoc, no network, the repo mounted at `/work`. `make help` lists every target
 with its variables.
 
 Every run stops after `TIMEOUT` seconds (default 1800): a hung parse otherwise
-blocks forever, and `timeout` inside the image cannot stop Node. Output the
-tools keep lands in `.scratch/`.
+blocks forever, and `timeout` inside the image cannot stop Node. Right after
+many files under the repo are deleted, a run can fail throughout while Docker
+Desktop's mount catches up, and passes when run again. Output the tools keep
+lands in `.scratch/`.
 
 ## Fuzz before a printer or parser PR
 
@@ -98,8 +100,8 @@ in under 200ms at every `proseWrap`. A case more than 10% slower than `main` at
 make pandoc-drift
 ```
 
-What moved upstream since the Pandoc the port was reviewed on, for the review
-[Bumping Pandoc](bumping-pandoc.md) walks through.
+Lists what moved upstream since the Pandoc the port was reviewed on, for the
+review that [Bumping Pandoc](bumping-pandoc.md) walks through.
 
 ## Generate the tables again
 
