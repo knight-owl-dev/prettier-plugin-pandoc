@@ -23,7 +23,7 @@ const CASES = {
     'a\\footnotemark{} b\\footnotetext{text} c\\footnotemark[5] d\\footnotetext[5]{five} e\\footnotemark[9]',
   'line breaks and passthrough': 'x\\newline y \\passthrough{\\texttt{a\\%b}}',
   links:
-    '\\url{http://a.b/c\\_d#e} \\nolinkurl{x\\%y} \\href{http://z}{zed} \\hyperlink{t}{to t} \\hyperref[lab]{L} \\hyperref{u}{c}{n}{T} \\hypertarget{h}{H}',
+    '\\url{http://a.b/c\\_d#e} \\url{a\\\\b\\x\\\\\\%d} \\nolinkurl{x\\%y} \\href{http://z}{zed} \\hyperlink{t}{to t} \\hyperref[lab]{L} \\hyperref{u}{c}{n}{T} \\hypertarget{h}{H}',
   'hyphenat and colors':
     '\\nohyphens{n} \\textnhtt{a b} \\nhttfamily{c} \\textcolor{red}{r} \\colorbox[rgb]{1,0,0}{bg}',
   toggles:
