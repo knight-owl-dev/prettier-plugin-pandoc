@@ -28,7 +28,7 @@ const CASES = {
   'definitions that stay text':
     '\\def\\x#1 #2{z}\n\n\\newcommand\n\\x{y}\n\na \\global\\advance b',
   makeatletter: '\\makeatletter\n\\def\\a@b{c}\n\\makeatother\nrest',
-  'drifts: a url with a comment':
+  'a url with a comment':
     'l1\n\nl2\n\nl3\n\nl4\n\na \\url{a%b} c\n\nl6\n\nl7\n\nl8\n\nl9\n\nl10',
   'drifts: ## and line ends':
     'a \\foo{##} b\n\na \\foo{x\\\ny} b\n\na \\foo{^^\nx} b\n\na \\foo{x\\   \n\nz} b',
