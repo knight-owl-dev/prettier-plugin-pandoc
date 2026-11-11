@@ -71,9 +71,9 @@ const CASES = {
 for (const [name, text] of Object.entries(CASES)) {
   for (const tabStop of TAB_STOPS) {
     test(`${name} (tab stop ${tabStop})`, () => {
-      const ours = readMarkdown(text, { tabStop }).log;
+      const read = readMarkdown(text, { tabStop });
       const theirs = pandocLog(text, 'markdown', tabStop);
-      assert.deepEqual(...logsCompared(text, tabStop, ours, theirs));
+      assert.deepEqual(...logsCompared(text, tabStop, read, theirs));
     });
   }
 }

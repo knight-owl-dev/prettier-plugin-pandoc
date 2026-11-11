@@ -1,6 +1,7 @@
 // A read's log beside Pandoc's: each message at Pandoc's position. Pandoc
-// gives a position in text extracted to be read again, a list item's, a
-// note's or raw TeX's (a `chunk`), in that text's lines: there only the
+// gives a position in text extracted to be read again in that text's
+// frame: a note's or raw TeX's (a `chunk`), or, in its source's name, a
+// container's (a list item's, a quote's, a table cell's). There only the
 // message is compared, the port's position being the source's. In raw TeX,
 // Pandoc's tokenizer drifts behind the text (`tokenize`): there Pandoc's
 // position may fall behind the port's, never ahead.
@@ -13,26 +14,53 @@ const LATEX = new Set([
   'UndefinedToggle',
 ]);
 
+// The blocks whose contents Pandoc extracts and reads again.
+const REREAD = new Set([
+  'BlockQuote',
+  'BulletList',
+  'OrderedList',
+  'DefinitionList',
+  'LineBlock',
+  'Table',
+]);
+
+// The spans of each block in `value` Pandoc reads again.
+function rereadSpans(value, spans = []) {
+  if (Array.isArray(value)) {
+    for (const v of value) rereadSpans(v, spans);
+  } else if (value !== null && typeof value === 'object') {
+    if (REREAD.has(value.t)) spans.push([value.start, value.end]);
+    for (const v of Object.values(value)) rereadSpans(v, spans);
+  }
+  return spans;
+}
+
 /**
- * Our log and Pandoc's `--log` JSON of `text`, read at `tabStop`, as two
- * values equal where they agree.
+ * Our read's log and Pandoc's `--log` JSON of `text`, read at `tabStop`, as
+ * two values equal where they agree.
  *
  * @param {string} text
  * @param {number} tabStop
- * @param {import('../../src/logging.js').LogMessage[]} ours
+ * @param {{blocks: object[], log: import('../../src/logging.js').LogMessage[]}} read
  * @param {object[]} theirs
  * @returns {[object[], object[]]}
  */
-export function logsCompared(text, tabStop, ours, theirs) {
+export function logsCompared(text, tabStop, read, theirs) {
   const at = positionsIn(text, tabStop);
+  const reread = rereadSpans(read.blocks);
+  const inReread = (offset) =>
+    reread.some(([start, end]) => start < offset && offset <= end);
   const want = theirs.map(normalized(at(text.length)));
-  const got = ours.map(({ start, end, pos, ...fields }, k) => {
-    const out =
+  const got = read.log.map(({ start, end, pos, ...fields }, k) => {
+    const offsets =
       fields.type === 'UnclosedDiv'
-        ? { ...fields, closepos: at(end), openpos: at(start) }
-        : { ...fields, at: at(pos) };
-    for (const key of ['at', 'openpos', 'closepos']) {
-      if (!(key in (want[k] ?? {}))) delete out[key];
+        ? { closepos: end, openpos: start }
+        : { at: pos };
+    const out = { ...fields };
+    for (const [key, offset] of Object.entries(offsets)) {
+      if (!(key in (want[k] ?? {}))) continue;
+      if (inReread(offset)) delete want[k][key];
+      else out[key] = at(offset);
     }
     if (LATEX.has(out.type) && out.at && behind(want[k].at, out.at)) {
       out.at = want[k].at;

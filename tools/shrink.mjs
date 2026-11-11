@@ -76,7 +76,7 @@ const FAILS = {
   differ: (doc) => pandoc(doc) !== mine(doc),
   log(doc) {
     const theirs = logCli(doc, found);
-    const pair = logsCompared(doc, found.tabStop, ours(doc).log, theirs);
+    const pair = logsCompared(doc, found.tabStop, ours(doc), theirs);
     return JSON.stringify(pair[0]) !== JSON.stringify(pair[1]);
   },
   span(doc) {
