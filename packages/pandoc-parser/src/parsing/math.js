@@ -12,7 +12,7 @@ import {
   space,
   string,
 } from '../char.js';
-import { alt, attempt, FAIL, many1, notFollowedBy } from '../core.js';
+import { alt, attempt, FAIL, many1, manyTill, notFollowedBy } from '../core.js';
 import { trimMath } from '../shared.js';
 import {
   blankline,
@@ -26,110 +26,110 @@ import { whenEnabled } from './state.js';
 
 /** @template T @typedef {import('../core.js').Parser<T>} Parser */
 
-const backslash = char('\\');
 const notDollar = notFollowedBy(char('$'));
 const notBlankline = notAhead(blankline);
 
 /**
- * Braces and what they hold, balanced, a backslash escaping the character
- * after it: what `\text` takes, which may hold a math delimiter.
+ * Any character, a line feed only where no blank line follows it.
  *
- * @see Text.Pandoc.Parsing.Math.mathInlineWith
+ * @see Text.Pandoc.Parsing.Math.mathChar
  * @type {Parser<string>}
  */
-function inBalancedBraces(ctx) {
-  const { text } = ctx;
-  if (text[ctx.pos] !== '{') return FAIL;
-  const from = ctx.pos;
-  let depth = 0;
-  for (let at = from; at < text.length; ) {
-    const c = String.fromCodePoint(text.codePointAt(at));
-    at += c.length;
-    if (c === '\\') {
-      if (at >= text.length) break;
-      at += String.fromCodePoint(text.codePointAt(at)).length;
-    } else if (c === '{') {
-      depth++;
-    } else if (c === '}' && --depth === 0) {
-      ctx.pos = at;
-      return text.slice(from, at);
-    }
-  }
-  ctx.pos = text.length;
-  return FAIL;
-}
-
-const text = string('text');
-const textCommand = attempt((ctx) => {
-  if (text(ctx) === FAIL) return FAIL;
-  const braces = inBalancedBraces(ctx);
-  return braces === FAIL ? FAIL : `\\text${braces}`;
-});
-const mathChar = satisfy((c) => !isSpaceChar(c) && c !== '\\');
-const escaped = (ctx) => {
-  if (backslash(ctx) === FAIL) return FAIL;
-  const command = textCommand(ctx);
-  if (command !== FAIL) return command;
-  const c = anyChar(ctx);
-  return c === FAIL ? FAIL : `\\${c}`;
-};
-const lineBreak = (ctx) =>
-  blankline(ctx) === FAIL ||
-  notBlankline(ctx) === FAIL ||
-  notDollar(ctx) === FAIL
-    ? FAIL
-    : '\n';
-const spaces = (ctx) => {
-  const s = textOf(many1(spaceChar))(ctx);
-  return s === FAIL || notDollar(ctx) === FAIL ? FAIL : s;
-};
-const inlineChunk = alt(mathChar, escaped, lineBreak, spaces);
-const noSpaceAhead = notFollowedBy(space);
-const noDigitAhead = notFollowedBy(digit);
-
-/**
- * Math between `open` and `close` on a line, or lines with no blank line
- * between them: after `$`, no space; after the close, no digit, which
- * would make it a price.
- *
- * @see Text.Pandoc.Parsing.Math.mathInlineWith
- * @param {string} open
- * @param {string} close
- * @returns {Parser<string>}
- */
-function mathInlineWith(open, close) {
-  const opening = string(open);
-  const words = many1Till(inlineChunk, attempt(string(close)));
-  return attempt((ctx) => {
-    if (opening(ctx) === FAIL) return FAIL;
-    if (open === '$' && noSpaceAhead(ctx) === FAIL) return FAIL;
-    const read = words(ctx);
-    if (read === FAIL || noDigitAhead(ctx) === FAIL) return FAIL;
-    return trimMath(read.join(''));
-  });
-}
-
-const displayChar = alt(
+const mathChar = alt(
   satisfy((c) => c !== '\n'),
   (ctx) => (newline(ctx) === FAIL || notBlankline(ctx) === FAIL ? FAIL : '\n'),
 );
 
+const commentLine = manyTill(anyChar, newline);
+
+/**
+ * A comment through its line feed, kept: its braces and dollars are text.
+ *
+ * @see Text.Pandoc.Parsing.Math.mathComment
+ * @type {Parser<string>}
+ */
+function mathComment(ctx) {
+  const from = ctx.pos;
+  if (ctx.text[from] !== '%') return FAIL;
+  ctx.pos++;
+  if (commentLine(ctx) === FAIL || notBlankline(ctx) === FAIL) return FAIL;
+  return ctx.text.slice(from, ctx.pos);
+}
+
+/**
+ * A TeX group, whole, so a delimiter in a command's argument
+ * (`\\text{a $x$}`) closes no math; an escaped brace nests nothing.
+ *
+ * @see Text.Pandoc.Parsing.Math.mathGroup
+ * @type {Parser<string>}
+ */
+function mathGroup(ctx) {
+  const from = ctx.pos;
+  if (ctx.text[from] !== '{') return FAIL;
+  ctx.pos++;
+  let escaped = false;
+  for (let depth = 1; depth > 0; ) {
+    if (!escaped) {
+      const at = ctx.pos;
+      if (mathComment(ctx) !== FAIL) continue;
+      if (ctx.pos !== at) return FAIL;
+    }
+    const c = mathChar(ctx);
+    if (c === FAIL) return FAIL;
+    if (escaped) escaped = false;
+    else if (c === '\\') escaped = true;
+    else if (c === '}') depth--;
+    else if (c === '{') depth++;
+  }
+  return ctx.text.slice(from, ctx.pos);
+}
+
+const plainChar = satisfy((c) => !isSpaceChar(c) && c !== '\\' && c !== '{');
+const spaces = textOf(many1(spaceChar));
+const escaped = (ctx) => {
+  if (char('\\')(ctx) === FAIL) return FAIL;
+  const c = anyChar(ctx);
+  return c === FAIL ? FAIL : `\\${c}`;
+};
+const noSpaceAhead = notFollowedBy(space);
+const noDigitAhead = notFollowedBy(digit);
+
 /**
  * Math between `open` and `close`, over lines with no blank line between
- * them.
+ * them. With `$`: no space after the open, no space or line feed before a
+ * `$`, no digit after the close, which would make it a price.
  *
- * @see Text.Pandoc.Parsing.Math.mathDisplayWith
+ * @see Text.Pandoc.Parsing.Math.mathWith
  * @param {string} open
  * @param {string} close
  * @returns {Parser<string>}
  */
-function mathDisplayWith(open, close) {
+function mathWith(open, close) {
+  const dollar = open === '$';
+  // Before a `$` that may close inline math, no space or line feed.
+  const beforeClose = (read) => (ctx) =>
+    read === FAIL || (dollar && notDollar(ctx) === FAIL) ? FAIL : read;
+  const chunk = alt(
+    mathComment,
+    mathGroup,
+    plainChar,
+    (ctx) => beforeClose(spaces(ctx))(ctx),
+    (ctx) =>
+      beforeClose(
+        newline(ctx) === FAIL || notBlankline(ctx) === FAIL ? FAIL : '\n',
+      )(ctx),
+    escaped,
+  );
   const opening = string(open);
-  const chars = many1Till(displayChar, attempt(string(close)));
+  const words = many1Till(chunk, attempt(string(close)));
   return attempt((ctx) => {
     if (opening(ctx) === FAIL) return FAIL;
-    const read = chars(ctx);
-    return read === FAIL ? FAIL : read.join('');
+    if (dollar && noSpaceAhead(ctx) === FAIL) return FAIL;
+    const read = words(ctx);
+    if (read === FAIL || (close === '$' && noDigitAhead(ctx) === FAIL)) {
+      return FAIL;
+    }
+    return trimMath(read.join(''));
   });
 }
 
@@ -140,9 +140,9 @@ function mathDisplayWith(open, close) {
  * @type {Parser<string>}
  */
 export const mathDisplay = alt(
-  whenEnabled('tex_math_dollars', mathDisplayWith('$$', '$$')),
-  whenEnabled('tex_math_single_backslash', mathDisplayWith('\\[', '\\]')),
-  whenEnabled('tex_math_double_backslash', mathDisplayWith('\\\\[', '\\\\]')),
+  whenEnabled('tex_math_dollars', mathWith('$$', '$$')),
+  whenEnabled('tex_math_single_backslash', mathWith('\\[', '\\]')),
+  whenEnabled('tex_math_double_backslash', mathWith('\\\\[', '\\\\]')),
 );
 
 /**
@@ -152,7 +152,7 @@ export const mathDisplay = alt(
  * @type {Parser<string>}
  */
 export const mathInline = alt(
-  whenEnabled('tex_math_dollars', mathInlineWith('$', '$')),
-  whenEnabled('tex_math_single_backslash', mathInlineWith('\\(', '\\)')),
-  whenEnabled('tex_math_double_backslash', mathInlineWith('\\\\(', '\\\\)')),
+  whenEnabled('tex_math_dollars', mathWith('$', '$')),
+  whenEnabled('tex_math_single_backslash', mathWith('\\(', '\\)')),
+  whenEnabled('tex_math_double_backslash', mathWith('\\\\(', '\\\\)')),
 );

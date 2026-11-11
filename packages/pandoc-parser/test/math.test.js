@@ -15,6 +15,10 @@ const CASES = {
   'over lines': '$a\nb$ $a\n\nb$\n\n$$a\nb$$ $$a\n\nb$$',
   'an apostrophe after': "$x$'s value, $x$' alone",
   'in a list and a quote': '- $x$\n- $$y$$\n\n> $a\n> b$',
+  'display, trimmed': '$$ x  $$ and $$\ny\n$$',
+  'comments, kept': '$x % c$ d\ne$ and $a % b\n\nc$',
+  'groups, whole': '$x{y$ z}$ and $\\colorbox{aqua}{$x$}$ and $\\{$',
+  'an escaped line feed': '$$x\\\n\ny$$',
 };
 
 for (const [name, text] of Object.entries(CASES)) {
