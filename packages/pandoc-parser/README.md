@@ -18,15 +18,15 @@ const doc = readMarkdown(text, { tabStop: 4 });
 doc.blocks[0].start; // where the first block starts in `text`
 ```
 
-| Export                              | What it is                                                                        |
-| ----------------------------------- | --------------------------------------------------------------------------------- |
-| `readMarkdown(text, {tabStop})`     | The document as Pandoc's Markdown reader reads it                                 |
-| `readLaTeX(text, options)`          | The document as Pandoc's LaTeX reader reads it                                    |
-| `withoutSpans(value)`               | A read without its spans: Pandoc's JSON                                           |
-| `toSources(files)`                  | Files joined as Pandoc's CLI joins them, with a lookup from an offset to its file |
-| `continuesParagraph(next, options)` | Whether Pandoc reads a paragraph on into the line `next`                          |
-| `DEFAULT_TAB_STOP`                  | Pandoc's default `--tab-stop`, 4                                                  |
-| `PandocParseError`                  | The error a read throws where Pandoc's fails, spanning its cause: `start`, `end`  |
+| Export                                   | What it is                                                                             |
+| ---------------------------------------- | -------------------------------------------------------------------------------------- |
+| `readMarkdown(text, {tabStop, sources})` | The document as Pandoc's Markdown reader reads it                                      |
+| `readLaTeX(text, options)`               | The document as Pandoc's LaTeX reader reads it                                         |
+| `withoutSpans(value)`                    | A read without its spans: Pandoc's JSON                                                |
+| `toSources(files)`                       | Files joined as Pandoc's CLI joins them: `text`, `sources` to read it by, and `locate` |
+| `continuesParagraph(next, options)`      | Whether Pandoc reads a paragraph on into the line `next`                               |
+| `DEFAULT_TAB_STOP`                       | Pandoc's default `--tab-stop`, 4                                                       |
+| `PandocParseError`                       | The error a read throws where Pandoc's fails: `start`, `end`, and any `detail`         |
 
 A Markdown read also carries four properties outside its JSON:
 

@@ -210,9 +210,15 @@ export class SourceText {
   }
 }
 
-// The index of the last piece starting before `offset`, or at it where
-// `inclusive`; -1 for none.
-function lastStarting(pieces, offset, inclusive) {
+/**
+ * The index of the last of `pieces`, in order of `at`, starting before
+ * `offset`, or at it where `inclusive`; -1 for none.
+ *
+ * @param {{at: number}[]} pieces
+ * @param {number} offset
+ * @param {boolean} inclusive
+ */
+export function lastStarting(pieces, offset, inclusive) {
   let [lo, hi] = [0, pieces.length - 1];
   let found = -1;
   while (lo <= hi) {

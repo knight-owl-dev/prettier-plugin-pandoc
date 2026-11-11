@@ -229,3 +229,21 @@ test('metadata in the Markdown, with noMetadata alone', () => {
     ['metadata-in-markdown'],
   );
 });
+
+test('raw TeX into a file whose name sorts first: why Pandoc fails', () => {
+  const [d, ...rest] = lint([
+    { path: 'ch9.md', text: '\\begin{foo}\na\n' },
+    { path: 'ch10.md', text: '\\end{foo}\n' },
+  ]);
+  assert.deepEqual(rest, []);
+  assert.equal(d.rule, 'pandoc-parse-error');
+  assert.deepEqual([d.source, d.line, d.column], ['ch9.md', 1, 1]);
+  assert.equal(
+    d.callouts.problem,
+    'raw TeX runs on into ch10.md, whose name sorts before ch9.md',
+  );
+  assert.equal(
+    d.callouts.remedy,
+    'End the TeX in ch9.md, or name the files so they sort in the order given.',
+  );
+});

@@ -9,6 +9,7 @@ import { FAIL } from '../core.js';
 import { EMPTY_MAP } from '../persistent-map.js';
 import { positions } from '../position.js';
 import { toLower, words } from '../shared.js';
+import { lastStarting } from '../source-text.js';
 
 /** @typedef {import('../core.js').Context} Context */
 /** @typedef {import('../options.js').ReaderOptions} ReaderOptions */
@@ -53,6 +54,8 @@ import { toLower, words } from '../shared.js';
  * @property {Map<string, import('../latex/parsing.js').Macro>} macros The
  *   TeX macros defined so far.
  * @property {Record<string, unknown>} meta The document's metadata so far.
+ * @property {Sources | null} sources The files the document joins, where
+ *   it joins several.
  */
 
 /** @typedef {[string, string[], [string, string][]]} Attr */
@@ -118,6 +121,7 @@ export const defaultParserState = (options) => ({
   logMessages: null,
   unresolved: null,
   metadataBlocks: null,
+  sources: null,
 });
 
 /**
@@ -196,15 +200,53 @@ function placeOf(end) {
 }
 
 /**
- * The line and column a parse is at, as Pandoc's input counts them.
+ * The files a document joins: where each starts and ends in the text the
+ * reader parses, and its name.
+ *
+ * @typedef {{text: string, files: SourceFile[]}} Sources
+ * @typedef {{path: string | undefined, at: number, end: number}} SourceFile
+ */
+
+/**
+ * The files of the text `ctx` reads: those its document joins, else the
+ * text as one file. A container's contents are a text of their own, as in
+ * Pandoc.
+ *
+ * @param {{text: string, state: {sources?: Sources | null}}} ctx
+ * @returns {SourceFile[]}
+ */
+export function filesOf(ctx) {
+  const sources = ctx.state.sources;
+  if (sources?.text === ctx.text) return sources.files;
+  return [{ path: undefined, at: 0, end: ctx.text.length }];
+}
+
+/**
+ * The file of `files` that `offset` is in.
+ *
+ * @param {SourceFile[]} files
+ * @param {number} offset
+ */
+export const fileAt = (files, offset) =>
+  files[Math.max(0, lastStarting(files, offset, true))];
+
+/**
+ * Where a parse is, as Pandoc's input counts it: the line and column in
+ * its file, and the file's name (`source`) in a document of several.
  *
  * @see Text.Parsec.Prim.getPosition
+ * @see Text.Pandoc.Sources.updateSourcePos
  * @param {Context} ctx
  * @param {number} [offset] Another offset in the text it reads.
- * @returns {{line: number, column: number}}
+ * @returns {{source?: string, line: number, column: number}}
  */
-export const getPosition = (ctx, offset = ctx.pos) =>
-  placeHere({ ...ctx, pos: offset }, ctx);
+export function getPosition(ctx, offset = ctx.pos) {
+  const at = placeHere({ ...ctx, pos: offset }, ctx);
+  const file = fileAt(filesOf(ctx), offset);
+  if (file.path === undefined) return at;
+  const first = placeHere({ ...ctx, pos: file.at }, ctx).line;
+  return { source: file.path, line: at.line - first + 1, column: at.column };
+}
 
 function placeHere(ctx, key = ctx) {
   let texts = reading.get(key);

@@ -14,3 +14,19 @@ export function codePointLength(text, pos) {
   const low = text.charCodeAt(pos + 1);
   return low >= 0xdc00 && low <= 0xdfff ? 2 : 1;
 }
+
+/**
+ * Haskell's order of `Text`: by code point, where JavaScript's compares
+ * UTF-16 code units.
+ *
+ * @param {string} a
+ * @param {string} b
+ */
+export function byCodePoint(a, b) {
+  const [x, y] = [[...a], [...b]];
+  for (let k = 0; k < Math.min(x.length, y.length); k++) {
+    const d = x[k].codePointAt(0) - y[k].codePointAt(0);
+    if (d !== 0) return d;
+  }
+  return x.length - y.length;
+}

@@ -336,6 +336,7 @@ const canContainAmp = (t) =>
 // A token at `at`'s position, spanning nothing there.
 const setposAt = (ctx) => (t) => ({
   ...t,
+  source: ctx.state.source,
   line: ctx.state.line,
   column: ctx.state.column,
   start: ctx.state.at,
