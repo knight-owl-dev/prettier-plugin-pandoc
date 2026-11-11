@@ -7,7 +7,6 @@
 // reads from those modules, it reads when called.
 
 import * as B from '../ast/builder.js';
-import { Node } from '../ast/nodes.js';
 import { keepContents } from '../ast/spans.js';
 import {
   attempt,
@@ -26,6 +25,7 @@ import {
   parseFromStringFresh,
 } from '../parsing/general.js';
 import { enabled } from '../parsing/state.js';
+import { paraToPlain } from '../shared.js';
 import { SourceText } from '../source-text.js';
 import { inlines } from './inlines.js';
 import { defListStart, listItem } from './lists.js';
@@ -33,17 +33,6 @@ import { table } from './tables.js';
 
 /** @typedef {import('../core.js').Context} Context */
 /** @typedef {import('../ast/nodes.js').Node} Node */
-
-/**
- * A paragraph as a plain block: a tight list's.
- *
- * @see Text.Pandoc.Readers.Markdown.paraToPlain
- * @param {Node} block
- */
-const paraToPlain = (block) =>
-  block.t === 'Para'
-    ? new Node('Plain', block.c, block.start, block.end)
-    : block;
 
 // The definitions of a term, by whether the four-space rule holds.
 const definitionsOf = new Map();

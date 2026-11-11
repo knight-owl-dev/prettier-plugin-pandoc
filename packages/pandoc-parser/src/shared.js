@@ -6,7 +6,7 @@
 import { concat, trimInlines } from './ast/inlines.js';
 import { Node } from './ast/nodes.js';
 import { keepContents } from './ast/spans.js';
-import { walkInlines } from './ast/walk.js';
+import { walk, walkInlines } from './ast/walk.js';
 import { isAlpha, isAlphaNum, isSpace } from './char.js';
 import { charWidth } from './text-width.js';
 
@@ -456,6 +456,59 @@ const isPara = (b) => b.t === 'Para';
 const withType = (b, t) => new Node(t, b.c, b.start, b.end);
 
 /**
+ * A paragraph as a plain block, any other block as it is.
+ *
+ * @see Text.Pandoc.Shared.paraToPlain
+ * @param {Node} block
+ */
+export const paraToPlain = (block) =>
+  isPara(block) ? withType(block, 'Plain') : block;
+
+/**
+ * A table with each paragraph plain where every list of blocks in it is
+ * empty or one paragraph or plain block; its notes keep their paragraphs.
+ * A note still pending its contents leaves the table as it is, until they
+ * are filled.
+ *
+ * @see Text.Pandoc.Shared.compactifyTable
+ * @template {Node | Node[]} T
+ * @param {T} table A table, or blocks: each of them.
+ * @returns {T}
+ */
+export function compactifyTable(table) {
+  if (Array.isArray(table)) {
+    return keepContents(table, table.map(compactifyTable));
+  }
+  let simple = true;
+  walk(
+    {
+      blocks: (bs) => {
+        simple &&= bs.length === 0 || (bs.length === 1 && isParaOrPlain(bs[0]));
+        return bs;
+      },
+      inline: (x) => {
+        if (x.t === 'Note' && !Array.isArray(x.c)) simple = false;
+        return x;
+      },
+    },
+    table,
+  );
+  if (!simple) return table;
+  const fixNote = (x) =>
+    x.t === 'Note' && x.c.length === 1 && x.c[0].t === 'Plain'
+      ? new Node(
+          'Note',
+          keepContents(x.c, [withType(x.c[0], 'Para')]),
+          x.start,
+          x.end,
+        )
+      : x;
+  return walk({ inline: fixNote }, walk({ block: paraToPlain }, table));
+}
+
+const isParaOrPlain = (b) => b.t === 'Para' || b.t === 'Plain';
+
+/**
  * List items made tight or loose as a whole: where only the last item ends
  * in a paragraph, that paragraph is plain; where any other has one, every
  * plain block is a paragraph.
@@ -492,7 +545,7 @@ const SPACE = null;
 // nothing), and the box. `[ ]` as one `Str`, a space inside, no `Str` holds.
 const TASKS = [
   [['[', SPACE, ']'], 'space', EMPTY_BOX],
-  [['[ ]'], 'space', CHECKED_BOX],
+  [['[ ]'], 'space', EMPTY_BOX],
   [['[x]'], 'space', CHECKED_BOX],
   [['[X]'], 'space', CHECKED_BOX],
   [['[', SPACE, ']'], 'end', EMPTY_BOX],

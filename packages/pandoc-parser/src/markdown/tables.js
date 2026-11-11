@@ -47,7 +47,7 @@ import {
   toTableComponents,
   withDefaultWidths,
 } from '../parsing/tables.js';
-import { splitTextByIndices } from '../shared.js';
+import { compactifyTable, splitTextByIndices } from '../shared.js';
 import { SourceText } from '../source-text.js';
 import { realLength } from '../text-width.js';
 import { attributes } from './attributes.js';
@@ -708,14 +708,16 @@ const tableAt = attempt((ctx) => {
   const captionBlocks = B.plain(ils, ils[0]?.start, ils.at(-1)?.end);
   const { specs, head, bodies, foot } = parts;
   const end = blockEnd(ctx.text, start, ctx.pos, []);
-  return B.tableWith(
-    caption?.attr ?? nullAttr,
-    B.simpleCaption(captionBlocks),
-    specs,
-    head,
-    bodies,
-    foot,
-    start,
-    end,
+  return compactifyTable(
+    B.tableWith(
+      caption?.attr ?? nullAttr,
+      B.simpleCaption(captionBlocks),
+      specs,
+      head,
+      bodies,
+      foot,
+      start,
+      end,
+    ),
   );
 });

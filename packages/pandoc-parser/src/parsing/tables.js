@@ -205,17 +205,6 @@ function cellSource(source, lines) {
 }
 
 /**
- * A single paragraph as a plain block.
- *
- * @see Text.Pandoc.Parsing.GridTable.plainify
- * @param {Blocks} blocks
- */
-const plainify = (blocks) =>
-  blocks.length === 1 && blocks[0].t === 'Para'
-    ? B.plain(blocks[0].c, blocks[0].start, blocks[0].end)
-    : blocks;
-
-/**
  * Each column's width, its separator counted, a fraction of the table's
  * width or of the text's `columns`, the wider.
  *
@@ -266,7 +255,7 @@ export function gridTableWith(blocks) {
           cellSource(ctx.text, content),
         );
         if (read === FAIL) return FAIL;
-        cells.push(B.cell(AlignDefault, rowSpan, colSpan, plainify(read)));
+        cells.push(B.cell(AlignDefault, rowSpan, colSpan, read));
       }
       const [top, bottom] = [table.rowSeps[r], table.rowSeps[r + 1]];
       rowList.push(new Row(nullAttr, cells, ...rowSpan(lines, top, bottom)));

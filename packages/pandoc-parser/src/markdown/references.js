@@ -13,6 +13,7 @@ import { Node, Row } from '../ast/nodes.js';
 import { keepContents } from '../ast/spans.js';
 import { updateState } from '../parsing/state.js';
 import { EMPTY_MAP } from '../persistent-map.js';
+import { compactifyTable } from '../shared.js';
 
 /** @typedef {import('../core.js').Context} Context */
 
@@ -192,7 +193,10 @@ function fillNotes(value, notes) {
       pending === undefined
         ? fillNotes(value.c, notes)
         : numberCitations(notes.get(pending.pendingNote), pending.noteNum);
-    return c === value.c ? value : new Node(value.t, c, value.start, value.end);
+    if (c === value.c) return value;
+    const filled = new Node(value.t, c, value.start, value.end);
+    // Pandoc compacts a table once its notes resolve.
+    return value.t === 'Table' ? compactifyTable(filled) : filled;
   }
   if (value instanceof Row) {
     const cells = fillNotes(value.cells, notes);
