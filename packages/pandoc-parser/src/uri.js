@@ -52,9 +52,10 @@ export function base64DataURIEnd(text, from) {
     if (at >= text.length) partial = true;
     return text[at];
   };
-  const literal = (s) => {
+  // `s` matched with `fold` applied to the text.
+  const literal = (s, fold = (c) => c) => {
     for (const c of s) {
-      if (peek() !== c) return false;
+      if (fold(peek()) !== c) return false;
       at++;
     }
     return true;
@@ -102,8 +103,9 @@ export function base64DataURIEnd(text, from) {
       }
     }
   };
+  // The scheme matches as `A.asciiCI` does: ASCII letters in either case.
   const matched =
-    literal('data:') &&
+    literal('data:', (c) => (c >= 'A' && c <= 'Z' ? c.toLowerCase() : c)) &&
     name() &&
     literal('/') &&
     name() &&

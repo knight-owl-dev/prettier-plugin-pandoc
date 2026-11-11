@@ -21,7 +21,7 @@ const CASES = {
   'no link': '[a\n\nb](u) [a]( [a](u [a] (u) [a] b [^1] ![a]',
   'no link in a link': '[[a](u)](v) [ a ](u)',
   'data URIs':
-    '[a](data:image/png;base64,iVBOR==) [a](data:image/png;base64,iV BOR)',
+    '[a](data:image/png;base64,iVBOR==) [a](data:image/png;base64,iV BOR) [a](DATA:image/gif;base64,R0lG  ODlh) [a](Data:image/gif;base64,R0lG)',
   images: 'x ![a](i.png) y ![](i.png) ![a](i.png "t"){width=50%}',
   'implicit figures':
     '![a](i.png)\n\n![a](i.png){alt="b c"}\n\n![a](i.png){latex-placement=h #f .c}\n\n![](i.png)',
