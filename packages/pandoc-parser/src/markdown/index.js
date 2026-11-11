@@ -28,22 +28,48 @@ function inSource(toSource, f) {
 }
 
 /**
+ * The files `text` joins, their offsets mapped into it through `input`;
+ * null for a single file.
+ *
+ * @see Text.Pandoc.Sources.toSources
+ *
+ * @param {{path: string, at: number}[] | undefined} sources
+ * @param {string} text
+ * @param {import('../source-text.js').SourceText} input
+ * @returns {import('../parsing/state.js').Sources | null}
+ */
+function joined(sources, text, input) {
+  if (sources === undefined || sources.length < 2) return null;
+  const starts = sources.map((s) => input.toInnerStart(s.at));
+  return {
+    text,
+    files: sources.map((s, k) => ({
+      path: s.path,
+      at: starts[k],
+      end: starts[k + 1] ?? text.length,
+    })),
+  };
+}
+
+/**
  * Read `source` as Pandoc's markdown: a `PandocParseError` where Pandoc
  * fails to.
  *
  * @see Text.Pandoc.Readers.Markdown.readMarkdown
  * @see Text.Pandoc.Readers.Markdown.parseMarkdown
  * @param {string} source
- * @param {{tabStop?: number}} [options]
+ * @param {{tabStop?: number, extensions?: string[], sources?: {path: string, at: number}[]}} [options]
+ *   `sources` are the files `source` joins, as `toSources` gives them.
  */
 export function readMarkdown(source, options) {
   const opts = readerOptions(options);
   const { text, toSource, input } = readerInput(source, opts.tabStop);
+  const sources = joined(options?.sources, text, input);
   const [blocks, meta, definitions, log, missed, metadataBlocks] = inSource(
     toSource,
     () =>
       readResolved((references) => {
-        const state = defaultParserState(opts);
+        const state = { ...defaultParserState(opts), sources };
         const ctx = { text, pos: 0, state, references, log: [] };
         optional(titleBlock)(ctx);
         const value = parseBlocks(ctx);

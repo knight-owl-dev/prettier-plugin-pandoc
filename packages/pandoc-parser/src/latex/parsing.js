@@ -6,7 +6,7 @@
 import * as B from '../ast/builder.js';
 import { Node } from '../ast/nodes.js';
 import { walk } from '../ast/walk.js';
-import { codePointLength } from '../code-points.js';
+import { byCodePoint, codePointLength } from '../code-points.js';
 import { commonState } from '../common-state.js';
 import {
   alt,
@@ -24,9 +24,10 @@ import {
   skipMany1,
 } from '../core.js';
 import { isAlphaNum, isAlpha as isLetter } from '../data-char.js';
+import { PandocParseError } from '../error.js';
 import { logOf, message, report } from '../logging.js';
 import { readInt } from '../parsing/lists.js';
-import { getPosition } from '../parsing/state.js';
+import { fileAt, filesOf, getPosition } from '../parsing/state.js';
 import { addMetaField, strip, uniqueIdent } from '../shared.js';
 import { evalFpeval, evalInteval } from './eval.js';
 
@@ -58,25 +59,32 @@ const isLowerHex = (c) => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
 const isDigit = (c) => c >= '0' && c <= '9';
 
 /**
- * The tokens of `text` from `from`, the first at Pandoc's position `line`
- * and `column`, made on demand: a consumer of the first ones tokenizes no
- * further. Positions move as Pandoc's do, drifts and all: a control space
- * before a non-blank line and `^^` before a newline leave later positions
- * behind the text.
+ * The tokens of `text` from `from` to `to`, the first at Pandoc's position
+ * `start`, each in its file `source` where it has one. They are made on
+ * demand: a consumer of the first ones tokenizes no further. Positions
+ * move as Pandoc's do, drifts and all: a control space before a non-blank
+ * line and `^^` before a newline leave later positions behind the text.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.tokenize
  * @param {string} text
  * @param {number} [from]
- * @param {{line: number, column: number}} [start]
+ * @param {{source?: string, line: number, column: number}} [start]
+ * @param {number} [to]
  * @returns {Generator<Tok>}
  */
-export function* tokenize(text, from = 0, start = { line: 1, column: 1 }) {
+export function* tokenize(
+  text,
+  from = 0,
+  start = { line: 1, column: 1 },
+  to = text.length,
+) {
   let { line, column } = start;
+  const { source } = start;
   let at = from;
   const st = { atIsLetter: false, explSyntax: false };
   // The code point at `i`; null at the end.
   const charAt = (i) =>
-    i < text.length ? String.fromCodePoint(text.codePointAt(i)) : null;
+    i < to ? String.fromCodePoint(text.codePointAt(i)) : null;
   // Where the run of characters `test` holds of ends, and how many.
   const span = (i, test) => {
     let n = 0;
@@ -90,13 +98,14 @@ export function* tokenize(text, from = 0, start = { line: 1, column: 1 }) {
     type,
     text: text.slice(s, e),
     ...extra,
+    ...(source !== undefined && { source }),
     line,
     column,
     start: s,
     end: e,
   });
 
-  while (at < text.length) {
+  while (at < to) {
     const c = charAt(at);
     const rest = at + c.length;
     if (c === '\n') {
@@ -112,7 +121,7 @@ export function* tokenize(text, from = 0, start = { line: 1, column: 1 }) {
       [column, at] = [column + n, end];
     } else if (c === '%') {
       const nl = text.indexOf('\n', rest);
-      const end = nl === -1 ? text.length : nl;
+      const end = nl === -1 || nl > to ? to : nl;
       yield tok('Comment', at, end);
       [column, at] = [column + 1 + codePoints(text, rest, end), end];
     } else if (c === '\\') {
@@ -136,12 +145,12 @@ export function* tokenize(text, from = 0, start = { line: 1, column: 1 }) {
         // leading spaces. Before a blank line, `\` and its spaces alone.
         const [r1, n1] = span(rest, isSpaceOrTab);
         let [r3, n2, n3] = [r1, 0, 0];
-        if (text[r1] === '\n') {
+        if (charAt(r1) === '\n') {
           [r3, n3] = span(r1 + 1, isSpaceOrTab);
           n2 = 1;
         }
         const width = 1 + n1 + n2 + n3;
-        if (text[r3] === '\n') {
+        if (charAt(r3) === '\n') {
           yield tok('CtrlSeq', at, r1, { name: ' ' });
           [column, at] = [column + width, r1];
         } else {
@@ -155,7 +164,7 @@ export function* tokenize(text, from = 0, start = { line: 1, column: 1 }) {
         [column, at] = [column + 2, end];
       }
     } else if (c === '#') {
-      if (text[rest] === '#') {
+      if (charAt(rest) === '#') {
         const [end, n] = span(rest + 1, isDigit);
         if (n > 0) {
           const arg = readInt(text.slice(rest + 1, end));
@@ -179,14 +188,14 @@ export function* tokenize(text, from = 0, start = { line: 1, column: 1 }) {
         }
       }
     } else if (c === '^') {
-      const d = text[rest] === '^' ? charAt(rest + 1) : null;
-      if (text[rest] !== '^') {
+      const d = charAt(rest) === '^' ? charAt(rest + 1) : null;
+      if (charAt(rest) !== '^') {
         yield tok('Symbol', at, rest);
         [column, at] = [column + 1, rest];
       } else if (
         d !== null &&
         isLowerHex(d) &&
-        isLowerHex(text[rest + 2] ?? '')
+        isLowerHex(charAt(rest + 2) ?? '')
       ) {
         yield tok('Esc2', at, rest + 3);
         [column, at] = [column + 4, rest + 3];
@@ -423,6 +432,7 @@ export function lpContext(input, s, end, common) {
     state: {
       input,
       expanded: false,
+      source: first?.source,
       line: first?.line ?? 1,
       column: first?.column ?? 1,
       at: first?.start ?? end ?? 0,
@@ -478,6 +488,7 @@ export function satisfyTok(f) {
       ...st,
       input: rest,
       expanded: false,
+      source: after ? after.source : st.source,
       line: after ? after.line : st.line,
       column: after
         ? after.column
@@ -520,7 +531,12 @@ export const parseFromToks = (parser, toks) => (ctx) => {
     ...outer,
     input: prepend(toks, null),
     expanded: false,
-    ...(first && { line: first.line, column: first.column, at: first.start }),
+    ...(first && {
+      source: first.source,
+      line: first.line,
+      column: first.column,
+      at: first.start,
+    }),
     end: toks.at(-1)?.end,
     ...NO_RAW,
   };
@@ -529,6 +545,7 @@ export const parseFromToks = (parser, toks) => (ctx) => {
     ...ctx.state,
     input: outer.input,
     expanded: outer.expanded,
+    source: outer.source,
     line: outer.line,
     column: outer.column,
     at: outer.at,
@@ -1156,6 +1173,7 @@ function ifStrequalParser(ctx) {
 
 // Where the parse is: Pandoc's `getPosition`, as a token's position.
 const here = (ctx) => ({
+  source: ctx.state.source,
   line: ctx.state.line,
   column: ctx.state.column,
   start: ctx.state.at,
@@ -2462,20 +2480,39 @@ export function removeLabel(lbl, value) {
 // Raw TeX in other formats
 
 /**
- * The tokens of what a parse of another format has left to read, from
- * where it is.
+ * The tokens of what a parse of another format has left to read: the rest
+ * of its file from where it is, then each later file from its own start,
+ * so a drift stays in the file it happens in.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.getInputTokens
- * @param {{text: string, pos: number}} ctx
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.tokenizeSources
+ * @param {{text: string, pos: number, state: {sources?: import('../parsing/state.js').Sources | null}}} ctx
  * @returns {TokList}
  */
 export function getInputTokens(ctx) {
   if (ctx.pos >= ctx.text.length) return null;
-  return streamOf(tokenize(ctx.text, ctx.pos, getPosition(ctx)));
+  const files = filesOf(ctx);
+  const k = files.indexOf(fileAt(files, ctx.pos));
+  function* sources() {
+    yield* tokenize(ctx.text, ctx.pos, getPosition(ctx), files[k].end);
+    for (const { path, at, end } of files.slice(k + 1)) {
+      const start = { source: path, line: 1, column: 1 };
+      yield* tokenize(ctx.text, at, start, end);
+    }
+  }
+  return streamOf(sources());
 }
 
-const before = (a, b) =>
-  a.line < b.line || (a.line === b.line && a.column < b.column);
+// Pandoc's order of positions: by file name, then line and column.
+const before = (a, b) => {
+  const names = byCodePoint(a.source ?? '', b.source ?? '');
+  if (names !== 0) return names < 0;
+  return a.line < b.line || (a.line === b.line && a.column < b.column);
+};
+
+// Parsec's error where `many` repeats a parser that reads nothing.
+const MANY_EMPTY =
+  "Text.ParserCombinators.Parsec.Prim.many: combinator 'many' is applied to a parser that accepts an empty string.";
 
 /**
  * Raw TeX in another format's parse: `parser`'s extent of `toks`, read
@@ -2501,7 +2538,9 @@ export const rawLaTeXParser = (toks, parser, valParser) => (ctx) => {
   const lstate = defaultLaTeXState(pstate.options);
   const extent = lpContext(toks, lstate, undefined, common);
   const first = withRaw((c) =>
-    parser(c) === FAIL ? FAIL : { line: c.state.line, column: c.state.column },
+    parser(c) === FAIL
+      ? FAIL
+      : { source: c.state.source, line: c.state.line, column: c.state.column },
   )(extent);
   if (first === FAIL) return FAIL;
   const [endpos, toks2] = first;
@@ -2520,6 +2559,18 @@ export const rawLaTeXParser = (toks, parser, valParser) => (ctx) => {
   const from = ctx.pos;
   while (ctx.pos < ctx.text.length && before(getPosition(ctx), endpos)) {
     ctx.pos += codePointLength(ctx.text, ctx.pos);
+  }
+  // An extent that ends in a file whose name sorts no later lies behind the
+  // parse. The TeX then reads nothing, and the `many` around it fails
+  // Pandoc: jgm/pandoc#12072.
+  if (ctx.pos === from && toks2.length > 0) {
+    const files = filesOf(ctx);
+    const [here, into] = [from, toks2.at(-1).start].map((o) =>
+      fileAt(files, o),
+    );
+    const detail =
+      into === here ? undefined : { file: here.path, into: into.path };
+    throw new PandocParseError(MANY_EMPTY, from, from, detail);
   }
   let result = pstate.options.extensions.has('latex_macros')
     ? untokenize(raw)

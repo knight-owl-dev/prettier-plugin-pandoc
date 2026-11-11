@@ -105,10 +105,22 @@ export const RULES = {
   PandocParseError: {
     rule: 'pandoc-parse-error',
     severity: 'error',
-    callouts: (msg) => ({
-      problem: msg.message.replace(/^Error parsing YAML metadata: /, ''),
-      effect: 'Pandoc fails to read the manuscript.',
-    }),
+    callouts: (msg) =>
+      msg.into === undefined
+        ? {
+            problem: msg.message.replace(/^Error parsing YAML metadata: /, ''),
+            effect: 'Pandoc fails to read the manuscript.',
+          }
+        : {
+            problem:
+              msg.into === msg.file
+                ? `raw TeX runs on into ${msg.into} again`
+                : `raw TeX runs on into ${msg.into}, whose name sorts before ${msg.file}`,
+            because:
+              'Pandoc compares positions across files by name first, which puts the end of the TeX before its start.',
+            effect: 'Pandoc fails to read the manuscript.',
+            remedy: `End the TeX in ${msg.file}, or name the files so they sort in the order given.`,
+          },
   },
   MacroAlreadyDefined: {
     rule: 'macro-already-defined',

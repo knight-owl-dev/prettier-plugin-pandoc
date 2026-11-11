@@ -9,6 +9,7 @@
 import * as B from '../ast/builder.js';
 import { Node } from '../ast/nodes.js';
 import { char } from '../char.js';
+import { byCodePoint } from '../code-points.js';
 import { alt, attempt, FAIL, many, notFollowedBy, optional } from '../core.js';
 import { logMessage, message, report } from '../logging.js';
 import {
@@ -243,12 +244,4 @@ export function checkNotes(ctx) {
   }
 }
 
-// Haskell's order of `Text`: by code point.
-function byLabel(a, b) {
-  const [x, y] = [[...a.key], [...b.key]];
-  for (let k = 0; k < Math.min(x.length, y.length); k++) {
-    const d = x[k].codePointAt(0) - y[k].codePointAt(0);
-    if (d !== 0) return d;
-  }
-  return x.length - y.length;
-}
+const byLabel = (a, b) => byCodePoint(a.key, b.key);

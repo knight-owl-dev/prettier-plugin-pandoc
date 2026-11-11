@@ -75,14 +75,14 @@ export { lintShortcuts } from './shortcuts.js';
  * @returns {Diagnostic[]}
  */
 export function lint(files, options = {}) {
-  const { text, locate } = toSources(files);
+  const { text, sources, locate } = toSources(files);
   const texts = new Map(files.map((f) => [f.path, f.text]));
   const order = new Map(files.map((f, k) => [f.path, k]));
   const place = (offset) => {
     const { path, offset: at } = locate(offset);
     return { path, offset: at, ...lineAndColumn(texts.get(path), at) };
   };
-  const out = diagnose(text, place, options);
+  const out = diagnose(text, place, { ...options, sources });
   return out.sort(
     (a, b) => order.get(a.source) - order.get(b.source) || a.start - b.start,
   );
@@ -213,6 +213,7 @@ function diagnose(
   {
     tabStop,
     extensions,
+    sources,
     spanTemplate = false,
     pinned = false,
     info = false,
@@ -220,15 +221,17 @@ function diagnose(
   },
 ) {
   const how = { spanTemplate, pinned };
+  // The misread check re-reads pieces of the text: `sources`' offsets are
+  // the whole text's.
   const reader = { tabStop, extensions };
   let doc;
   try {
-    doc = readMarkdown(text, reader);
+    doc = readMarkdown(text, { ...reader, sources });
   } catch (e) {
     if (!(e instanceof PandocParseError)) throw e;
     // Pandoc reads nothing: its failure is all there is to report.
-    const { message, start, end } = e;
-    const msg = { type: 'PandocParseError', message, start, end };
+    const { message, start, end, detail } = e;
+    const msg = { type: 'PandocParseError', message, start, end, ...detail };
     return [diagnostic(RULES.PandocParseError, msg, null, place, text, how)];
   }
   const where = (offset) => {

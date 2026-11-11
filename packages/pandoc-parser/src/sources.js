@@ -4,12 +4,9 @@
 // Pandoc reads its inputs as one document: each file, a byte order mark
 // dropped, ending in a newline, one added where it has none (an empty file
 // adds nothing), then a newline more. So a definition in one file serves
-// the others, and a fence or div left open runs on into the next.
-//
-// Not followed: Pandoc keeps each file's positions apart, and raw TeX's
-// extent compares them. A TeX environment running from one file into the
-// next, its positions drifted (`latex/parsing.js` tokenize), can end
-// elsewhere than in the joined text.
+// the others, and a fence or div left open runs on into the next. Each
+// file keeps positions of its own, which raw TeX's extent compares, so
+// `readMarkdown` takes the files as `sources`.
 
 /**
  * The text of `files` joined as Pandoc joins them, and where an offset in
@@ -18,7 +15,7 @@
  *
  * @see Text.Pandoc.Sources.toSources
  * @param {{path: string, text: string}[]} files
- * @returns {{text: string, locate: (offset: number) => {path: string, offset: number}}}
+ * @returns {{text: string, sources: {path: string, at: number}[], locate: (offset: number) => {path: string, offset: number}}}
  */
 export function toSources(files) {
   const pieces = [];
@@ -41,5 +38,6 @@ export function toSources(files) {
     const { at, path, skip, length } = pieces[lo];
     return { path, offset: skip + Math.min(offset - at, length) };
   };
-  return { text, locate };
+  const sources = pieces.map(({ path, at }) => ({ path, at }));
+  return { text, sources, locate };
 }

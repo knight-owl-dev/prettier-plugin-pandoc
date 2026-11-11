@@ -162,6 +162,7 @@ const tokAt = (at, type, text, name) => ({
   type,
   text,
   ...(name !== undefined && { name }),
+  ...(at.source !== undefined && { source: at.source }),
   line: at.line,
   column: at.column,
   start: at.start,
