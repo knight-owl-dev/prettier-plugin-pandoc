@@ -20,22 +20,19 @@ import { NBSP, toRomanNumeral } from '../shared.js';
 import { translateTerm } from '../translations.js';
 import {
   anySymbol,
-  anyTok,
   braced,
   getRawCommand,
   isWordTok,
   keyvals,
   newlineTok,
-  prepend,
   rawopt,
   satisfyTok,
-  setInput,
   skipopts,
   spaces,
   symbol,
-  tokenize,
   untokenize,
   updateLaTeXState,
+  verbTok,
   withVerbatimMode,
 } from './parsing.js';
 
@@ -147,46 +144,6 @@ function doverb(ctx, start) {
   if (toks === FAIL) return FAIL;
   return B.code(untokenize(toks), start, ctx.state.at);
 }
-
-/**
- * The next token, cut at `stopchar` where it holds one: the rest put back,
- * the stop character a symbol of its own and what follows tokenized
- * again.
- *
- * @see Text.Pandoc.Readers.LaTeX.Inline.verbTok
- * @param {string} stopchar
- * @returns {Parser<Tok>}
- */
-const verbTok = (stopchar) => (ctx) => {
-  const t = anyTok(ctx);
-  if (t === FAIL) return FAIL;
-  const chars = [...t.text];
-  const i = chars.indexOf(stopchar);
-  if (i === -1) return t;
-  const t1 = chars.slice(0, i).join('');
-  const t2 = chars.slice(i + 1).join('');
-  // A token from an expansion spans nothing; its pieces neither.
-  const at = (k) => (t.end === t.start ? t.start : t.start + k);
-  const stopAt = at(t1.length);
-  const stop = {
-    type: 'Symbol',
-    text: stopchar,
-    line: t.line,
-    column: t.column + i,
-    start: stopAt,
-    end: at(t1.length + stopchar.length),
-  };
-  const restAt = at(t1.length + stopchar.length);
-  const rest = [
-    ...tokenize(t2, 0, { line: t.line, column: t.column + i + 1 }),
-  ].map((x) => ({
-    ...x,
-    start: t.end === t.start ? t.start : restAt + x.start,
-    end: t.end === t.start ? t.start : restAt + x.end,
-  }));
-  setInput(ctx, prepend([stop, ...rest], ctx.state.input), ctx.state.expanded);
-  return { ...t, text: t1, end: stopAt };
-};
 
 /**
  * The language among listings' options, as skylighting names it where it
