@@ -46,13 +46,13 @@
   },
   "libraries": {
     "aeson": { "version": "2.2.5.0", "modules": ["Data.Aeson.Types"] },
-    "commonmark": { "version": "0.3", "modules": ["Commonmark.Entity"] },
-    "doclayout": { "version": "0.5.0.3", "modules": ["Text.DocLayout"] },
+    "commonmark": { "version": "0.3.1", "modules": ["Commonmark.Entity"] },
+    "doclayout": { "version": "0.6", "modules": ["Text.DocLayout"] },
     "emojis": { "version": "0.1.5", "modules": [] },
     "filepath": { "version": "1.5.4.0", "modules": ["System.FilePath"] },
     "ghc": { "version": "9.10.3", "modules": ["Data.Char"] },
     "gridtables": {
-      "version": "0.1.1.0",
+      "version": "0.1.1.1",
       "modules": [
         "Text.GridTable",
         "Text.GridTable.ArrayTable",
@@ -80,7 +80,7 @@
     },
     "scientific": { "version": "0.3.8.1", "modules": ["Data.Scientific"] },
     "skylighting-core": {
-      "version": "0.14.7",
+      "version": "0.15",
       "modules": ["Skylighting.Core"]
     },
     "tagsoup": {
