@@ -1,8 +1,9 @@
 # PR Auto-Merge Command
 
-Enable auto-merge (squash) on a pull request with a reviewed, consolidated
-commit body — and **no subject**, so GitHub keeps the PR title as the squash
-title and appends `(#N)` on merge.
+Enable auto-merge on a pull request, by the method its history deserves:
+**squash** for one unit of work, with a reviewed, consolidated body and **no
+subject**, so GitHub keeps the PR title and appends `(#N)`; **rebase** for
+independent units, each commit one, landing as written.
 
 ## Arguments: $ARGUMENTS
 
@@ -54,7 +55,26 @@ If no PR exists for the branch, stop and tell the user (suggest `/pr-create`).
   Never resolve a thread whose feedback is not yet handled — fix it first, then
   resolve. If any unresolved thread is unaddressed, stop and tell the user.
 
-### 3. Generate the consolidated squash body
+### 3. Choose the method
+
+Read the commits:
+
+```bash
+git log main..HEAD --format='%h %s%n%b'
+```
+
+- **Rebase** when the PR bundles independent changes and each commit is one of
+  them, whole and worth finding later by `git bisect` or `git blame` (a Pandoc
+  bump's ports, each mapping an upstream fix).
+- **Squash** otherwise: one change, or commits that iterate on it (review fixes,
+  WIP, steps that mean nothing alone). When in doubt, squash.
+
+`fixup!` and `squash!` commits count as the commits they fold into (step 4b).
+
+Recommend one, with a line of evidence (e.g. "14 commits, each one ported
+change: rebase"); the user confirms in step 5.
+
+### 4a. Squash: generate the consolidated body
 
 Distill the PR's commits and description into one clean, changelog-style body —
 the change and why, grouped conceptually, not a commit-by-commit dump:
@@ -68,34 +88,60 @@ git log main..HEAD --format='%s%n%b'
 - Laconic and load-bearing; flowing prose or tight bullets, no drama.
 - Keep it consistent with the PR's own Summary/Changes.
 
-### 4. Let the user review the body
+### 4b. Rebase: ready the commits
 
-Show the generated body verbatim, then AskUserQuestion:
-
-- Question: "Enable auto-merge with this body?"
-- Options: "Enable as shown", "Edit the body", "Cancel".
-
-If "Edit", take the revision and re-confirm before proceeding.
-
-### 5. Enable auto-merge
+Each commit lands on `main` as it stands. On the PR's branch, checked out
+(`gh pr checkout <number>`), fold `fixup!` and `squash!` commits into their
+targets, onto the current `main`:
 
 ```bash
-gh pr merge <number> --auto --squash --body "<approved body>"
+git fetch origin
+git rebase --autosquash origin/main
 ```
 
-Omit `--subject` deliberately: GitHub defaults the squash title to the PR title
-and appends `(#N)`. Passing a subject would override that and drop the PR-number
-suffix.
+Then stop and report, rather than merge, if any subject reads as a step rather
+than a change (`WIP`, `wip`, `tmp`, "address review", "fix tests"), names an
+issue number, or any commit carries a `Co-Authored-By` trailer. The rebase stays
+local until the user confirms.
 
-### 6. Confirm
+### 5. Let the user confirm
 
-Report that auto-merge is enabled and the PR will squash-merge once required
-checks pass. Show the PR URL.
+Show the method and its evidence, then the squash body verbatim, or for a rebase
+the subjects that will land. AskUserQuestion:
+
+- Question: "Enable auto-merge as shown?"
+- Options: "Enable as shown", "Switch to the other method", "Edit the body"
+  (squash only), "Cancel".
+
+On a switch or an edit, prepare that (step 4a or 4b) and re-confirm.
+
+### 6. Enable auto-merge
+
+```bash
+# squash
+gh pr merge <number> --auto --squash --body "<approved body>"
+
+# rebase: push the readied commits first; CI runs on the new head
+git push --force-with-lease
+gh pr merge <number> --auto --rebase
+```
+
+For a squash, omit `--subject` deliberately: GitHub defaults the squash title to
+the PR title and appends `(#N)`. Passing a subject would override that and drop
+the PR-number suffix. A rebase keeps each commit's subject; GitHub still links
+the commits to the PR.
+
+### 7. Confirm
+
+Report that auto-merge is enabled, by which method, and that the PR merges once
+required checks pass. Show the PR URL.
 
 ### Error Handling
 
 - **No PR for the branch** — suggest `/pr-create`.
 - **Auto-merge disabled on the repo** — `gh` errors; tell the user to enable it
   (Settings → General → Allow auto-merge) or merge manually.
-- **Already enabled** — report it; re-running with a new `--body` updates the
-  pending squash body.
+- **Already enabled** — report it; re-running updates the pending method and
+  squash body.
+- **Rebase conflicts** — stop with the conflicting files; the user resolves them
+  or the PR squashes instead.
