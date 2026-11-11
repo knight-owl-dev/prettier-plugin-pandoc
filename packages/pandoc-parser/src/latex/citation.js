@@ -27,9 +27,8 @@ import {
   egroup,
   grouped,
   isWordTok,
-  lpContext,
   parenWrapped,
-  prepend,
+  parseFromToks,
   satisfyTok,
   sp,
   spaces,
@@ -218,23 +217,13 @@ const keys = attempt((ctx) =>
  * @returns {Parser<Citation[]>}
  */
 function simpleCiteArgs(inline) {
-  // The bracketed option read as inlines on its own, as `LaTeX.hs`'s `opt`.
+  // The bracketed option read as inlines, as `LaTeX.hs`'s `opt`.
+  const manyInlines = many(inline);
   const opt = (ctx) => {
     const toks = optToks(ctx);
     if (toks === FAIL) return FAIL;
-    const sub = lpContext(
-      prepend(toks, null),
-      ctx.state.s,
-      toks.at(-1)?.end,
-      ctx.common,
-    );
-    const ils = many(inline)(sub);
-    if (ils === FAIL) {
-      throw new Error(
-        `the LaTeX reader failed in an option at offset ${sub.state.at}`,
-      );
-    }
-    return B.concat(ils);
+    const ils = parseFromToks(manyInlines, toks)(ctx);
+    return ils === FAIL ? FAIL : B.concat(ils);
   };
   const note = optionMaybe(opt);
   return attempt((ctx) => {

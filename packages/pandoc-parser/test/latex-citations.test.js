@@ -22,6 +22,7 @@ const CASES = {
   'block quotes':
     '\\blockquote{A quote.}\n\n\\blockquote[Author]{With text.}\n\n\\blockcquote[p.~5]{key}{With cite.}.\n\n\\foreignblockquote{french}{Bonjour.}\n\n\\hyphenblockcquote{german}[s]{k}{Hallo}',
   keys: '\\cite{ a , b }  \\cite[{x}]{k} \\cite{k:1-2_3}',
+  'definitions in an option': '\\cite[\\def\\z{Z}]{k} \\z',
 };
 
 for (const [name, text] of Object.entries(CASES)) {
