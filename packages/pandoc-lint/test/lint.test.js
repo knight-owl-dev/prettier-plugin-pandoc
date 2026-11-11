@@ -21,7 +21,6 @@ const MANUSCRIPTS = {
   'a div open to the end': ['::: aside\nOpen.\n', 'More.\n', '# End\n'],
   'an HTML div open': ['<div>\ntext\n', '\n'],
   'identifiers across files': ['# One {#a}\n', '# Two {#a}\n\n# a\n'],
-  'metadata in the second file': ['Text.\n', '---\nk: 1\nk: 2\n---\n'],
   'macros and toggles': [
     '\\newcommand{\\x}{1}\n',
     '\\newcommand{\\x}{2}\n\nA \\iftoggle{t}{x}{y} b.\n',
@@ -187,6 +186,28 @@ test('a metadata block that is no YAML, the only diagnostic', () => {
       ['pandoc-parse-error', 'error', 'b.md', 3, 1],
     );
   }
+});
+
+test("metadata in the second file that fails: where Pandoc's error is", () => {
+  const files = [
+    { path: 'f1.md', text: 'Text.\n' },
+    { path: 'f2.md', text: '---\nk: 1\nk: 2\n---\n' },
+  ];
+  const [d, ...rest] = lint(files);
+  assert.deepEqual(rest, []);
+  const pandoc = () => {
+    try {
+      pandocFiles(files);
+    } catch (e) {
+      return e.message;
+    }
+    assert.fail('Pandoc reads it');
+  };
+  const at = /\n(\S+):(\d+):(\d+): /.exec(pandoc());
+  assert.deepEqual(
+    [d.rule, d.source, d.line, d.column],
+    ['pandoc-parse-error', at[1], Number(at[2]), Number(at[3])],
+  );
 });
 
 test('metadata in the Markdown, with noMetadata alone', () => {

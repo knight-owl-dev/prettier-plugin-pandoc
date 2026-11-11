@@ -129,7 +129,6 @@ defines goes unreported, since prose writes `[sic]` that way.
 | `duplicate-note-reference`  | warn     | A note defined again                                                              |
 | `note-defined-but-not-used` | warn     | A note no reference uses                                                          |
 | `duplicate-identifier`      | warn     | An identifier already in use                                                      |
-| `yaml-warning`              | warn     | A metadata key given again                                                        |
 | `macro-already-defined`     | warn     | A macro or environment defined again                                              |
 | `undefined-toggle`          | warn     | `\iftoggle` on a toggle nothing defines                                           |
 | `parsing-unescaped`         | info     | A TeX special character left unescaped                                            |
