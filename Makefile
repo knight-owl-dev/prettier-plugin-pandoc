@@ -22,8 +22,8 @@ DOCKER_TTY ?= $(if $(IS_TTY),-t)
 COMPOSE = DOCKER_UID=$$(id -u) DOCKER_GID=$$(id -g) docker compose --progress quiet
 
 # Each command in the `node` service, killed after TIMEOUT seconds: a hung
-# parse otherwise blocks forever.
-TIMEOUT ?= 1800
+# parse otherwise blocks forever. About six times CI's `make test`.
+TIMEOUT ?= 480
 RUN = tools/run.sh $(TIMEOUT)
 
 test-image:
@@ -125,8 +125,11 @@ bench-compare: test-image node_modules/.package-lock.json
 # ci-tools image, so the toolchain is the pinned one wherever make runs.
 LINT_TARGETS := lint-actions lint-docker lint-js lint-md lint-md-fmt lint-notices lint-sh lint-spell
 
+# `timeout` ends a run whose client died forwarding nothing, and as PID 1
+# passes Ctrl-C and `docker stop` on to make's recipe.
+LINT_TIMEOUT ?= 120
 LINT_RUNNER ?= docker run --rm $(DOCKER_TTY) -e GITHUB_TOKEN \
-	-v "$(CURDIR):/work" -w /work $(CI_TOOLS_IMAGE) make
+	-v "$(CURDIR):/work" -w /work $(CI_TOOLS_IMAGE) timeout $(LINT_TIMEOUT) make
 
 lint:
 	@$(LINT_RUNNER) $(LINT_TARGETS)
