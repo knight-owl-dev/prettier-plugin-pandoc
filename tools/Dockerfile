@@ -1,13 +1,33 @@
 # The test image: Node for the suite and the tools, Pandoc for the oracle.
 #
 # The oracle asks Pandoc whether formatting changed what a document means, so
-# the Pandoc here is the reader under test. Its binary is static: copied onto
-# the Node image, it links against nothing there.
-
-FROM pandoc/minimal:3.11.0.0@sha256:fc17da3ba8f0a70b2ad5d7d4d61fed7d25da2e091cc3139f4d371f03b18641df AS pandoc
+# the Pandoc here is the reader under test: the static binary its release
+# publishes, pinned per architecture as <tag>@sha256:<tarball digest>. Moving
+# it: docs/bumping-pandoc.md.
 
 FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94
 
-COPY --from=pandoc /usr/local/bin/pandoc /usr/local/bin/pandoc
+# renovate: datasource=github-release-attachments depName=jgm/pandoc
+ARG PANDOC_AMD64=3.11@sha256:37edb3bbcf722f921a009941bf5874e2e0c09263226c9b4a2d980788cb062ab6
+# renovate: datasource=github-release-attachments depName=jgm/pandoc
+ARG PANDOC_ARM64=3.11@sha256:56ed5566ec41d22ec9ee0704e6ac0b98ba102e92384efd5306173a22d314c79a
+
+ARG TARGETARCH
+
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+
+RUN case "${TARGETARCH}" in \
+      amd64) pin="${PANDOC_AMD64}" ;; \
+      arm64) pin="${PANDOC_ARM64}" ;; \
+      *) echo "no Pandoc release for ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    version="${pin%@sha256:*}"; \
+    name="pandoc-${version}-linux-${TARGETARCH}"; \
+    wget -q -O /tmp/pandoc.tar.gz \
+      "https://github.com/jgm/pandoc/releases/download/${version}/${name}.tar.gz"; \
+    echo "${pin#*@sha256:}  /tmp/pandoc.tar.gz" | sha256sum -c -s; \
+    tar -xzf /tmp/pandoc.tar.gz -C /tmp; \
+    cp "/tmp/pandoc-${version}/bin/pandoc" /usr/local/bin/pandoc; \
+    rm -rf /tmp/*
 
 WORKDIR /work
