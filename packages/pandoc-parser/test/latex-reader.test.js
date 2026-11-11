@@ -38,6 +38,8 @@ const CASES = {
     '\\iftrue yes\\else no\\fi \\iffalse A\\else B\\fi \\newif\\iffoo \\iffoo T\\else F\\fi \\footrue \\iffoo T\\else F\\fi \\newif\\foo x \\foo y',
   'conditionals nested':
     '\\newif\\iffoo\n\\iffalse \\ifx ab c\\fi d\\else e\\fi\n\n\\iftrue x\\iffoo y\\fi z\\else w\\fi\n\n\\iffalse a\\iffoo b\\else c\\fi d\\else e\\fi f\n\n\\let\\myif\\iftrue \\iffalse \\myif g\\fi h\\else i\\fi\n\n\\iftrue j \\iffalse',
+  'expansions: of a special macro, of defaults, of a final newline':
+    '\\def\\foo{bar}\\def\\x{a\n}\n\\iftrue\\foo\\fi\n\n\\newcommand{\\opt}[2][#2]{(#1)}\\opt{x} \\opt[y]{z}\n\n\\x\nb\n\n\\x % c\nd\n\n\\x\n\ne\n',
   'environments defined':
     '\\newenvironment{e}[1]{[#1:}{]}\n\\begin{e}{x}body\\end{e}\n\n\\DeclareMathOperator{\\op}{op}$\\op x$',
   'number of arguments':

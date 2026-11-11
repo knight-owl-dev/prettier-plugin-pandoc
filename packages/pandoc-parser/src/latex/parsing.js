@@ -694,7 +694,11 @@ function combineTok(t, list) {
 function handleMacros(ctx, n, at, name, rest) {
   if (n > 20) throw new Error(`PandocMacroLoop: ${name}`);
   const macro = ctx.state.s.macros[0].get(name);
-  if (macro === undefined) return trySpecialMacro(ctx, name, rest);
+  if (macro === undefined) {
+    // What a special macro gives may begin with a macro.
+    const special = trySpecialMacro(ctx, name, rest);
+    return special === null ? null : doMacrosOn(ctx, n + 1, special);
+  }
   // A macro expanding to itself after an unknown command expands again at
   // the same position, each time in a fresh `doMacros` (#11088).
   const last = ctx.state.s.lastExpansion;
@@ -731,13 +735,41 @@ function handleMacros(ctx, n, at, name, rest) {
       : read(sub);
   if (args === FAIL) return null;
   updateLaTeXState(ctx, { lastExpansion });
-  let result = sub.state.input;
-  for (let k = macro.body.length - 1; k >= 0; k--) {
-    result = addTok(false, args, at, macro.body[k], result);
+  const after = sub.state.input;
+  let result = after;
+  const body = trailingNewlineAsSpace(macro.body, after);
+  const resolved = resolveArgs(args);
+  for (let k = body.length - 1; k >= 0; k--) {
+    result = addTok(false, resolved, at, body[k], result);
   }
   return macro.expansionPoint === 'ExpandWhenUsed'
     ? doMacrosOn(ctx, n + 1, result)
     : result;
+}
+
+// Each argument with the arguments it names, as a default may (`O{#2}`),
+// substituted; one naming itself, through others or not, left as written.
+function resolveArgs(args) {
+  const resolve = (visited, xs) =>
+    xs.flatMap((t) =>
+      t.type === 'Arg' && !visited.includes(t.arg) && args.has(t.arg)
+        ? resolve([t.arg, ...visited], args.get(t.arg))
+        : [t],
+    );
+  return new Map([...args].map(([i, xs]) => [i, resolve([i], xs)]));
+}
+
+// A body's one final newline a space where a newline follows the use, as
+// TeX reads it: no blank line.
+function trailingNewlineAsSpace(body, after) {
+  const [last, prev] = [body.at(-1), body.at(-2)];
+  if (last?.type !== 'Newline' || prev?.type === 'Newline') return body;
+  let cell = after;
+  while (cell?.tok.type === 'Spaces' || cell?.tok.type === 'Comment') {
+    cell = tail(cell);
+  }
+  if (cell?.tok.type !== 'Newline') return body;
+  return [...body.slice(0, -1), { ...last, type: 'Spaces', text: ' ' }];
 }
 
 const matchTok = ({ type, text }) =>
