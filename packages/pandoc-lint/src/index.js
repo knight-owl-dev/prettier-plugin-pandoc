@@ -57,11 +57,13 @@ export { lintShortcuts } from './shortcuts.js';
 
 /**
  * How a shortcut's template is read: the reader's extensions changed, as
- * Pandoc's `+name` and `-name`, and whether it must be one paragraph.
+ * Pandoc's `+name` and `-name`; whether it is a span's; and whether its
+ * lines are not the file's, so that all of it is at its start.
  *
  * @typedef {object} TemplateOptions
  * @property {string[]} [extensions]
- * @property {boolean} [oneParagraph]
+ * @property {boolean} [spanTemplate]
+ * @property {boolean} [pinned]
  */
 
 /**
@@ -103,9 +105,10 @@ export function lintSnippet(text, options = {}) {
     column = 1,
     indent = 0,
     file,
+    pinned = false,
   } = options;
   const place = (offset) => {
-    const at = Math.min(offset, text.length);
+    const at = pinned ? 0 : Math.min(offset, text.length);
     const local = lineAndColumn(text, at);
     const there = {
       line: line + local.line - 1,
@@ -114,7 +117,15 @@ export function lintSnippet(text, options = {}) {
     const outer = file === undefined ? at : offsetAt(file, there);
     return { path: source, offset: outer, ...there };
   };
-  return diagnose(text, place, options).sort((a, b) => a.start - b.start);
+  const found = diagnose(text, place, options);
+  // A frame of lines the file doesn't have would mislead.
+  const framed = pinned
+    ? found.map(({ callouts: { verbatim, ...callouts }, ...d }) => ({
+        ...d,
+        callouts,
+      }))
+    : found;
+  return framed.sort((a, b) => a.start - b.start);
 }
 
 /**
@@ -203,7 +214,7 @@ const SEVERITY = { warn: 'WARN', info: 'INFO', error: 'ERROR' };
 function diagnose(
   text,
   place,
-  { tabStop, extensions, oneParagraph, info = false, noMetadata = false },
+  { tabStop, extensions, spanTemplate, info = false, noMetadata = false },
 ) {
   const reader = { tabStop, extensions };
   let doc;
@@ -226,7 +237,7 @@ function diagnose(
     definitions: doc.definitions,
     firstWithId: (id, before) => firstWithId(doc.blocks, id, before),
     toKey,
-    oneParagraph: oneParagraph === true,
+    spanTemplate: spanTemplate === true,
   };
   const seen = new Set();
   const out = [];

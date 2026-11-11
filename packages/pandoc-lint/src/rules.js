@@ -6,7 +6,7 @@
  * What a rule reads a message against: where an offset is, as
  * `path:line:column`; the source's text between two offsets; and the
  * read's reference definitions and AST, for the place a duplicate repeats;
- * and whether it must be one paragraph, as a span template must.
+ * and whether it is a span's template, which is one paragraph.
  *
  * @typedef {object} Read
  * @property {(offset: number) => string} where
@@ -14,7 +14,7 @@
  * @property {{start: number, end: number, label: [number, number]}[]} definitions
  * @property {(id: string, before: number) => {start: number, end: number} | null} firstWithId
  * @property {(label: string) => string} toKey
- * @property {boolean} oneParagraph
+ * @property {boolean} spanTemplate
  */
 
 /**
@@ -152,7 +152,7 @@ export const RULES = {
       problem: `${msg.block} is read as paragraph text`,
       because: `A paragraph runs on to the next blank line: a ${msg.block} on the line after its text is part of it.`,
       // A span is one paragraph: a blank line would split it.
-      remedy: read.oneParagraph
+      remedy: read.spanTemplate
         ? `Escape it with a backslash: ${ESCAPE_AT}. A span is one paragraph.`
         : `Put a blank line before it; if it is meant as text, escape it with a backslash: ${ESCAPE_AT}.`,
     }),

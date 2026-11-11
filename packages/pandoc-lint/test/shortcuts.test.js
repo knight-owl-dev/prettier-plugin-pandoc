@@ -106,12 +106,19 @@ for (const indent of [4, 6]) {
 
 // An indentation indicator sets the indent: spaces past it are Markdown.
 test('a literal span with an indentation indicator', () => {
-  for (const header of ['|2', '|2-', '|-2']) {
+  for (const header of ['|2', '|2-', '|-2', '\n    |2']) {
     const text = `ind:\n  span: ${header}\n      see [x][nope]\n`;
+    const line = header.startsWith('\n') ? 4 : 3;
     assert.deepEqual(found(text), [
-      ['undefined-reference', 3, 11, '[x][nope]'],
+      ['undefined-reference', line, 11, '[x][nope]'],
     ]);
   }
+});
+
+test('a plain span on one line: where it is', () => {
+  assert.deepEqual(found('s:\n  span: see [x][nope] and more\n'), [
+    ['undefined-reference', 2, 13, '[x][nope]'],
+  ]);
 });
 
 test('a body and a span: each linted', () => {
@@ -154,6 +161,21 @@ test('a quoted body: at its start, with no frame of lines it lacks', () => {
   assert.equal(lintShortcuts('s.yaml', text)[0].callouts.verbatim, undefined);
 });
 
+test('a quoted body: each finding, each place it names at its start', () => {
+  const two = 'q:\n  body: "a\\n# h1\\n\\nb\\n# h2\\n"\n';
+  assert.deepEqual(
+    found(two).map(([rule, line, column]) => [rule, line, column]),
+    [
+      ['block-in-paragraph', 2, 9],
+      ['block-in-paragraph', 2, 9],
+    ],
+  );
+  const again = 'q:\n  body: "[a]: /x\\n\\n[a]: /y\\n"\n';
+  const [d] = lintShortcuts('s.yaml', again);
+  assert.equal(d.rule, 'duplicate-link-reference');
+  assert.deepEqual(d.callouts.offenders, ['s.yaml:2:9: [a]: /x']);
+});
+
 // A span is one paragraph: a blank line before the block would split it.
 test("a span's misread: escaped, not split", () => {
   const text = [
@@ -187,6 +209,29 @@ test('an aliased template: linted at its anchor, a finding once', () => {
     [['undefined-reference', 3, 5]],
   );
   assert.deepEqual(found('a:\n  span: &s "[]{.slot}"\nb:\n  span: *s\n'), []);
+});
+
+// One node, a body and a span: their finding once, with the span's remedy,
+// which holds for both.
+test('an anchor read as a body and a span: one finding', () => {
+  const text = [
+    'a:',
+    '  body: &t |',
+    '    the edition of',
+    '    1984. A reissue',
+    'b:',
+    '  span: *t',
+    '',
+  ].join('\n');
+  const found = lintShortcuts('s.yaml', text);
+  assert.equal(found.length, 1);
+  assert.match(found[0].callouts.remedy, /A span is one paragraph/);
+});
+
+test('an alias to no anchor: YAML that is not', () => {
+  assert.deepEqual(found('x:\n  body: *nope\n'), [
+    ['yaml-syntax', 2, 9, '*nope'],
+  ]);
 });
 
 test('what makes it no shortcuts file', () => {

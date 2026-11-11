@@ -22,7 +22,7 @@ const TEMPLATES = [
   {
     key: 'span',
     extensions: [...FRAGMENT, '-implicit_figures'],
-    oneParagraph: true,
+    spanTemplate: true,
   },
 ];
 
@@ -55,9 +55,9 @@ export function lintShortcuts(path, text, options = {}) {
     ];
   }
   const out = [];
-  // A template an alias repeats is linted once as each template it is,
-  // where its anchor is.
-  const linted = Object.fromEntries(TEMPLATES.map((t) => [t.key, new Set()]));
+  // Each node's findings by the template it is read as: an alias repeats
+  // a template, linted where its anchor is.
+  const reads = new Map();
   for (const { key, value } of doc.contents.items) {
     if (!isMap(value)) continue;
     const name = isScalar(key) ? String(key.value) : '?';
@@ -65,11 +65,21 @@ export function lintShortcuts(path, text, options = {}) {
       const written = value.get(template.key, true);
       if (written === undefined) continue;
       const markdown = isAlias(written) ? written.resolve(doc) : written;
-      if (markdown === undefined || linted[template.key].has(markdown)) {
+      if (markdown === undefined) {
+        out.push(
+          fail(
+            'yaml-syntax',
+            `alias *${written.source} names no anchor`,
+            written.range,
+          ),
+        );
         continue;
       }
-      linted[template.key].add(markdown);
+      if (!reads.has(markdown)) reads.set(markdown, new Map());
+      const read = reads.get(markdown);
+      if (read.has(template.key)) continue;
       if (!isScalar(markdown) || typeof markdown.value !== 'string') {
+        read.set(template.key, []);
         out.push(
           fail(
             `shortcut-${template.key}`,
@@ -79,59 +89,53 @@ export function lintShortcuts(path, text, options = {}) {
         );
         continue;
       }
-      const found = lintSnippet(markdown.value, {
-        ...options,
-        extensions: template.extensions,
-        oneParagraph: template.oneParagraph,
-        ...placement(text, markdown),
-        source: path,
-        file: text,
-      });
-      out.push(
-        ...(markdown.type === 'BLOCK_LITERAL'
-          ? found
-          : found.map(atStart(text, markdown))),
+      read.set(
+        template.key,
+        lintSnippet(markdown.value, {
+          ...options,
+          extensions: template.extensions,
+          spanTemplate: template.spanTemplate,
+          ...placement(text, markdown),
+          source: path,
+          file: text,
+        }),
       );
     }
   }
-  // One read as a body and as a span finds the same thing once.
-  const once = new Map(out.map((d) => [JSON.stringify(d), d]));
-  return [...once.values()].sort((a, b) => a.start - b.start);
+  for (const read of reads.values()) out.push(...merged(read));
+  return out.sort((a, b) => a.start - b.start);
 }
 
-// Where a literal block's Markdown sits in the YAML: from the line after
-// its header, each line indented as the header's indicator says, past the
-// indent of the header's line, or else as its first line with text.
+// A node's findings read as a body and as a span, one where both find it:
+// the span's, whose remedy holds for both.
+function merged(read) {
+  const span = read.get('span') ?? [];
+  const at = (d) => [d.rule, d.start, d.end, d.callouts.problem].join();
+  const found = new Set(span.map(at));
+  return [
+    ...span,
+    ...(read.get('body') ?? []).filter((d) => !found.has(at(d))),
+  ];
+}
+
+// Where a template's Markdown sits in the YAML. A literal block's lines
+// are the file's past the indent YAML strips; a plain scalar on one line is
+// its line. Any other's lines are not the file's: it is all at its start.
 function placement(text, markdown) {
-  const headerStart = text.lastIndexOf('\n', markdown.range[0]) + 1;
-  const contentStart = text.indexOf('\n', markdown.range[0]) + 1;
-  const header = text.slice(markdown.range[0], contentStart);
-  const indicator = /^[|>](?:[+-]?([1-9])|([1-9])[+-]?)/.exec(header);
-  const lines = text.slice(contentStart, markdown.range[1]).split('\n');
-  const indent = indicator
-    ? /^ */.exec(text.slice(headerStart))[0].length +
-      Number(indicator[1] ?? indicator[2])
-    : /^ */.exec(lines.find((l) => l.trim() !== '') ?? '')[0].length;
-  const first = lineAndColumn(text, contentStart);
-  return { line: first.line, column: indent + 1, indent };
-}
-
-// A diagnostic of a template whose lines are not the source's (folded, or
-// quoted), moved to where the template starts; its frame, of lines the
-// file doesn't have, goes.
-function atStart(text, markdown) {
-  const [start] = markdown.range;
+  const [start, end] = markdown.range;
+  if (markdown.type === 'BLOCK_LITERAL') {
+    const contentStart = text.indexOf('\n', start) + 1;
+    const lines = text.slice(contentStart, end).split('\n');
+    const values = markdown.value.split('\n');
+    const k = values.findIndex((l) => l.trim() !== '');
+    const spaces = (l) => /^ */.exec(l)[0].length;
+    const indent = k === -1 ? 0 : spaces(lines[k]) - spaces(values[k]);
+    const { line } = lineAndColumn(text, contentStart);
+    return { line, column: indent + 1, indent };
+  }
   const at = lineAndColumn(text, start);
-  return ({ callouts: { verbatim, ...callouts }, ...d }) => ({
-    ...d,
-    callouts,
-    start,
-    end: start,
-    line: at.line,
-    column: at.column,
-    endLine: at.line,
-    endColumn: at.column,
-  });
+  const oneLine = !text.slice(start, end).includes('\n');
+  return { ...at, pinned: !(markdown.type === 'PLAIN' && oneLine) };
 }
 
 // The line and column of `offset`, from 1, a column a code point.

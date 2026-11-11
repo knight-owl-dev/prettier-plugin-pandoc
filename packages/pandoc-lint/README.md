@@ -70,9 +70,10 @@ documents of their own, under every rule, and each diagnostic lands at its line
 and column in the YAML. A folded or quoted template, whose lines are not the
 file's, reports at its start.
 
-A template is read as keystone reads it, as a fragment: no `%` title block, no
+A template is read as a fragment, as keystone reads one: no `%` title block, no
 YAML metadata block, and no identifier a heading didn't write. A span's lone
-image stays an image, not a figure.
+image stays an image, not a figure. Templates are read at `--tab-stop`, as files
+are.
 
 Four errors are about the file itself: `yaml-syntax` for invalid YAML,
 `shortcut-file` for anything other than a mapping of shortcuts, and
