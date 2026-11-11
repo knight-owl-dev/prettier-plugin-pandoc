@@ -111,16 +111,20 @@ export function lintShortcuts(path, text, options = {}) {
 function merged(read) {
   const span = read.get('span') ?? [];
   const at = (d) => [d.rule, d.start, d.end, d.callouts.problem].join();
-  const found = new Set(span.map(at));
-  return [
-    ...span,
-    ...(read.get('body') ?? []).filter((d) => !found.has(at(d))),
-  ];
+  const left = new Map();
+  for (const d of span) left.set(at(d), (left.get(at(d)) ?? 0) + 1);
+  const body = (read.get('body') ?? []).filter((d) => {
+    const n = left.get(at(d)) ?? 0;
+    left.set(at(d), n - 1);
+    return n <= 0;
+  });
+  return [...span, ...body];
 }
 
 // Where a template's Markdown sits in the YAML. A literal block's lines
-// are the file's past the indent YAML strips; a plain scalar on one line is
-// its line. Any other's lines are not the file's: it is all at its start.
+// are the file's past the indent YAML strips; a scalar on one line, its
+// text as written, is its line, inside any quotes. Any other's lines are
+// not the file's: it is all at its start.
 function placement(text, markdown) {
   const [start, end] = markdown.range;
   if (markdown.type === 'BLOCK_LITERAL') {
@@ -133,9 +137,12 @@ function placement(text, markdown) {
     const { line } = lineAndColumn(text, contentStart);
     return { line, column: indent + 1, indent };
   }
+  const quoted = markdown.type === 'PLAIN' ? 0 : 1;
+  const written = text.slice(start + quoted, end - quoted);
   const at = lineAndColumn(text, start);
-  const oneLine = !text.slice(start, end).includes('\n');
-  return { ...at, pinned: !(markdown.type === 'PLAIN' && oneLine) };
+  return !written.includes('\n') && written === markdown.value
+    ? { ...at, column: at.column + quoted }
+    : { ...at, pinned: true };
 }
 
 // The line and column of `offset`, from 1, a column a code point.

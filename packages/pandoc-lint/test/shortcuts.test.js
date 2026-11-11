@@ -115,10 +115,28 @@ test('a literal span with an indentation indicator', () => {
   }
 });
 
-test('a plain span on one line: where it is', () => {
+test('a span on one line, as written: where it is', () => {
   assert.deepEqual(found('s:\n  span: see [x][nope] and more\n'), [
     ['undefined-reference', 2, 13, '[x][nope]'],
   ]);
+  assert.deepEqual(found("s:\n  span: '[]{.slot} see [x][nope]'\n"), [
+    ['undefined-reference', 2, 24, '[x][nope]'],
+  ]);
+  assert.deepEqual(found('s:\n  span: "[]{.slot} see [x][nope]"\n'), [
+    ['undefined-reference', 2, 24, '[x][nope]'],
+  ]);
+});
+
+test('an unclosed div: where Pandoc closes it, in the file', () => {
+  const literal = 'q:\n  body: |\n    ::: a\n    text\n';
+  const [open] = lintShortcuts('s.yaml', literal);
+  assert.equal(open.callouts.effect, 'Pandoc closes it at s.yaml:5:1.');
+  const quoted = 'q:\n  body: "::: a\\ntext\\n"\n';
+  const [pinned] = lintShortcuts('s.yaml', quoted);
+  assert.equal(
+    pinned.callouts.effect,
+    'Pandoc closes it where its template ends.',
+  );
 });
 
 test('a body and a span: each linted', () => {
@@ -187,6 +205,8 @@ test("a span's misread: escaped, not split", () => {
   ].join('\n');
   const [d] = lintShortcuts('s.yaml', text);
   assert.equal(d.rule, 'block-in-paragraph');
+  // The build reads it as written: text, one edit from a block.
+  assert.equal(d.severity, 'warn');
   assert.equal(
     d.callouts.remedy,
     'Escape it with a backslash: before its marker, or before the period or parenthesis after its number or letter. A span is one paragraph.',
@@ -223,9 +243,9 @@ test('an anchor read as a body and a span: one finding', () => {
     '  span: *t',
     '',
   ].join('\n');
-  const found = lintShortcuts('s.yaml', text);
-  assert.equal(found.length, 1);
-  assert.match(found[0].callouts.remedy, /A span is one paragraph/);
+  const diagnostics = lintShortcuts('s.yaml', text);
+  assert.equal(diagnostics.length, 1);
+  assert.match(diagnostics[0].callouts.remedy, /A span is one paragraph/);
 });
 
 test('an alias to no anchor: YAML that is not', () => {

@@ -110,22 +110,18 @@ export function lintSnippet(text, options = {}) {
   const place = (offset) => {
     const at = pinned ? 0 : Math.min(offset, text.length);
     const local = lineAndColumn(text, at);
+    // An empty line's start is the file's line start: no indent to add.
+    const empty =
+      local.column === 1 && (at === text.length || text[at] === '\n');
     const there = {
       line: line + local.line - 1,
-      column: local.column + (local.line === 1 ? column - 1 : indent),
+      column:
+        local.column + (local.line === 1 ? column - 1 : empty ? 0 : indent),
     };
     const outer = file === undefined ? at : offsetAt(file, there);
     return { path: source, offset: outer, ...there };
   };
-  const found = diagnose(text, place, options);
-  // A frame of lines the file doesn't have would mislead.
-  const framed = pinned
-    ? found.map(({ callouts: { verbatim, ...callouts }, ...d }) => ({
-        ...d,
-        callouts,
-      }))
-    : found;
-  return framed.sort((a, b) => a.start - b.start);
+  return diagnose(text, place, options).sort((a, b) => a.start - b.start);
 }
 
 /**
@@ -214,8 +210,16 @@ const SEVERITY = { warn: 'WARN', info: 'INFO', error: 'ERROR' };
 function diagnose(
   text,
   place,
-  { tabStop, extensions, spanTemplate, info = false, noMetadata = false },
+  {
+    tabStop,
+    extensions,
+    spanTemplate = false,
+    pinned = false,
+    info = false,
+    noMetadata = false,
+  },
 ) {
+  const how = { spanTemplate, pinned };
   const reader = { tabStop, extensions };
   let doc;
   try {
@@ -225,7 +229,7 @@ function diagnose(
     // Pandoc reads nothing: its failure is all there is to report.
     const { message, start, end } = e;
     const msg = { type: 'PandocParseError', message, start, end };
-    return [diagnostic(RULES.PandocParseError, msg, null, place, text)];
+    return [diagnostic(RULES.PandocParseError, msg, null, place, text, how)];
   }
   const where = (offset) => {
     const p = place(offset);
@@ -237,7 +241,7 @@ function diagnose(
     definitions: doc.definitions,
     firstWithId: (id, before) => firstWithId(doc.blocks, id, before),
     toKey,
-    spanTemplate: spanTemplate === true,
+    ...how,
   };
   const seen = new Set();
   const out = [];
@@ -253,7 +257,7 @@ function diagnose(
     const key = JSON.stringify(msg);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(diagnostic(rule, msg, read, place, text));
+    out.push(diagnostic(rule, msg, read, place, text, how));
   }
   return out;
 }
@@ -277,8 +281,9 @@ const metadataInMarkdown = (block) => ({
 });
 
 // A message as a diagnostic: its span kept to the file it starts in, and a
-// frame of the line it starts on.
-function diagnostic(rule, msg, read, place, text) {
+// frame of the line it starts on, where its lines are the file's. A span
+// template's own severity, where its rule has one.
+function diagnostic(rule, msg, read, place, text, { spanTemplate, pinned }) {
   const from = place(msg.start);
   const lineEnd = text.indexOf('\n', msg.start);
   const until = Math.min(msg.end, lineEnd === -1 ? text.length : lineEnd);
@@ -287,7 +292,7 @@ function diagnostic(rule, msg, read, place, text) {
   const callouts = rule.callouts(msg, read);
   return {
     rule: rule.rule,
-    severity: rule.severity,
+    severity: (spanTemplate && rule.spanSeverity) || rule.severity,
     source: from.path,
     start: from.offset,
     end: to.offset,
@@ -297,7 +302,9 @@ function diagnostic(rule, msg, read, place, text) {
     endColumn: to.column,
     callouts: {
       ...withoutEmpty(callouts),
-      verbatim: codeFrame(text, msg.start, until, from.line),
+      ...(pinned
+        ? {}
+        : { verbatim: codeFrame(text, msg.start, until, from.line) }),
     },
   };
 }

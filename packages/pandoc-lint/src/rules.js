@@ -6,7 +6,8 @@
  * What a rule reads a message against: where an offset is, as
  * `path:line:column`; the source's text between two offsets; and the
  * read's reference definitions and AST, for the place a duplicate repeats;
- * and whether it is a span's template, which is one paragraph.
+ * whether it is a span's template, which is one paragraph; and whether its
+ * lines are not the file's, every place in it at its start.
  *
  * @typedef {object} Read
  * @property {(offset: number) => string} where
@@ -15,6 +16,7 @@
  * @property {(id: string, before: number) => {start: number, end: number} | null} firstWithId
  * @property {(label: string) => string} toKey
  * @property {boolean} spanTemplate
+ * @property {boolean} pinned
  */
 
 /**
@@ -23,6 +25,7 @@
  * @typedef {object} Rule
  * @property {string} rule
  * @property {'error' | 'warn' | 'info'} severity
+ * @property {'error' | 'warn' | 'info'} [spanSeverity] In a span's template.
  * @property {(msg: object, read: Read) => Record<string, string | string[]>} callouts
  */
 
@@ -45,7 +48,9 @@ export const RULES = {
     severity: 'warn',
     callouts: (msg, read) => ({
       problem: 'div is never closed',
-      effect: `Pandoc closes it at ${read.where(msg.end)}.`,
+      effect: read.pinned
+        ? 'Pandoc closes it where its template ends.'
+        : `Pandoc closes it at ${read.where(msg.end)}.`,
       remedy: read.slice(msg.start, msg.start + 1).startsWith('<')
         ? 'Close it with </div>.'
         : 'Close it with a line of :::.',
@@ -148,6 +153,8 @@ export const RULES = {
   BlockInParagraph: {
     rule: 'block-in-paragraph',
     severity: 'error',
+    // A span holds no blocks: the line is text, one edit from a block.
+    spanSeverity: 'warn',
     callouts: (msg, read) => ({
       problem: `${msg.block} is read as paragraph text`,
       because: `A paragraph runs on to the next blank line: a ${msg.block} on the line after its text is part of it.`,
