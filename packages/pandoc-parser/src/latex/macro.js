@@ -1,11 +1,14 @@
 // Macro definitions: `\newcommand` and its kin, `\def` and its kin, `\let`,
-// `\newif` and `\newenvironment`; recorded where `latex_macros` is on, kept
+// `\newif`, `\newenvironment`, and LaTeX3's document commands and
+// environments and their copies; recorded where `latex_macros` is on, kept
 // raw where it is off.
 //
 // Ported from Pandoc's `Text.Pandoc.Readers.LaTeX.Macro`.
 
 import { alt, attempt, FAIL, many, many1, option, optional } from '../core.js';
+import { isAlpha as isLetter } from '../data-char.js';
 import { message, report } from '../logging.js';
+import { strip } from '../shared.js';
 import {
   anyControlSeq,
   anyTok,
@@ -20,6 +23,7 @@ import {
   singleChar,
   spaces,
   symbol,
+  tokenize,
   untokenize,
   updateLaTeXState,
   withRaw,
@@ -28,6 +32,7 @@ import {
 
 /** @typedef {import('../tex.js').Tok} Tok */
 /** @typedef {import('./parsing.js').Macro} Macro */
+/** @typedef {import('./parsing.js').ArgSpec} ArgSpec */
 
 const macrosOn = (ctx) => ctx.state.s.options.extensions.has('latex_macros');
 
@@ -95,11 +100,6 @@ const MACRO_DEF_COMMANDS = new Set([
   'renewenvironment',
   'provideenvironment',
 ]);
-
-const commandDefs = alt(
-  newcommand,
-  checkGlobal(alt(letmacro, edefmacro, defmacro, (ctx) => newif(ctx))),
-);
 
 function commandDef(ctx) {
   const pairs = commandDefs(ctx);
@@ -307,7 +307,7 @@ const argTok = satisfyTok(isArgTok);
 /** @see Text.Pandoc.Readers.LaTeX.Macro.argspecArg */
 function argspecArg(ctx) {
   const t = argTok(ctx);
-  return t === FAIL ? FAIL : { num: t.arg };
+  return t === FAIL ? FAIL : { kind: 'ArgNum', num: t.arg };
 }
 
 const patternToks = many1(
@@ -323,7 +323,7 @@ const patternToks = many1(
 /** @see Text.Pandoc.Readers.LaTeX.Macro.argspecPattern */
 function argspecPattern(ctx) {
   const toks = patternToks(ctx);
-  return toks === FAIL ? FAIL : { pattern: toks };
+  return toks === FAIL ? FAIL : { kind: 'Pattern', toks };
 }
 
 const newcommandSeq = alt(
@@ -347,7 +347,8 @@ const numArgs = option(0, attempt(bracketedNum));
 const optArg = option(null, attempt(bracketedToks));
 
 // Arguments 1 to `n`.
-const numbered = (n) => Array.from({ length: n }, (_, k) => ({ num: k + 1 }));
+const numbered = (n) =>
+  Array.from({ length: n }, (_, k) => ({ kind: 'ArgNum', num: k + 1 }));
 
 /**
  * `\newcommand` and its kin: read verbatim, its macros expanded where it
@@ -398,6 +399,385 @@ function newcommand(ctx) {
     return [];
   })(ctx);
 }
+
+// What a definition of `name` gives where a macro of that name exists:
+// nothing for `\Provide…`, nothing and a log for `\New…`, else `result`
+// for `\Renew…` and `\Declare…`.
+function redefine(ctx, pos, mtype, name, result, fields) {
+  if (lookupMacro(ctx, name) === undefined) return result;
+  if (mtype.startsWith('Provide')) return [];
+  if (mtype.startsWith('New')) {
+    report(
+      ctx,
+      message('MacroAlreadyDefined', pos.start, ctx.state.at, fields),
+    );
+    return [];
+  }
+  return result;
+}
+
+const seqOf = (names) => alt(...names.map(controlSeq));
+const documentCommandSeq = seqOf(
+  ['', 'Expandable'].flatMap((x) =>
+    ['New', 'Renew', 'Provide', 'Declare'].map(
+      (y) => `${y}${x}DocumentCommand`,
+    ),
+  ),
+);
+const spacedCommandName = (ctx) =>
+  spaces(ctx) === FAIL ? FAIL : commandName(ctx);
+
+/**
+ * `\NewDocumentCommand\cmd{argspec}{body}` and its kin, with xparse's
+ * argument specifiers.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Macro.newDocumentCommand
+ */
+const newDocumentCommand = attempt((ctx) => {
+  const pos = documentCommandSeq(ctx);
+  if (pos === FAIL) return FAIL;
+  return withVerbatimMode((c) => {
+    const cs = spacedCommandName(c);
+    if (cs === FAIL || spaces(c) === FAIL) return FAIL;
+    const specs = xparseArgSpecs(false)(c);
+    if (specs === FAIL || spaces(c) === FAIL) return FAIL;
+    const contents = bracedOrToken(c);
+    if (contents === FAIL) return FAIL;
+    const m = makeMacro(
+      'GroupScope',
+      'ExpandWhenUsed',
+      specs[0],
+      null,
+      contents,
+    );
+    return redefine(c, pos, pos.name, cs.name, [[cs.name, m]], {
+      name: cs.text,
+    });
+  })(ctx);
+});
+
+const documentEnvironmentSeq = seqOf(
+  ['New', 'Renew', 'Provide', 'Declare'].map((y) => `${y}DocumentEnvironment`),
+);
+const spacedBracedOrToken = (ctx) =>
+  spaces(ctx) === FAIL ? FAIL : bracedOrToken(ctx);
+
+/**
+ * `\NewDocumentEnvironment{name}{argspec}{begin}{end}` and its kin, with
+ * xparse's argument specifiers, the arguments in the end code too: the
+ * begin defines a macro of the end, its arguments in place, which the end
+ * expands; in a group, so environments nest. A `b` argument, the body,
+ * reads to `\end{name}`, begin and end one macro.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Macro.newDocumentEnvironment
+ */
+const newDocumentEnvironment = attempt((ctx) => {
+  const pos = documentEnvironmentSeq(ctx);
+  if (pos === FAIL) return FAIL;
+  return withVerbatimMode((c) => {
+    if (spaces(c) === FAIL) return FAIL;
+    const nameToks = braced(c);
+    if (nameToks === FAIL || spaces(c) === FAIL) return FAIL;
+    const name = strip(untokenize(nameToks));
+    const specs = xparseArgSpecs(true)(c);
+    if (specs === FAIL) return FAIL;
+    const [argspecs, usesBody] = specs;
+    const begin = spacedBracedOrToken(c);
+    if (begin === FAIL) return FAIL;
+    const end = spacedBracedOrToken(c);
+    if (end === FAIL) return FAIL;
+    const bg = ctrlSeqAt(pos, 'bgroup', '\\bgroup ');
+    const eg = ctrlSeqAt(pos, 'egroup', '\\egroup ');
+    const helperName = `pandocxparseenvend${letterize(name)}`;
+    const helper = ctrlSeqAt(pos, helperName, `\\${helperName} `);
+    const defHelper = [
+      ctrlSeqAt(pos, 'def'),
+      helper,
+      tokAt(pos, 'Symbol', '{'),
+      ...end,
+      tokAt(pos, 'Symbol', '}'),
+    ];
+    const macro = (specs_, body) =>
+      makeMacro('GroupScope', 'ExpandWhenUsed', specs_, null, body);
+    const result = usesBody
+      ? [
+          [
+            name,
+            macro(
+              [
+                ...argspecs,
+                { kind: 'Pattern', toks: toksAt(pos, `\\end{${name}}`) },
+              ],
+              [bg, ...defHelper, ...begin, helper, eg],
+            ),
+          ],
+        ]
+      : [
+          [name, macro(argspecs, [bg, ...defHelper, ...begin])],
+          [`end${name}`, macro([], [helper, eg])],
+        ];
+    return redefine(c, pos, pos.name, name, result, { name });
+  })(ctx);
+});
+
+const commandCopySeq = seqOf(
+  ['New', 'Renew', 'Declare'].map((y) => `${y}CommandCopy`),
+);
+
+/**
+ * `\NewCommandCopy\new\old` and its kin: as `\let`, of control sequences
+ * only.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Macro.commandCopy
+ */
+const commandCopy = attempt((ctx) => {
+  const pos = commandCopySeq(ctx);
+  if (pos === FAIL) return FAIL;
+  return withVerbatimMode((c) => {
+    const cs = spacedCommandName(c);
+    if (cs === FAIL || spaces(c) === FAIL) return FAIL;
+    const target = anyControlSeq(c);
+    if (target === FAIL) return FAIL;
+    const m =
+      lookupMacro(c, target.name) ??
+      makeMacro('GroupScope', 'ExpandWhenDefined', [], null, [target]);
+    return redefine(c, pos, pos.name, cs.name, [[cs.name, m]], {
+      name: cs.text,
+    });
+  })(ctx);
+});
+
+const environmentCopySeq = seqOf(
+  ['New', 'Renew', 'Declare'].map((y) => `${y}EnvironmentCopy`),
+);
+const spacedBracedText = (ctx) => {
+  if (spaces(ctx) === FAIL) return FAIL;
+  const ts = braced(ctx);
+  return ts === FAIL ? FAIL : untokenize(ts);
+};
+
+/**
+ * `\NewEnvironmentCopy{new}{old}` and its kin: the begin and end macros
+ * copied; where the old is no macro, `\begin{old}` and `\end{old}`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Macro.environmentCopy
+ */
+const environmentCopy = attempt((ctx) => {
+  const pos = environmentCopySeq(ctx);
+  if (pos === FAIL) return FAIL;
+  return withVerbatimMode((c) => {
+    const name = spacedBracedText(c);
+    if (name === FAIL) return FAIL;
+    const target = spacedBracedText(c);
+    if (target === FAIL) return FAIL;
+    const copyOne = (to, from, fallback) => [
+      to,
+      lookupMacro(c, from) ??
+        makeMacro(
+          'GroupScope',
+          'ExpandWhenUsed',
+          [],
+          null,
+          toksAt(pos, fallback),
+        ),
+    ];
+    const result = [
+      copyOne(name, target, `\\begin{${target}}`),
+      copyOne(`end${name}`, `end${target}`, `\\end{${target}}`),
+    ];
+    return redefine(c, pos, pos.name, name, result, { name });
+  })(ctx);
+});
+
+// `text`'s tokens, at `at`'s position.
+const toksAt = (at, text) =>
+  [...tokenize(text, 0, at)].map((t) => ({
+    ...t,
+    start: at.start,
+    end: at.start,
+  }));
+
+/**
+ * A text in letters only, to name a control sequence that survives being
+ * tokenized again: any other character `x` and its code, digits as `a`
+ * to `j`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Macro.letterize
+ * @param {string} t
+ */
+function letterize(t) {
+  const letter = (d) => String.fromCharCode(d.charCodeAt(0) + 49);
+  let out = '';
+  for (const c of t) {
+    out += isLetter(c)
+      ? c
+      : `x${[...String(c.codePointAt(0))].map(letter).join('')}`;
+  }
+  return out;
+}
+
+/**
+ * A braced xparse argument specification, `{s O{default} m}`: its specs,
+ * and whether it ends in a body, `b` or `c`, which only an environment's
+ * may (`allowBody`).
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Macro.xparseArgSpecs
+ * @param {boolean} allowBody
+ * @returns {import('../core.js').Parser<[ArgSpec[], boolean]>}
+ */
+const xparseArgSpecs = (allowBody) => (ctx) => {
+  if (symbol('{')(ctx) === FAIL) return FAIL;
+  const specs = [];
+  for (let n = 1; ; ) {
+    if (spaces(ctx) === FAIL) return FAIL;
+    if (symbol('}')(ctx) !== FAIL) return [specs, false];
+    const r = xparseArgSpec(allowBody, n)(ctx);
+    if (r === FAIL) return FAIL;
+    const [spec, isBody] = r;
+    specs.push(spec);
+    if (isBody) {
+      if (spaces(ctx) === FAIL || symbol('}')(ctx) === FAIL) return FAIL;
+      return [specs, true];
+    }
+    n += numslots(spec);
+  }
+};
+
+// How many arguments a spec binds: an embellishment one each.
+const numslots = (spec) =>
+  spec.kind === 'EmbellishArg'
+    ? spec.embs.length
+    : spec.kind === 'ProcessedArg'
+      ? numslots(spec.spec)
+      : 1;
+
+const specTok = (ctx) => (spaces(ctx) === FAIL ? FAIL : singleChar(ctx));
+const embTokens = (ts) =>
+  ts.filter((t) => !['Spaces', 'Newline', 'Comment'].includes(t.type));
+const spacedBraced = (ctx) => (spaces(ctx) === FAIL ? FAIL : braced(ctx));
+const embDefaults = (ctx) => {
+  if (symbol('{')(ctx) === FAIL) return FAIL;
+  const ds = many(attempt(spacedBraced))(ctx);
+  if (ds === FAIL || spaces(ctx) === FAIL || symbol('}')(ctx) === FAIL) {
+    return FAIL;
+  }
+  return ds;
+};
+
+/**
+ * One xparse argument specifier, the `n`th argument, with its modifiers:
+ * the spec, and whether it is a body.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Macro.xparseArgSpec
+ * @param {boolean} allowBody
+ * @param {number} n
+ * @returns {import('../core.js').Parser<[ArgSpec, boolean]>}
+ */
+const xparseArgSpec = (allowBody, n) => (ctx) => {
+  // `!` turns off the spaces skipped before an optional argument, and the
+  // trimming of a body.
+  let noBang = true;
+  const procs = [];
+  for (;;) {
+    const t = singleChar(ctx);
+    if (t === FAIL) return FAIL;
+    const plain = (spec) =>
+      procs.length === 0
+        ? [spec, false]
+        : [{ kind: 'ProcessedArg', procs, spec }, false];
+    const delim = (open, close, dflt) =>
+      plain({ kind: 'DelimArg', skipSp: noBang, open, close, dflt });
+    const delimSpec = (withDefault) => {
+      const open = specTok(ctx);
+      if (open === FAIL) return FAIL;
+      const close = specTok(ctx);
+      if (close === FAIL) return FAIL;
+      const dflt = withDefault ? spacedBraced(ctx) : null;
+      return dflt === FAIL ? FAIL : delim(open, close, dflt);
+    };
+    const bracket = (text) => setposTok(t, text);
+    switch (t.text) {
+      case '+': // "long": no difference
+        break;
+      case '!':
+        noBang = false;
+        break;
+      case '=': // a key-value interface for the argument: not modeled
+        if (spacedBraced(ctx) === FAIL) return FAIL;
+        break;
+      case '>': {
+        const proc = spacedBraced(ctx);
+        if (proc === FAIL) return FAIL;
+        procs.push(proc);
+        break;
+      }
+      case 'm':
+        return plain({ kind: 'ArgNum', num: n });
+      case 'o':
+        return delim(bracket('['), bracket(']'), null);
+      case 'O': {
+        const dflt = spacedBraced(ctx);
+        return dflt === FAIL ? FAIL : delim(bracket('['), bracket(']'), dflt);
+      }
+      case 's':
+        return plain({ kind: 'BoolArg', skipSp: noBang, tok: bracket('*') });
+      case 't': {
+        const tok = specTok(ctx);
+        return tok === FAIL
+          ? FAIL
+          : plain({ kind: 'BoolArg', skipSp: noBang, tok });
+      }
+      case 'd':
+      case 'r':
+        return delimSpec(false);
+      case 'D':
+      case 'R':
+        return delimSpec(true);
+      case 'v':
+        return plain({ kind: 'VerbArg' });
+      case 'e':
+      case 'E': {
+        const embtoks = spacedBraced(ctx);
+        if (embtoks === FAIL) return FAIL;
+        let defaults = [];
+        if (t.text === 'E') {
+          if (spaces(ctx) === FAIL) return FAIL;
+          defaults = embDefaults(ctx);
+          if (defaults === FAIL) return FAIL;
+        }
+        const embs = embTokens(embtoks).map((e, k) => [e, defaults[k] ?? null]);
+        return plain({ kind: 'EmbellishArg', embs });
+      }
+      case 'b':
+      case 'c':
+        if (!allowBody) return FAIL;
+        // Processors do not apply to a body.
+        return [
+          {
+            kind: t.text === 'b' ? 'BodyArg' : 'VerbBodyArg',
+            trim: noBang,
+            num: n,
+          },
+          true,
+        ];
+      default:
+        return FAIL; // an xparse specifier not supported
+    }
+    if (spaces(ctx) === FAIL) return FAIL;
+  }
+};
+
+// A symbol at a token's position.
+const setposTok = (at, text) => tokAt(at, 'Symbol', text);
+
+const commandDefs = alt(
+  newcommand,
+  newDocumentCommand,
+  newDocumentEnvironment,
+  commandCopy,
+  environmentCopy,
+  checkGlobal(alt(letmacro, edefmacro, defmacro, newif)),
+);
 
 const newenvironmentSeq = alt(
   controlSeq('newenvironment'),

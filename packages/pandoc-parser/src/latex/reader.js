@@ -9,7 +9,7 @@ import { doc } from '../ast/document.js';
 import { DefaultDelim, DefaultStyle, Node, nullAttr } from '../ast/nodes.js';
 import { mapSpans } from '../ast/spans.js';
 import { walk, walkInlines } from '../ast/walk.js';
-import { isSpace, string } from '../char.js';
+import { string } from '../char.js';
 import { renderLang } from '../collate/lang.js';
 import { commonState } from '../common-state.js';
 import {
@@ -43,6 +43,7 @@ import {
   NBSP,
   splitTextBy,
   stringify,
+  strip,
   toLower,
   trim,
 } from '../shared.js';
@@ -1530,15 +1531,6 @@ const ensureExtension = (isAllowed, defaultExt, fp) =>
 /** @see Text.Pandoc.Readers.LaTeX.removeDoubleQuotes */
 const removeDoubleQuotes = (t) =>
   t.length >= 2 && t.startsWith('"') && t.endsWith('"') ? t.slice(1, -1) : t;
-
-// Haskell's `T.strip`.
-const strip = (t) => {
-  const cs = [...t];
-  let [from, to] = [0, cs.length];
-  while (from < to && isSpace(cs[from])) from++;
-  while (to > from && isSpace(cs[to - 1])) to--;
-  return cs.slice(from, to).join('');
-};
 
 const isCommentTok = (t) => t.type === 'Comment';
 

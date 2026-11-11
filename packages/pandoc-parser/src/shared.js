@@ -23,6 +23,20 @@ export const NBSP = String.fromCodePoint(0xa0);
 export const toLower = (s) => [...s].map((c) => c.toLowerCase()).join('');
 
 /**
+ * `s` without the spaces at either end, as GHC's `isSpace` has them.
+ *
+ * @see Data.Text.strip
+ * @param {string} s
+ */
+export function strip(s) {
+  const cs = [...s];
+  let [from, to] = [0, cs.length];
+  while (from < to && isSpace(cs[from])) from++;
+  while (to > from && isSpace(cs[to - 1])) to--;
+  return cs.slice(from, to).join('');
+}
+
+/**
  * The runs of `s` between its spaces, as GHC's `isSpace` has them.
  *
  * @see Data.Text.words
