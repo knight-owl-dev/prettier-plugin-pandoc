@@ -105,9 +105,12 @@ bun-check: test-image node_modules/.package-lock.json
 	@$(COMPOSE) build bun
 	@$(COMPOSE) run --rm -T bun tools/bun/check.sh $(BUN_CHECK_ARGS)
 	@$(RUN) sh -c 'node packages/pandoc-lint/src/cli.js --format=json --info \
-		$(BUN_CHECK_ARGS) > .scratch/bun/node.json || true'
+		$(BUN_CHECK_ARGS) > .scratch/bun/node.json || true; \
+		node packages/pandoc-lint/src/cli.js --version > .scratch/bun/node.version'
 	@cmp .scratch/bun/node.json .scratch/bun/bun.json \
 		&& echo "Bun's JSON is Node's"
+	@cmp .scratch/bun/node.version .scratch/bun/bun.version \
+		&& echo "Bun's --version is Node's"
 
 # The baseline runs in a worktree of REF; this checkout's documents feed both.
 bench-compare: test-image node_modules/.package-lock.json

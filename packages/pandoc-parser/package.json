@@ -11,7 +11,10 @@
   ],
   "license": "GPL-2.0-or-later",
   "type": "module",
-  "exports": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./upstream": "./src/upstream.js"
+  },
   "files": [
     "src",
     "upstream.json",
