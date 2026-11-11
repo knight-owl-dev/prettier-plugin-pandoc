@@ -41,6 +41,8 @@ const CASES = {
     'a \\foo*\n{a} b\n\na \\foo<2->{x} \\bar<presentation>{y} \\baz<abc>{z}\n\na \\small b \\tiny{c}',
   'loose block commands':
     '\\item foo\n\n\\hspace{1em} text\n\n\\input{a}{b}\n\n\\textcolor{red}{x}\n\n\\textcolor{red}{x\n\ny}\n\n\\section{x}\n\n\\label{y} z',
+  'LaTeX3 syntax, constants and argument markers':
+    '\\ExplSyntaxOn\n\\ShowCommand\\foo \\ShowEnvironment{bar}\n\\DeclareKeys[x]{a=b} \\DeclareUnknownKeyHandler{h} \\ProcessKeyOptions[p] \\SetKeys[q]{k}\n\\c_ampersand_str \\c_atsign_str \\c_backslash_str \\c_left_brace_str \\c_right_brace_str \\c_circumflex_str \\c_colon_str \\c_dollar_str \\c_hash_str \\c_percent_str \\c_tilde_str \\c_underscore_str\n\\ExplSyntaxOff\n\na {\\ttfamily b c } d \\NoValue{} \\BooleanTrue{} \\BooleanFalse{} e\n',
   'ConTeXt environments':
     '\\startitemize\n\\item a\n\\stopitemize\n\ntext \\starttext x \\stoptext more\n\n\\start[x y]z\\stop[x y]',
   'in lists, quotes and links':

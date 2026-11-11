@@ -46,6 +46,7 @@ argspecs
 astronomicalunit
 asturian
 atomicmassunit
+atsign
 atto
 autocap
 autocite
@@ -140,6 +141,7 @@ envname
 eqnarray
 eqref
 etoolbox
+expandableinput
 expandafter
 expl
 extratitle
@@ -518,6 +520,7 @@ toprule
 tothe
 totoks
 tspec
+ttfamily
 uline
 umol
 untoken
@@ -539,6 +542,7 @@ vref
 vskip
 wproj
 xdef
+xparse
 yocto
 yotta
 zepto
