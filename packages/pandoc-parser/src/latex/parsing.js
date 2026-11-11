@@ -1368,6 +1368,46 @@ export function bracketedToks(ctx) {
 }
 
 /**
+ * The next token, cut at `stopchar` where it holds one: the rest put back,
+ * the stop character a symbol of its own and what follows tokenized
+ * again.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.verbTok
+ * @param {string} stopchar
+ * @returns {Parser<Tok>}
+ */
+export const verbTok = (stopchar) => (ctx) => {
+  const t = anyTok(ctx);
+  if (t === FAIL) return FAIL;
+  const chars = [...t.text];
+  const i = chars.indexOf(stopchar);
+  if (i === -1) return t;
+  const t1 = chars.slice(0, i).join('');
+  const t2 = chars.slice(i + 1).join('');
+  // A token from an expansion spans nothing; its pieces neither.
+  const at = (k) => (t.end === t.start ? t.start : t.start + k);
+  const stopAt = at(t1.length);
+  const stop = {
+    type: 'Symbol',
+    text: stopchar,
+    line: t.line,
+    column: t.column + i,
+    start: stopAt,
+    end: at(t1.length + stopchar.length),
+  };
+  const restAt = at(t1.length + stopchar.length);
+  const rest = [
+    ...tokenize(t2, 0, { line: t.line, column: t.column + i + 1 }),
+  ].map((x) => ({
+    ...x,
+    start: t.end === t.start ? t.start : restAt + x.start,
+    end: t.end === t.start ? t.start : restAt + x.end,
+  }));
+  setInput(ctx, prepend([stop, ...rest], ctx.state.input), ctx.state.expanded);
+  return { ...t, text: t1, end: stopAt };
+};
+
+/**
  * `parser`'s values in parentheses, joined by `mconcat`.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.parenWrapped
