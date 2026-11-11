@@ -2,9 +2,12 @@
 //
 // Ported from Pandoc's `Text.Pandoc.ImageSize`: what readers use.
 
+import { codePointLength } from './code-points.js';
+import { isSpace } from './data-char.js';
+
 /**
- * A number and the unit after it; null where it starts with no number
- * Haskell reads as a `Double`.
+ * A number and the unit after it, spaces before the unit dropped; null
+ * where it starts with no number Haskell reads as a `Double`.
  *
  * @see Text.Pandoc.ImageSize.numUnit
  * @param {string} s
@@ -13,7 +16,11 @@
 export function numUnit(s) {
   const nums = /^[0-9.]*/.exec(s)[0];
   if (!/^[0-9]+(\.[0-9]+)?$/.test(nums)) return null;
-  return [Number(nums), s.slice(nums.length)];
+  let unit = s.slice(nums.length);
+  while (unit !== '' && isSpace(unit)) {
+    unit = unit.slice(codePointLength(unit, 0));
+  }
+  return [Number(nums), unit];
 }
 
 /**

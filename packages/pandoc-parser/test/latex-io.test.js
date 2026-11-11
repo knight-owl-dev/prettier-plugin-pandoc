@@ -34,7 +34,7 @@ const CASES = {
   ],
   images: [
     { 'img.png': 'x', 'dir/pic.PDF': 'x' },
-    '\\includegraphics{img} \\includegraphics[width=0.5\\textwidth,height=2cm,alt=Alt]{img2} \\includesvg{dir/pic} \\includegraphics{"q.jpg"}',
+    '\\includegraphics{img} \\includegraphics[width=0.5\\textwidth,height=2cm,alt=Alt]{img2} \\includesvg{dir/pic} \\includegraphics{"q.jpg"} \\includegraphics[width=0.5 \\textwidth, height=2 cm]{img}',
   ],
   inputminted: [
     { 'code.py': 'print(1)\r\n' },
