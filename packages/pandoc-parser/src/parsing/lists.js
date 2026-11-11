@@ -18,7 +18,7 @@ import {
   UpperRoman,
 } from '../ast/nodes.js';
 import { alphaNum, char, digit } from '../char.js';
-import { alt, attempt, choice, FAIL, skipMany, skipMany1 } from '../core.js';
+import { alt, attempt, FAIL, skipMany, skipMany1 } from '../core.js';
 import { textOf } from './general.js';
 import { updateState } from './state.js';
 
@@ -208,29 +208,49 @@ const inTwoParens = (num) =>
     return [n[1], n[0], TwoParens];
   });
 
+// The number `num` reads, then `.` or `)`: `)` closes two parentheses
+// where `(` opened the marker.
+const withDelim = (num, paren) =>
+  attempt((ctx) => {
+    const n = num(ctx);
+    if (n === FAIL) return FAIL;
+    const [style, start] = n;
+    if (period(ctx) !== FAIL) {
+      return [start, style, style === DefaultStyle ? DefaultDelim : Period];
+    }
+    return close(ctx) === FAIL
+      ? FAIL
+      : [start, style, paren ? TwoParens : OneParen];
+  });
+
+// The numbers a marker's first character may start, in Pandoc's order.
 const NUMBERS = [
-  decimal,
-  exampleNum,
-  defaultNum,
-  romanOne,
-  lowerAlpha,
-  lowerRoman,
-  upperAlpha,
-  upperRoman,
-];
+  [(c) => c === '@', [exampleNum]],
+  [(c) => c === '#', [defaultNum]],
+  [(c) => c >= '0' && c <= '9', [exampleNum, decimal]],
+  [(c) => c >= 'a' && c <= 'z', [romanOne, lowerAlpha, lowerRoman]],
+  [(c) => c >= 'A' && c <= 'Z', [romanOne, upperAlpha, upperRoman]],
+].map(([starts, nums]) => [
+  starts,
+  [false, true].map((paren) =>
+    alt(...nums.map((num) => withDelim(num, paren))),
+  ),
+]);
 
 /**
- * Any ordered list marker: each delimiter, each style within it, in
- * Pandoc's order.
+ * Any ordered list marker, `(` optional before it, the number read as its
+ * first character says.
  *
  * @see Text.Pandoc.Parsing.Lists.anyOrderedListMarker
  * @type {import('../core.js').Parser<ListAttributes>}
  */
-export const anyOrderedListMarker = choice(
-  [inPeriod, inOneParen, inTwoParens].flatMap((delimited) =>
-    NUMBERS.map(delimited),
-  ),
-);
+export const anyOrderedListMarker = attempt((ctx) => {
+  const paren = open(ctx) !== FAIL;
+  const c = ctx.text[ctx.pos];
+  const entry =
+    c === undefined ? undefined : NUMBERS.find(([starts]) => starts(c));
+  return entry === undefined ? FAIL : entry[1][Number(paren)](ctx);
+});
 
 const NUMBER_OF = new Map([
   ['DefaultStyle', decimal],
