@@ -42,6 +42,8 @@ const CASES = {
     '\\RN{12} \\Rn{2024} \\RN 7 \\mkbibquote{q} \\mkbibemph{e} \\mkbibparens{p} \\mkbibbrackets{b} \\autocap{a} \\bibstring{and} \\adddot\\adddotspace\\addabbrvspace\\hyphen',
   references:
     '\\label{x} \\ref{x} \\cref{x} \\Cref{x} \\vref{x} \\eqref{x} \\autoref{x}',
+  'LaTeX3 syntax, constants and argument markers':
+    '\\ExplSyntaxOn\n\\ShowCommand\\foo \\ShowEnvironment{bar}\n\\DeclareKeys[x]{a=b} \\DeclareUnknownKeyHandler{h} \\ProcessKeyOptions[p] \\SetKeys[q]{k}\n\\c_ampersand_str \\c_atsign_str \\c_backslash_str \\c_left_brace_str \\c_right_brace_str \\c_circumflex_str \\c_colon_str \\c_dollar_str \\c_hash_str \\c_percent_str \\c_tilde_str \\c_underscore_str\n\\ExplSyntaxOff\n\na {\\ttfamily b c } d \\NoValue{} \\BooleanTrue{} \\BooleanFalse{} e\n',
   acronyms: '\\gls{api} \\Glspl{api} \\acf{x} \\acsp{y}',
 };
 

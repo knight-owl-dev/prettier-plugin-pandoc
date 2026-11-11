@@ -23,6 +23,10 @@ const VARIANTS = ['', '+raw_tex'];
 // Each case: the files beside the document, and the document.
 const CASES = {
   input: [{ 'a.tex': 'Included \\emph{text}.\n' }, 'Before \\input{a} after.'],
+  expandableinput: [
+    { 'a.tex': 'In.\n' },
+    'Before \\expandableinput{a} after.\n\n\\expandableinput{a}',
+  ],
   include: [{ 'a.tex': 'Inc.\n' }, '\\include{a}\n\nNext.'],
   'an input with its extension': [{ 'b.txt': 'Plain.\n' }, '\\input{b.txt}'],
   'an input missing': [{}, 'x \\input{missing} y'],

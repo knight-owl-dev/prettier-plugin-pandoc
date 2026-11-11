@@ -1084,6 +1084,12 @@ const processHBox = (ils) =>
 
 const tokThen = (f) => wrapping((ctx) => tok(ctx), f);
 const inlinesThen = (f) => wrapping((ctx) => inlines(ctx), f);
+const constant = (t) => (ctx, start) => lit(t, start, ctx.state.at);
+// `p` read, nothing made.
+const discarding = (p) => (ctx) => (p(ctx) === FAIL ? FAIL : []);
+const spacesThenControlSeq = (ctx) =>
+  spaces(ctx) === FAIL ? FAIL : anyControlSeq(ctx);
+const optsThenBraced = (ctx) => (skipopts(ctx) === FAIL ? FAIL : braced(ctx));
 const urlArg = (ctx) => {
   const url = bracedUrl(ctx);
   return url === FAIL ? FAIL : unescapeURL(untokenize(url));
@@ -1146,6 +1152,7 @@ const REST_COMMANDS = [
   ['sl', extracting((ctx) => inlines(ctx), B.emph)],
   ['bf', extracting((ctx) => inlines(ctx), B.strong)],
   ['tt', inlinesThen(code)],
+  ['ttfamily', extracting((ctx) => inlines(ctx), code)],
   ['rm', (ctx) => inlines(ctx)],
   ['itshape', extracting((ctx) => inlines(ctx), B.emph)],
   ['slshape', extracting((ctx) => inlines(ctx), B.emph)],
@@ -1168,6 +1175,10 @@ const REST_COMMANDS = [
   ['footnotemark', footnotemark],
   ['footnotetext', footnotetext],
   ['newline', (ctx, start) => B.linebreak(start, ctx.state.at)],
+  // xparse argument markers, in case they leak into the document:
+  ['NoValue', constant('-NoValue-')],
+  ['BooleanTrue', () => []],
+  ['BooleanFalse', () => []],
   ['passthrough', tokThen(fixPassthroughEscapes)],
   // \passthrough macro used by latex writer for listings
   ['includegraphics', includegraphics],
@@ -1217,6 +1228,7 @@ const REST_COMMANDS = [
   ['iftoggle', attempt((ctx) => (ifToggle(ctx) === FAIL ? FAIL : inline(ctx)))],
   // include
   ['input', rawInlineOr('input', include('input'))],
+  ['expandableinput', rawInlineOr('expandableinput', include('input'))],
   // soul package
   ['st', extracting((ctx) => tok(ctx), B.strikeout)],
   ['ul', tokThen(B.underline)],
@@ -1231,6 +1243,19 @@ const REST_COMMANDS = [
   // this is used internally by pandoc but the definition is too complicated
   // for pandoc to handle (see #11140):
   ['pandocbounded', (ctx) => tok(ctx)],
+  // LaTeX3 constants
+  ['c_ampersand_str', constant('&')],
+  ['c_atsign_str', constant('@')],
+  ['c_backslash_str', constant('\\')],
+  ['c_left_brace_str', constant('{')],
+  ['c_right_brace_str', constant('}')],
+  ['c_circumflex_str', constant('^')],
+  ['c_colon_str', constant(':')],
+  ['c_dollar_str', constant('$')],
+  ['c_hash_str', constant('#')],
+  ['c_percent_str', constant('%')],
+  ['c_tilde_str', constant('~')],
+  ['c_underscore_str', constant('_')],
 ];
 
 // ---------------------------------------------------------------------
@@ -1774,6 +1799,7 @@ const BLOCK_COMMANDS = new Map([
   // include
   ['include', rawBlockOr('include', include('include'))],
   ['input', rawBlockOr('input', include('input'))],
+  ['expandableinput', rawBlockOr('expandableinput', include('input'))],
   ['subfile', rawBlockOr('subfile', doSubfile)],
   ['usepackage', rawBlockOr('usepackage', usepackage)],
   // preamble
@@ -1784,6 +1810,15 @@ const BLOCK_COMMANDS = new Map([
         ? FAIL
         : [],
   ],
+  // LaTeX3 conveniences, parsed and ignored:
+  ['ExplSyntaxOn', () => []],
+  ['ExplSyntaxOff', () => []],
+  ['ShowCommand', discarding(withVerbatimMode(spacesThenControlSeq))],
+  ['ShowEnvironment', discarding(braced)],
+  ['DeclareKeys', discarding(optsThenBraced)],
+  ['DeclareUnknownKeyHandler', discarding(optsThenBraced)],
+  ['ProcessKeyOptions', discarding(skipopts)],
+  ['SetKeys', discarding(optsThenBraced)],
   // epigraph package
   ['epigraph', epigraph],
   // alignment
