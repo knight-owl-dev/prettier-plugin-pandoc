@@ -529,11 +529,12 @@ const bracketedSpanAt = whenEnabled(
   'bracketed_spans',
   attempt((ctx) => {
     const start = ctx.pos;
-    const ref = reference(ctx);
-    if (ref === FAIL) return FAIL;
+    if (enabled(ctx, 'footnotes') && noNoteAhead(ctx) === FAIL) return FAIL;
+    const label = inBalancedBrackets(ctx);
+    if (label === FAIL) return FAIL;
     const attr = attributes(ctx);
     if (attr === FAIL) return FAIL;
-    return wrapSpan(attr, ref.label, start, ctx.pos);
+    return wrapSpan(attr, label, start, ctx.pos);
   }),
 );
 

@@ -25,7 +25,8 @@ const CASES = {
   images: 'x ![a](i.png) y ![](i.png) ![a](i.png "t"){width=50%}',
   'implicit figures':
     '![a](i.png)\n\n![a](i.png){alt="b c"}\n\n![a](i.png){latex-placement=h #f .c}\n\n![](i.png)',
-  spans: '[a]{.smallcaps} [a]{.ul .x} [a]{#i} [a]{} [a]{.underline .smallcaps}',
+  spans:
+    '[a]{.smallcaps} [a]{.ul .x} [a]{#i} [a]{} [a]{.underline .smallcaps} [ a ]{.c} [\na\n]{.c}',
   'a small-caps style': '[a]{style="font-variant: small-caps;"}',
   nested: '*[a](u)* - [a](u)\n- ![b](c)\n\n[a](u) [b](v)',
 };
