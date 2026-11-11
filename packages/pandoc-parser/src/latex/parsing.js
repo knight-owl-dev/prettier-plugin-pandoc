@@ -360,6 +360,7 @@ export const defaultLaTeXState = (options) => ({
   fileContents: new Map(),
   enableWithRaw: true,
   ligatures: true,
+  lastExpansion: null,
 });
 
 /**
@@ -694,6 +695,19 @@ function handleMacros(ctx, n, at, name, rest) {
   if (n > 20) throw new Error(`PandocMacroLoop: ${name}`);
   const macro = ctx.state.s.macros[0].get(name);
   if (macro === undefined) return trySpecialMacro(ctx, name, rest);
+  // A macro expanding to itself after an unknown command expands again at
+  // the same position, each time in a fresh `doMacros` (#11088).
+  const last = ctx.state.s.lastExpansion;
+  const count =
+    last?.name === name &&
+    last.source === at.source &&
+    last.line === at.line &&
+    last.column === at.column
+      ? last.count + 1
+      : 1;
+  if (count > 1000) throw new Error(`PandocMacroLoop: ${name}`);
+  const { source, line, column } = at;
+  const lastExpansion = { name, source, line, column, count };
   const read = (c) => {
     const args =
       macro.optarg === null
@@ -716,6 +730,7 @@ function handleMacros(ctx, n, at, name, rest) {
       ? withVerbatimMode(read)(sub)
       : read(sub);
   if (args === FAIL) return null;
+  updateLaTeXState(ctx, { lastExpansion });
   let result = sub.state.input;
   for (let k = macro.body.length - 1; k >= 0; k--) {
     result = addTok(false, args, at, macro.body[k], result);

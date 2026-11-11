@@ -107,3 +107,9 @@ test('spans: raw TeX and environments run from their commands', () => {
 test('a document Pandoc fails to read fails', () => {
   assert.throws(() => readLaTeX('a } b'), /the LaTeX reader failed/);
 });
+
+test('a macro expanding to itself at one position fails as a loop', () => {
+  const text =
+    '\\makeatletter\n\\def\\small{\\@setfontsize\\small\\@ixpt{10}}\n\\makeatother\n\\small test\n';
+  assert.throws(() => readLaTeX(text), /PandocMacroLoop: small/);
+});
