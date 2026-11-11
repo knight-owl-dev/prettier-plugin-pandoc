@@ -732,13 +732,19 @@ export const tok = tokWith(inline);
  * @param {string} t
  */
 function unescapeURL(t) {
-  const [first, ...parts] = t.split('\\');
-  return (
-    first +
-    parts
-      .map((x) => (x !== '' && '#$%&~_^\\{}'.includes(x[0]) ? x : `\\${x}`))
-      .join('')
-  );
+  let out = '';
+  let i = 0;
+  for (let j = t.indexOf('\\'); j !== -1; j = t.indexOf('\\', i)) {
+    const c = t[j + 1];
+    if (c !== undefined && '#$%&~_^\\{}'.includes(c)) {
+      out += t.slice(i, j) + c;
+      i = j + 2;
+    } else {
+      out += t.slice(i, j + 1);
+      i = j + 1;
+    }
+  }
+  return out + t.slice(i);
 }
 
 // `p` with the ligatures of `--`, quotes and the like off.
