@@ -235,6 +235,7 @@ infile
 inputminted
 itemindent
 itshape
+ixpt
 jbig
 katal
 keyval
@@ -395,6 +396,7 @@ seename
 serbianc
 setcounter
 setdefaultlanguage
+setfontsize
 setlength
 setmainlanguage
 setpos
