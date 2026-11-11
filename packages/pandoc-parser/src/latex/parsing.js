@@ -53,8 +53,8 @@ const isDigit = (c) => c >= '0' && c <= '9';
  * The tokens of `text` from `from`, the first at Pandoc's position `line`
  * and `column`, made on demand: a consumer of the first ones tokenizes no
  * further. Positions move as Pandoc's do, drifts and all: a control space
- * before a non-blank line, `##` without digits, and `^^` before a newline
- * leave later positions behind the text.
+ * before a non-blank line and `^^` before a newline leave later positions
+ * behind the text.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.tokenize
  * @param {string} text
@@ -152,12 +152,10 @@ export function* tokenize(text, from = 0, start = { line: 1, column: 1 }) {
           yield tok('DeferredArg', at, end, { arg });
           [column, at] = [column + 2 + n, end];
         } else {
-          // Two symbols, the position past the first only: the rest of
-          // the line drifts a column.
           yield tok('Symbol', at, rest);
           column++;
           yield tok('Symbol', rest, rest + 1);
-          at = rest + 1;
+          [column, at] = [column + 1, rest + 1];
         }
       } else {
         const [end, n] = span(rest, isDigit);
@@ -1176,8 +1174,8 @@ export function bracedWith(getTok) {
 export const braced = bracedWith(anyTok);
 
 /**
- * A comment in a URL re-read as text: `%`, then its text tokenized again,
- * at positions shifted as Pandoc shifts them (#5844).
+ * A comment in a URL re-read as text: `%`, then its text tokenized again
+ * (#5844).
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.retokenizeComment
  */
@@ -1186,14 +1184,8 @@ function retokenizeComment(ctx) {
   const t = satisfyTok(isCommentTok)(ctx);
   if (t === FAIL) return ctx.pos === at ? undefined : FAIL;
   const shifted = [
-    ...tokenize(t.text, 1, { line: t.line, column: t.column }),
-  ].map((x) => ({
-    ...x,
-    line: x.line + t.line - 1,
-    column: x.column + t.column,
-    start: t.start + x.start,
-    end: t.start + x.end,
-  }));
+    ...tokenize(t.text, 1, { line: t.line, column: t.column + 1 }),
+  ].map((x) => ({ ...x, start: t.start + x.start, end: t.start + x.end }));
   const percent = { ...t, type: 'Symbol', text: '%', end: t.start + 1 };
   setInput(
     ctx,

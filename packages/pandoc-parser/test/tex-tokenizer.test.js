@@ -89,7 +89,7 @@ test('a control space before a blank line: the backslash and its spaces', () => 
   ]);
 });
 
-test('arguments, and ## without digits drifting a column', () => {
+test('arguments, and ## without digits', () => {
   assert.deepEqual(toks('#1##2#x'), [
     ['Arg', '#1', 1, 1, 1],
     ['DeferredArg', '##2', 1, 3, 2],
@@ -99,7 +99,7 @@ test('arguments, and ## without digits drifting a column', () => {
   assert.deepEqual(toks('##a'), [
     ['Symbol', '#', 1, 1],
     ['Symbol', '#', 1, 2],
-    ['Word', 'a', 1, 2],
+    ['Word', 'a', 1, 3],
   ]);
 });
 
