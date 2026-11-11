@@ -818,11 +818,11 @@ function trySpecialMacro(ctx, name, rest) {
       return expanded;
     }
     case 'iftrue':
-      return handleIf(ctx, ifParser(true), rest);
+      return doIf(ctx, true, rest);
     case 'iffalse':
-      return handleIf(ctx, ifParser(false), rest);
+      return doIf(ctx, false, rest);
     case 'ifmmode':
-      return handleIf(ctx, ifParser(ctx.state.s.mathMode), rest);
+      return doIf(ctx, ctx.state.s.mathMode, rest);
     case 'ifstrequal':
       return handleIf(ctx, ifStrequalParser, rest);
     default:
@@ -845,35 +845,90 @@ function handleIf(ctx, parser, rest) {
   return result === FAIL ? null : result;
 }
 
-const elseOrFi = alt(
-  (ctx) => controlSeq('else')(ctx),
-  (ctx) => controlSeq('fi')(ctx),
-);
+const PRIMITIVE_CONDITIONALS = new Set([
+  'if',
+  'ifcase',
+  'ifcat',
+  'ifcsname',
+  'ifdefined',
+  'ifdim',
+  'ifeof',
+  'iffalse',
+  'iffontchar',
+  'ifhbox',
+  'ifhmode',
+  'ifincsname',
+  'ifinner',
+  'ifmmode',
+  'ifnum',
+  'ifodd',
+  'iftrue',
+  'ifvbox',
+  'ifvmode',
+  'ifvoid',
+  'ifx',
+]);
 
 /**
- * A conditional's branches to `\fi`: the one `b` takes, before the rest.
+ * A conditional's branch `b` takes, before what follows its `\fi`; the
+ * other skipped unexpanded, as TeX skips it. A macro that is one primitive
+ * conditional, as `\newif` makes, nests as one. Null where no `\fi` ends
+ * it.
  *
- * @see Text.Pandoc.Readers.LaTeX.Parsing.ifParser
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.doIf
  * @param {boolean} b
+ * @param {TokList} rest
  */
-function ifParser(b) {
-  const ifToks = many((ctx) =>
-    notFollowedBy(elseOrFi)(ctx) === FAIL ? FAIL : anyTok(ctx),
-  );
-  const elseToks = alt(
-    (ctx) =>
-      controlSeq('else')(ctx) === FAIL
-        ? FAIL
-        : manyTill(anyTok, controlSeq('fi'))(ctx),
-    (ctx) => (controlSeq('fi')(ctx) === FAIL ? FAIL : []),
-  );
-  return (ctx) => {
-    const yes = ifToks(ctx);
-    if (yes === FAIL) return FAIL;
-    const no = elseToks(ctx);
-    if (no === FAIL) return FAIL;
-    return prepend(b ? yes : no, ctx.state.input);
-  };
+function doIf(ctx, b, rest) {
+  const conditionals = new Set(PRIMITIVE_CONDITIONALS);
+  for (const table of ctx.state.s.macros) {
+    for (const [name, m] of table) {
+      if (
+        m.argspecs.length === 0 &&
+        m.optarg === null &&
+        m.body.length === 1 &&
+        m.body[0].type === 'CtrlSeq' &&
+        PRIMITIVE_CONDITIONALS.has(m.body[0].name)
+      ) {
+        conditionals.add(name);
+      }
+    }
+  }
+  const split = splitConditional(conditionals, rest);
+  if (split === null) return null;
+  const [ifToks, elseToks, after] = split;
+  return prepend(b ? ifToks : elseToks, after);
+}
+
+/**
+ * A conditional's tokens before its `\else` or `\fi`, those of its
+ * `\else` branch, and the stream after its `\fi`; null where no `\fi` ends
+ * it.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Parsing.splitConditional
+ * @param {Set<string>} conditionals
+ * @param {TokList} list
+ * @returns {[Tok[], Tok[], TokList] | null}
+ */
+function splitConditional(conditionals, list) {
+  const branches = [[]];
+  let depth = 0;
+  for (let cell = list; cell !== null; cell = tail(cell)) {
+    const t = cell.tok;
+    if (t.type === 'CtrlSeq') {
+      if (t.name === 'fi' && depth === 0) {
+        return [branches[0], branches[1] ?? [], tail(cell)];
+      }
+      if (t.name === 'else' && depth === 0 && branches.length === 1) {
+        branches.push([]);
+        continue;
+      }
+      if (t.name === 'fi') depth--;
+      else if (conditionals.has(t.name)) depth++;
+    }
+    branches.at(-1).push(t);
+  }
+  return null;
 }
 
 const bracedOrOne = alt(
