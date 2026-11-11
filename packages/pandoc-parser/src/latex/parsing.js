@@ -828,16 +828,6 @@ const matchPattern = (toks) =>
 const ctrlSeqAt = (at, name) =>
   setpos(at, { type: 'CtrlSeq', name, text: `\\${name} ` });
 
-const rawBracedOrOneTok = alt(
-  (ctx) => {
-    const r = withRaw(attempt(braced))(ctx);
-    return r === FAIL ? FAIL : r[1];
-  },
-  (ctx) => {
-    const t = anyTok(ctx);
-    return t === FAIL ? FAIL : [t];
-  },
-);
 // The tokens up to `pattern`, each part read by `part`.
 const upTo = (part, pattern) =>
   attempt((ctx) => {
@@ -876,8 +866,7 @@ function getargs(num, argmap, specs) {
           let x;
           if (next?.kind === 'Pattern') {
             // A body to `\end{name}`, its groups kept whole.
-            const part =
-              spec.kind === 'ArgNum' ? bracedOrOne : rawBracedOrOneTok;
+            const part = spec.kind === 'ArgNum' ? bracedOrOne : groupOrTok;
             x = upTo(part, next.toks)(ctx);
             if (x === FAIL) return FAIL;
             if (spec.kind === 'BodyArg' && spec.trim) x = trimSpaceToks(x);
@@ -1691,7 +1680,8 @@ export function bracketed(parser, mconcat) {
   });
 }
 
-const bracketPart = alt(
+// A group as written, braces and all, or a token.
+const groupOrTok = alt(
   (ctx) => {
     const r = withRaw(attempt(braced))(ctx);
     return r === FAIL ? FAIL : r[1];
@@ -1701,7 +1691,7 @@ const bracketPart = alt(
     return t === FAIL ? FAIL : [t];
   },
 );
-const bracketParts = manyTill(bracketPart, symbol(']'));
+const bracketParts = manyTill(groupOrTok, symbol(']'));
 
 /**
  * A bracketed option's tokens, braces in it kept whole.
