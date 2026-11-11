@@ -4,6 +4,7 @@
 // takes the instances' transformations as a visitor; nodes keep their spans.
 
 import { Node, Row } from './nodes.js';
+import { keepContents } from './spans.js';
 
 /**
  * What a walk applies: to each inline, each block, each list of inlines.
@@ -12,6 +13,7 @@ import { Node, Row } from './nodes.js';
  * @property {(x: Node) => Node} [inline]
  * @property {(x: Node) => Node} [block]
  * @property {(xs: Node[]) => Node[]} [inlines]
+ * @property {(bs: Node[]) => Node[]} [blocks]
  */
 
 /**
@@ -44,7 +46,10 @@ function walker(visitor) {
     const ys = xs.map(inline);
     return visitor.inlines ? visitor.inlines(ys) : ys;
   };
-  const blocks = (bs) => bs.map(block);
+  const blocks = (bs) => {
+    const ys = keepContents(bs, bs.map(block));
+    return visitor.blocks ? visitor.blocks(ys) : ys;
+  };
   const caption = ([short, bs]) => [
     short === null ? null : inlines(short),
     blocks(bs),
@@ -91,7 +96,9 @@ function walker(visitor) {
         d = [c[0], inlines(c[1]), c[2]];
         break;
       case 'Note':
-        d = blocks(c);
+        // A note still pending its contents (`markdown/references.js`)
+        // holds none yet.
+        if (Array.isArray(c)) d = blocks(c);
         break;
     }
     const y = d === c ? x : new Node(t, d, x.start, x.end);

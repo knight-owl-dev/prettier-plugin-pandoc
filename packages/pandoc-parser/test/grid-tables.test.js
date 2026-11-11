@@ -45,6 +45,19 @@ const CASES = {
 +=====+=====+
 | f   | g   |
 +=====+=====+`,
+  'notes defined after the table': `+---+---+
+| a | b[^1] |
++---+---+
+
+| x | y[^2] |
+|---|-------|
+
+[^1]: one
+
+    two
+
+[^2]: one
+`,
   'small tables':
     '+---+\n| x |\n+---+\n\n+---+\n|   |\n+---+\n\n+--+\n|ab|\n+--+',
   'wide characters': '+---+---+\n| 日本 | b |\n+---+---+',
