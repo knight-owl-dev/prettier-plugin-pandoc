@@ -471,8 +471,15 @@ function tableFromTraceInfo(traced, partSeps, specs1) {
   const rowIndex = new Map(rowseps.map((r, k) => [r, k + 1]));
   const colIndex = new Map(colseps.map((c, k) => [c, k + 1]));
   const widths = colseps.slice(1).map((b, k) => b - colseps[k] - 1);
-  const aligns = (partSeps[0]?.specs ?? specs1 ?? []).map((s) => s.align);
-  const colSpecs = widths.map((w, k) => [aligns[k] ?? 'AlignDefault', w]);
+  // A marker may span columns: each takes the alignment of the one over it.
+  const alignSpecs = partSeps[0]?.specs ?? specs1 ?? [];
+  const alignFor = (left, right) =>
+    alignSpecs.find((s) => s.colStart - 1 <= left && right <= s.colEnd)
+      ?.align ?? 'AlignDefault';
+  const colSpecs = widths.map((w, k) => [
+    alignFor(colseps[k], colseps[k + 1]),
+    w,
+  ]);
   const lastLine = rowseps.at(-1);
   const headSep =
     partSeps.length > 0 ? rowIndex.get(partSeps[0].line) : undefined;
