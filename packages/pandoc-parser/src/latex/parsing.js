@@ -219,16 +219,44 @@ function codePoints(text, start, end) {
 
 /**
  * Tokens as text: a space after a control word before a letter, where
- * writing them together would make one control word.
+ * writing them together would make one control word (#5836).
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.untokenize
  * @param {Iterable<Tok>} toks
  */
 export function untokenize(toks) {
-  const list = [...toks];
+  const list = Array.isArray(toks) ? toks : [...toks];
   let out = '';
-  for (let k = list.length - 1; k >= 0; k--) out = untokenAccum(list[k], out);
+  for (let k = 0; k < list.length; k++) {
+    const { type, text } = list[k];
+    out += text;
+    if (
+      type === 'CtrlSeq' &&
+      text !== '' &&
+      isLetter(lastChar(text)) &&
+      nextStartsWithLetter(list, k + 1)
+    ) {
+      out += ' ';
+    }
+  }
   return out;
+}
+
+// The last code point of a non-empty text.
+const lastChar = (t) => {
+  const code = t.charCodeAt(t.length - 1);
+  return code >= 0xdc00 && code <= 0xdfff && t.length > 1
+    ? t.slice(-2)
+    : t.slice(-1);
+};
+
+// Whether the first text from `list[k]` on starts with a letter.
+function nextStartsWithLetter(list, k) {
+  for (; k < list.length; k++) {
+    const { text } = list[k];
+    if (text !== '') return isLetter(String.fromCodePoint(text.codePointAt(0)));
+  }
+  return false;
 }
 
 /**
@@ -237,28 +265,7 @@ export function untokenize(toks) {
  * @see Text.Pandoc.Readers.LaTeX.Parsing.untoken
  * @param {Tok} tok
  */
-export const untoken = (tok) => untokenAccum(tok, '');
-
-// A token's text before `accum`: a control sequence ending in a letter
-// spaced from a letter after it.
-// @see Text.Pandoc.Readers.LaTeX.Parsing.untokenAccum
-function untokenAccum(tok, accum) {
-  const { text } = tok;
-  if (tok.type === 'CtrlSeq') {
-    const last = [...text].at(-1);
-    const first =
-      accum === '' ? undefined : String.fromCodePoint(accum.codePointAt(0));
-    if (
-      last !== undefined &&
-      first !== undefined &&
-      isLetter(last) &&
-      isLetter(first)
-    ) {
-      return `${text} ${accum}`;
-    }
-  }
-  return text + accum;
-}
+export const untoken = (tok) => tok.text;
 
 // ---------------------------------------------------------------------
 // The token stream and the parser state
@@ -378,8 +385,8 @@ export const defaultLaTeXState = (options) => ({
  * how Parsec tells consuming from not; the state holds the input with the
  * reader's state, so backtracking puts back what macro expansion rewrote,
  * as Parsec's `setInput` is undone. `line` and `column` are Pandoc's
- * position, `at` the true offset it stands for; `raws` the tokens each
- * open `withRaw` has read, latest first, by key.
+ * position, `at` the true offset it stands for; `rawToks` the tokens read
+ * while `rawScopes` `withRaw`s are open, latest first, `rawCount` of them.
  *
  * @typedef {object} LPState
  * @property {TokList} input
@@ -389,9 +396,14 @@ export const defaultLaTeXState = (options) => ({
  * @property {number} column
  * @property {number} at
  * @property {number | undefined} end Where the input ends, for `at` there.
- * @property {[number, TokList][]} raws
+ * @property {TokList} rawToks
+ * @property {number} rawCount
+ * @property {number} rawScopes
  * @property {ReturnType<typeof defaultLaTeXState>} s
  */
+
+// No `withRaw` open.
+const NO_RAW = { rawToks: null, rawCount: 0, rawScopes: 0 };
 
 /**
  * A context reading `input` in state `s`, at its first token's position;
@@ -414,7 +426,7 @@ export function lpContext(input, s, end, common) {
       column: first?.column ?? 1,
       at: first?.start ?? end ?? 0,
       end,
-      raws: [],
+      ...NO_RAW,
       s,
     },
     common,
@@ -470,9 +482,11 @@ export function satisfyTok(f) {
         ? after.column
         : st.column + codePoints(tok.text, 0, tok.text.length),
       at: after ? after.start : (st.end ?? tok.end),
-      raws: st.s.enableWithRaw
-        ? st.raws.map(([key, list]) => [key, { tok, next: list }])
-        : st.raws,
+      ...(st.rawScopes > 0 &&
+        st.s.enableWithRaw && {
+          rawToks: { tok, next: st.rawToks },
+          rawCount: st.rawCount + 1,
+        }),
     };
     ctx.pos++;
     return tok;
@@ -486,7 +500,7 @@ export function satisfyTok(f) {
  */
 export const peekTok = (ctx) => {
   doMacros(ctx);
-  return lookAhead(anyTok)(ctx);
+  return ctx.state.input?.tok ?? FAIL;
 };
 
 /**
@@ -507,7 +521,7 @@ export const parseFromToks = (parser, toks) => (ctx) => {
     expanded: false,
     ...(first && { line: first.line, column: first.column, at: first.start }),
     end: toks.at(-1)?.end,
-    raws: [],
+    ...NO_RAW,
   };
   const result = parser(ctx);
   ctx.state = {
@@ -518,7 +532,9 @@ export const parseFromToks = (parser, toks) => (ctx) => {
     column: outer.column,
     at: outer.at,
     end: outer.end,
-    raws: outer.raws,
+    rawToks: outer.rawToks,
+    rawCount: outer.rawCount,
+    rawScopes: outer.rawScopes,
   };
   return result;
 };
@@ -579,20 +595,22 @@ export const withVerbatimMode = (parser) => (ctx) => {
  * @returns {import('../core.js').Parser<[T, Tok[]]>}
  */
 export const withRaw = (parser) => (ctx) => {
-  const { raws } = ctx.state;
-  const key = raws.length === 0 ? 0 : Math.max(...raws.map(([k]) => k)) + 1;
-  ctx.state = { ...ctx.state, raws: [...raws, [key, null]] };
+  const startCount = ctx.state.rawCount;
+  ctx.state = { ...ctx.state, rawScopes: ctx.state.rawScopes + 1 };
   const result = parser(ctx);
   if (result === FAIL) return FAIL;
-  const entry = ctx.state.raws.find(([k]) => k === key);
-  if (entry === undefined) {
-    throw new Error(`sRawTokens has nothing at key ${key}`);
+  const st = ctx.state;
+  const raw = [];
+  let cell = st.rawToks;
+  for (let k = st.rawCount - startCount; k > 0; k--) {
+    raw.push(cell.tok);
+    cell = cell.next;
   }
-  ctx.state = {
-    ...ctx.state,
-    raws: ctx.state.raws.filter(([k]) => k !== key),
-  };
-  return [result, tokensOf(entry[1]).reverse()];
+  ctx.state =
+    st.rawScopes <= 1
+      ? { ...st, ...NO_RAW }
+      : { ...st, rawScopes: st.rawScopes - 1 };
+  return [result, raw.reverse()];
 };
 
 // ---------------------------------------------------------------------
@@ -624,15 +642,15 @@ const setpos = (at, tok) => ({
 });
 
 /**
- * Macros at the input's head expanded, unless the head is expanded
- * already or the reader is in verbatim mode.
+ * Macros at the input's head expanded, unless the head is no control
+ * sequence, is expanded already, or the reader is in verbatim mode.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.doMacros
  * @param {{state: LPState}} ctx
  */
 export function doMacros(ctx) {
   const { input, expanded, s } = ctx.state;
-  if (expanded || s.verbatimMode) return;
+  if (expanded || input?.tok.type !== 'CtrlSeq' || s.verbatimMode) return;
   setInput(ctx, doMacrosOn(ctx, 1, input), true);
 }
 
