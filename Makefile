@@ -14,7 +14,7 @@ DOCKER_TTY ?= $(if $(IS_TTY),-t)
 .PHONY: resolve test test-image lint lint-fix lint-actions lint-docker lint-js \
 	lint-js-fix lint-md lint-md-fix lint-md-fmt lint-md-fmt-fix lint-notices lint-sh lint-spell help \
 	fuzz-print fuzz-parser shrink probe snapshots-diff snapshots-write bench \
-	bench-compare pandoc-drift pandoc-lint bun-check pack-check release
+	bench-compare pandoc-drift tables pandoc-lint bun-check pack-check release
 
 # Node, npm and Pandoc come from the compose services (docker-compose.yaml),
 # never the host. They run as the invoking user, so node_modules on the mount
@@ -79,6 +79,11 @@ bench: test-image node_modules/.package-lock.json
 # In the `fetch` service: it reads Hackage.
 pandoc-drift: test-image
 	@$(COMPOSE) run --rm -T fetch node tools/drift.mjs
+
+# In the `fetch` service, then formatted as the linter wants them.
+tables: test-image node_modules/.package-lock.json
+	@$(COMPOSE) run --rm -T fetch node tools/tables.mjs
+	@$(LINT_RUNNER) lint-js-fix
 
 pandoc-lint: test-image node_modules/.package-lock.json
 	@test -n "$(FILES)" || { echo "FILES=<file.md ...> [ARGS]" >&2; exit 2; }
@@ -200,6 +205,7 @@ help:
 	@echo "  make bench             Benchmark the parser and plugin [WHAT RUNS]"
 	@echo "  make bench-compare     Benchmark against REF (default main) [WHAT RUNS]"
 	@echo "  make pandoc-drift      What moved upstream since the Pandoc the port was reviewed on"
+	@echo "  make tables            Generate the tables taken from upstream data again"
 	@echo "  make pandoc-lint       Lint a manuscript (FILES=<file.md ...> [ARGS])"
 	@echo "  make bun-check         Compile pandoc-lint with Bun; check it lints as Node does"
 	@echo "  make pack-check        Check what each package's tarball holds"

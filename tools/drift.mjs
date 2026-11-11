@@ -2,21 +2,15 @@
 // (`upstream.json`) and the one the oracle runs: each ported module's diff,
 // each followed library's at the version the new binary links, Pandoc's
 // dependencies added and dropped, and its changelog between the two. Sources
-// come from Hackage. Writes `.scratch/pandoc-<to>/`; its README.md is the
-// summary the review in docs/bumping-pandoc.md starts from.
+// come from Hackage (`lib/hackage.mjs`). Writes `.scratch/pandoc-<to>/`; its
+// README.md is the summary the review in docs/bumping-pandoc.md starts from.
 //
 //   node tools/drift.mjs
 
 import { spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { unpack } from './lib/hackage.mjs';
 import { load, ROOT } from './lib/run.mjs';
 
 const { pandocLinks, pandocVersion } = await load(
@@ -35,28 +29,6 @@ if (to === from) {
   process.exit(0);
 }
 const OUT = join(ROOT, `.scratch/pandoc-${to}`);
-const HACKAGE = join(OUT, 'hackage');
-
-/**
- * A Hackage package's source, unpacked once into `hackage/<id>/`: whole, or
- * not at all, so a run cut short leaves nothing the next one trusts.
- */
-async function unpack(id) {
-  const dir = join(HACKAGE, id);
-  if (existsSync(dir)) return dir;
-  const url = `https://hackage.haskell.org/package/${id}/${id}.tar.gz`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url}: ${response.status}`);
-  const partial = join(HACKAGE, `.${id}`);
-  rmSync(partial, { recursive: true, force: true });
-  mkdirSync(partial, { recursive: true });
-  const input = Buffer.from(await response.arrayBuffer());
-  const tar = spawnSync('tar', ['-xzf', '-', '-C', partial], { input });
-  if (tar.status !== 0) throw new Error(`${id}: ${tar.stderr}`);
-  renameSync(join(partial, id), dir);
-  rmSync(partial, { recursive: true });
-  return dir;
-}
 
 /**
  * The unified diff of `a` and `b` (recursive for directories), written to
@@ -185,8 +157,8 @@ writeFileSync(
   `# Pandoc ${from} → ${to}
 
 What moved upstream since the port was reviewed on ${from}; the review:
-docs/bumping-pandoc.md. Sources unpacked in \`hackage/\`; Pandoc's changes in
-its own words in \`changelog.md\`.
+docs/bumping-pandoc.md. Sources unpacked in \`.scratch/hackage/\`; Pandoc's
+changes in its own words in \`changelog.md\`.
 
 ## Ported modules and data that changed
 ${table(['Upstream', 'Lines', 'Diff'], modules)}

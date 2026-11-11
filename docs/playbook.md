@@ -101,6 +101,17 @@ make pandoc-drift
 What moved upstream since the Pandoc the port was reviewed on, for the review
 [Bumping Pandoc](bumping-pandoc.md) walks through.
 
+## Generate the tables again
+
+```sh
+make tables
+```
+
+Writes the tables taken from upstream data (`*-table.js`, `abbreviations.js`,
+`uri-schemes.js`, `skylighting/syntaxes.js`) from the sources `upstream.json`
+names, fetched from Hackage into `.scratch/hackage/`. Run with nothing moved, it
+rewrites each as it is.
+
 ## Lint a manuscript
 
 ```sh

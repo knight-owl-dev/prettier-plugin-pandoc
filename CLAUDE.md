@@ -28,6 +28,8 @@ Recipes live in [docs/playbook.md](docs/playbook.md); reach for one when:
 - **A change moves the plugin's output** → § Snapshots.
 - **A change may cost speed** → § Benchmark.
 - **A manuscript may draw Pandoc's warnings** → § Lint a manuscript.
+- **A table taken from upstream data must follow its source** → § Generate the
+  tables again.
 - **A Renovate PR bumps Pandoc** →
   [docs/bumping-pandoc.md](docs/bumping-pandoc.md).
 - **A release is due** → README § Releasing.
