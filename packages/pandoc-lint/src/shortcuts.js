@@ -1,17 +1,34 @@
 // Keystone's shortcuts files: each top-level key a shortcut, its `body`
-// the Markdown it injects. Each body is linted as a document of its own,
-// placed where it is in the YAML.
+// and `span` the Markdown it injects as a div and as a span. Each template
+// is linted as a document of its own, placed where it is in the YAML.
 //
 // @see https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/
 
-import { isMap, isScalar, parseDocument } from 'yaml';
+import { isAlias, isMap, isScalar, parseDocument } from 'yaml';
 import { lintSnippet } from './index.js';
 
 /** @typedef {import('./index.js').Diagnostic} Diagnostic */
 
+// A template is part of a document, not one: it carries no title or
+// metadata, and its headings no generated identifiers. A span holds
+// inlines, so an image alone in it makes no figure.
+const FRAGMENT = [
+  '-pandoc_title_block',
+  '-yaml_metadata_block',
+  '-auto_identifiers',
+];
+const TEMPLATES = [
+  { key: 'body', extensions: FRAGMENT },
+  {
+    key: 'span',
+    extensions: [...FRAGMENT, '-implicit_figures'],
+    oneParagraph: true,
+  },
+];
+
 /**
- * The diagnostics of a shortcuts file: what is no YAML, a body that is no
- * text, and each body's Markdown as `lintSnippet` finds it.
+ * The diagnostics of a shortcuts file: what is no YAML, a template that is
+ * no text, and each template's Markdown as `lintSnippet` finds it.
  *
  * @param {string} path
  * @param {string} text
@@ -38,52 +55,69 @@ export function lintShortcuts(path, text, options = {}) {
     ];
   }
   const out = [];
+  // A template an alias repeats is linted once as each template it is,
+  // where its anchor is.
+  const linted = Object.fromEntries(TEMPLATES.map((t) => [t.key, new Set()]));
   for (const { key, value } of doc.contents.items) {
-    const body = isMap(value) ? value.get('body', true) : undefined;
-    if (body === undefined) continue;
+    if (!isMap(value)) continue;
     const name = isScalar(key) ? String(key.value) : '?';
-    if (!isScalar(body) || typeof body.value !== 'string') {
+    for (const template of TEMPLATES) {
+      const written = value.get(template.key, true);
+      if (written === undefined) continue;
+      const markdown = isAlias(written) ? written.resolve(doc) : written;
+      if (markdown === undefined || linted[template.key].has(markdown)) {
+        continue;
+      }
+      linted[template.key].add(markdown);
+      if (!isScalar(markdown) || typeof markdown.value !== 'string') {
+        out.push(
+          fail(
+            `shortcut-${template.key}`,
+            `${template.key} of shortcut '${name}' is not text`,
+            written.range,
+          ),
+        );
+        continue;
+      }
+      const found = lintSnippet(markdown.value, {
+        ...options,
+        extensions: template.extensions,
+        oneParagraph: template.oneParagraph,
+        ...placement(text, markdown),
+        source: path,
+        file: text,
+      });
       out.push(
-        fail(
-          'shortcut-body',
-          `body of shortcut '${name}' is not text`,
-          body.range,
-        ),
+        ...(markdown.type === 'BLOCK_LITERAL'
+          ? found
+          : found.map(atStart(text, markdown))),
       );
-      continue;
     }
-    const found = lintSnippet(body.value, {
-      ...options,
-      ...placement(text, body),
-      source: path,
-      file: text,
-    });
-    out.push(
-      ...(body.type === 'BLOCK_LITERAL'
-        ? found
-        : found.map(atStart(text, body))),
-    );
   }
-  return out.sort((a, b) => a.start - b.start);
+  // One read as a body and as a span finds the same thing once.
+  const once = new Map(out.map((d) => [JSON.stringify(d), d]));
+  return [...once.values()].sort((a, b) => a.start - b.start);
 }
 
 // Where a literal block's Markdown sits in the YAML: from the line after
 // its header, each line indented as its first line with text.
-function placement(text, body) {
-  const contentStart = text.indexOf('\n', body.range[0]) + 1;
-  const lines = text.slice(contentStart, body.range[1]).split('\n');
+function placement(text, markdown) {
+  const contentStart = text.indexOf('\n', markdown.range[0]) + 1;
+  const lines = text.slice(contentStart, markdown.range[1]).split('\n');
   const indent = /^ */.exec(lines.find((l) => l.trim() !== '') ?? '')[0].length;
   const first = lineAndColumn(text, contentStart);
   return { line: first.line, column: indent + 1, indent };
 }
 
-// A diagnostic of a body whose lines are not the source's (folded, or
-// quoted), moved to where the body starts.
-function atStart(text, body) {
-  const [start] = body.range;
+// A diagnostic of a template whose lines are not the source's (folded, or
+// quoted), moved to where the template starts; its frame, of lines the
+// file doesn't have, goes.
+function atStart(text, markdown) {
+  const [start] = markdown.range;
   const at = lineAndColumn(text, start);
-  return (d) => ({
+  return ({ callouts: { verbatim, ...callouts }, ...d }) => ({
     ...d,
+    callouts,
     start,
     end: start,
     line: at.line,

@@ -4,7 +4,7 @@
 // pandoc-lint --version
 //
 // Lints the files as one manuscript, read in the order given, as Pandoc
-// reads several, and each shortcuts file's bodies. Exits 1 on an error,
+// reads several, and each shortcuts file's templates. Exits 1 on an error,
 // or on any warning with `--strict`; 2 where it cannot lint.
 
 import { readFileSync } from 'node:fs';

@@ -56,6 +56,15 @@ export { lintShortcuts } from './shortcuts.js';
  */
 
 /**
+ * How a shortcut's template is read: the reader's extensions changed, as
+ * Pandoc's `+name` and `-name`, and whether it must be one paragraph.
+ *
+ * @typedef {object} TemplateOptions
+ * @property {string[]} [extensions]
+ * @property {boolean} [oneParagraph]
+ */
+
+/**
  * The diagnostics of `files`, read as one manuscript: by file in the order
  * given, then by where each starts.
  *
@@ -79,12 +88,12 @@ export function lint(files, options = {}) {
 
 /**
  * The diagnostics of a snippet: markdown taken from a file, a shortcut's
- * body in YAML, placed where it is there. Its first line starts at `line`
+ * template in YAML, placed where it is there. Its first line starts at `line`
  * and `column`; each after it is indented `indent` columns. Given `file`,
  * the text it was taken from, offsets are that text's, else the snippet's.
  *
  * @param {string} text
- * @param {Options & {source?: string, line?: number, column?: number, indent?: number, file?: string}} [options]
+ * @param {Options & TemplateOptions & {source?: string, line?: number, column?: number, indent?: number, file?: string}} [options]
  * @returns {Diagnostic[]}
  */
 export function lintSnippet(text, options = {}) {
@@ -191,10 +200,15 @@ const SEVERITY = { warn: 'WARN', info: 'INFO', error: 'ERROR' };
 
 // The diagnostics of the read of `text`, `place` giving where an offset in
 // it is: one per message, a message Pandoc logs twice once.
-function diagnose(text, place, { tabStop, info = false, noMetadata = false }) {
+function diagnose(
+  text,
+  place,
+  { tabStop, extensions, oneParagraph, info = false, noMetadata = false },
+) {
+  const reader = { tabStop, extensions };
   let doc;
   try {
-    doc = readMarkdown(text, { tabStop });
+    doc = readMarkdown(text, reader);
   } catch (e) {
     if (!(e instanceof PandocParseError)) throw e;
     // Pandoc reads nothing: its failure is all there is to report.
@@ -212,12 +226,13 @@ function diagnose(text, place, { tabStop, info = false, noMetadata = false }) {
     definitions: doc.definitions,
     firstWithId: (id, before) => firstWithId(doc.blocks, id, before),
     toKey,
+    oneParagraph: oneParagraph === true,
   };
   const seen = new Set();
   const out = [];
   const messages = [
     ...doc.log,
-    ...misreads(doc, text, { tabStop }),
+    ...misreads(doc, text, reader),
     ...undefinedReferences(doc),
     ...(noMetadata ? doc.metadataBlocks.map(metadataInMarkdown) : []),
   ];

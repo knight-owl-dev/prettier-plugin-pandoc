@@ -33,7 +33,7 @@ const FLAT = new Set(['Str', 'Space', 'SoftBreak', 'LineBreak']);
  *
  * @param {{blocks: object[], log: {type: string, start: number}[]}} doc
  * @param {string} text
- * @param {{tabStop?: number}} options
+ * @param {{tabStop?: number, extensions?: string[]}} options
  * @returns {Misread[]}
  */
 export function misreads(doc, text, options) {

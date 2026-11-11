@@ -65,13 +65,18 @@ with, so a tool that pins both checks they read alike by comparing the two.
 
 `--shortcuts=FILE` lints a keystone shortcuts file, laid out as its
 [manual](https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/)
-describes. Each shortcut's `body` is read as a document of its own, under every
-rule, and each diagnostic lands at its line and column in the YAML. A folded or
-quoted body, whose lines are not the file's, reports at its start.
+describes. Each shortcut's templates, its `body` and its `span`, are read as
+documents of their own, under every rule, and each diagnostic lands at its line
+and column in the YAML. A folded or quoted template, whose lines are not the
+file's, reports at its start.
 
-Three errors are about the file itself: `yaml-syntax` for invalid YAML,
+A template is read as keystone reads it, as a fragment: no `%` title block, no
+YAML metadata block, and no identifier a heading didn't write. A span's lone
+image stays an image, not a figure.
+
+Four errors are about the file itself: `yaml-syntax` for invalid YAML,
 `shortcut-file` for anything other than a mapping of shortcuts, and
-`shortcut-body` for a body that is not text.
+`shortcut-body` and `shortcut-span` for a template that is not text.
 
 ## JSON
 

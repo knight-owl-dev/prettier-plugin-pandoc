@@ -1,4 +1,5 @@
-# Shortcuts as keystone's manual writes them, and one body that misreads.
+# Shortcuts as keystone's manual writes them, one body that misreads, and
+# a span with a reference nothing defines.
 pullquote:
   class: align
   content: font
@@ -17,3 +18,7 @@ epigraph:
       Opening words
       ::: slot
       :::
+sic:
+  class: container
+  span: |
+    []{.slot} [[sic]]{.font style="italic"}, as [the style guide][guide] has it
