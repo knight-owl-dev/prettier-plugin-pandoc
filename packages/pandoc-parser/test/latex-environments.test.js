@@ -33,6 +33,8 @@ const CASES = {
     '\\begin{table}\n\\caption{Cap}\\label{tab:x}\n\\begin{tabular}{|l|r|}\nx & y \\\\\n\\end{tabular}\n\\end{table}\n\\ref{tab:x}',
   'multicolumn and multirow':
     '\\begin{tabular}{*{3}{c}}\n\\multicolumn{2}{l}{wide} & z \\\\\n\\multirow{2}{*}{tall} & b & c \\\\\n & e & f \\\\\n\\end{tabular}',
+  'a cell of two paragraphs':
+    '\\begin{tabular}{ll}\na & b\\par c \\\\\n\\multicolumn{2}{l}{d} \\\\\n\\end{tabular}',
   'longtable and booktabs':
     '\\begin{longtable}{ll}\n\\toprule\nH1 & H2 \\\\\n\\midrule\nr1 & r2 \\\\\n\\bottomrule\n\\caption{Long}\n\\end{longtable}',
   'tabularx and column specs':

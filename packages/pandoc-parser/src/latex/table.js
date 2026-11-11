@@ -34,7 +34,7 @@ import {
   skipMany,
 } from '../core.js';
 import { message, report } from '../logging.js';
-import { trim } from '../shared.js';
+import { compactifyTable, trim } from '../shared.js';
 import {
   anyTok,
   bgroup,
@@ -431,7 +431,7 @@ function parseTableCell(block) {
   };
   const parseSimpleCell = (ctx) => {
     const bs = blocks(ctx);
-    return bs === FAIL ? FAIL : B.cell(AlignDefault, 1, 1, plainify(bs));
+    return bs === FAIL ? FAIL : B.cell(AlignDefault, 1, 1, bs);
   };
   // The parsing of empty cells is important in LaTeX, especially when
   // dealing with multirow/multicolumn. See #6603.
@@ -476,19 +476,6 @@ function cellAlignment(ctx) {
         : AlignDefault;
 }
 
-/**
- * A lone paragraph as plain text.
- *
- * @see Text.Pandoc.Readers.LaTeX.Table.plainify
- * @param {Blocks} bs
- */
-function plainify(bs) {
-  if (bs.length === 1 && bs[0].t === 'Para') {
-    return B.plain(bs[0].c, bs[0].start, bs[0].end);
-  }
-  return bs;
-}
-
 const inBrackets = (p) => (ctx) =>
   symbol('[')(ctx) === FAIL
     ? FAIL
@@ -518,7 +505,7 @@ function multirowCell(block) {
     if (symbol('{')(ctx) === FAIL) return FAIL;
     const bs = many(block)(ctx);
     if (bs === FAIL || symbol('}')(ctx) === FAIL) return FAIL;
-    return plainify(bs.flat());
+    return bs.flat();
   };
   return (ctx) => {
     if (controlSeq('multirow')(ctx) === FAIL) return FAIL;
@@ -554,7 +541,7 @@ function multicolumnCell(block) {
     const singleCell = (c) => {
       const bs = many(block)(c);
       if (bs === FAIL) return FAIL;
-      return B.cell(alignment, 1, span, plainify(bs.flat()));
+      return B.cell(alignment, 1, span, bs.flat());
     };
     const nestedCell = (c) => {
       const inner = multirow(c);
@@ -699,15 +686,17 @@ function simpTable(block, inline, envname, hasWidthParameter) {
       for (const p of [spaces, ...tail]) if (p(c) === FAIL) return FAIL;
       if (atEnd(c) === FAIL) return FAIL;
       const specs = colspecs.map(([a, w]) => [a, w]);
-      return B.tableWith(
-        nullAttr,
-        B.emptyCaption,
-        specs,
-        [nullAttr, fixTableRows(header)],
-        [[nullAttr, 0, [], fixTableRows(rows)]],
-        [nullAttr, []],
-        start,
-        c.state.at,
+      return compactifyTable(
+        B.tableWith(
+          nullAttr,
+          B.emptyCaption,
+          specs,
+          [nullAttr, fixTableRows(header)],
+          [[nullAttr, 0, [], fixTableRows(rows)]],
+          [nullAttr, []],
+          start,
+          c.state.at,
+        ),
       );
     })(ctx);
 }
