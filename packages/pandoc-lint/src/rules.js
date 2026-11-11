@@ -90,17 +90,6 @@ export const RULES = {
       };
     },
   },
-  YamlWarning: {
-    rule: 'yaml-warning',
-    severity: 'warn',
-    callouts: (msg) => ({
-      problem: msg.message.replace(
-        /^Duplicate key: (.*)$/,
-        'metadata key $1 is given again',
-      ),
-      effect: 'The metadata reads the last value.',
-    }),
-  },
   PandocParseError: {
     rule: 'pandoc-parse-error',
     severity: 'error',
