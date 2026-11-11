@@ -66,8 +66,8 @@ Beyond Pandoc's own modules:
 - **A library that moved** is reviewed the same way, through its diff.
 - **A dependency Pandoc adds** in place of one the port follows (yamlet for
   yaml) is ported from its source in `hackage/`.
-- **A generated table** (`*-table.js`, `skylighting/syntaxes.js`) is generated
-  again when the source its header names moved.
+- **A generated table** is generated again once its source is restamped:
+  `make tables` (playbook § Generate the tables again).
 - **GHC** moving means checking `data-char.js` against its Unicode version.
 
 Each verdict goes into the PR's review log, one row per change:
