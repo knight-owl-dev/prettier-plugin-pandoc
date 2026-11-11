@@ -369,6 +369,7 @@ export const defaultLaTeXState = (options) => ({
   fileContents: new Map(),
   enableWithRaw: true,
   ligatures: true,
+  caseExclusions: new Map(),
   lastExpansion: null,
 });
 

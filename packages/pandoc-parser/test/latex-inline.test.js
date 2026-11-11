@@ -44,6 +44,8 @@ const CASES = {
     '\\label{x} \\ref{x} \\cref{x} \\Cref{x} \\vref{x} \\eqref{x} \\autoref{x}',
   'LaTeX3 syntax, constants and argument markers':
     '\\ExplSyntaxOn\n\\ShowCommand\\foo \\ShowEnvironment{bar}\n\\DeclareKeys[x]{a=b} \\DeclareUnknownKeyHandler{h} \\ProcessKeyOptions[p] \\SetKeys[q]{k}\n\\c_ampersand_str \\c_atsign_str \\c_backslash_str \\c_left_brace_str \\c_right_brace_str \\c_circumflex_str \\c_colon_str \\c_dollar_str \\c_hash_str \\c_percent_str \\c_tilde_str \\c_underscore_str\n\\ExplSyntaxOff\n\na {\\ttfamily b c } d \\NoValue{} \\BooleanTrue{} \\BooleanFalse{} e\n',
+  'LaTeX3 case changing':
+    "\\DeclareUppercaseExclusions{iPhone, eBay}\n\\DeclareTitlecaseExclusions{of,the}\n\\DeclareLowercaseExclusions{NASA}\n\\AddToNoCaseChangeList{\\foo}\n\\DeclareCaseChangeEquivalent\\bar{\\baz}\n\\DeclareUppercaseMapping[de]{x}{y}\n\\DeclareLowercaseMapping{x}{y}\n\\DeclareTitlecaseMapping[de]{x}{y}\n\n\\MakeUppercase{an iPhone and \\emph{eBay}, \\NoCaseChange{keep} $x$ \\texttt{code} \\cite{key} \\textsuperscript{sup} ``q'' \\href{u}{link}}\n\n\\MakeUppercase[lang=de]{straße} \\MakeLowercase{NASA and NATO \\textbf{BOLD}} \\uppercase{ǆx}\n\n\\MakeTitlecase{\\emph{ǆa} of \\textbf{the} world} \\MakeTitlecase[words=all]{war of the worlds ﬂy \\emph{x y}}\n\n\\MakeTitlecase{ßa} \\MakeTitlecase{ა} \\MakeTitlecase{{} \\textsuperscript{s} z}\n\n\\MakeTitlecase{\\NoCaseChange{x}y} \\MakeTitlecase[words=all]{a\\\\b c~d}\n\nx\\CaseSwitch{a}{b}{c}{d}y \\NoCaseChange{n}\n\n\\MakeUppercase{a\\NoCaseChange{b}c} \\MakeUppercase{\\footnote{note} x}\n\n\\MakeTitlecase{ᾷ} \\MakeTitlecase{ﬂ} \\MakeTitlecase[words=all]{ǉ ῳ}\n",
   acronyms: '\\gls{api} \\Glspl{api} \\acf{x} \\acsp{y}',
 };
 

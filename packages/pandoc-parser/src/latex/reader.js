@@ -889,19 +889,232 @@ function ifdim(ctx, start) {
   return B.rawInline('latex', raw, start, ctx.state.at);
 }
 
+// Unicode's full mapping, with no context to its upper case.
+// @see Data.Text.toUpper
+const upper = (t) => t.toUpperCase();
+
 /**
- * @see Text.Pandoc.Readers.LaTeX.alterStr
+ * A case-changing command's argument with `f` applied, the exclusions
+ * `\Declare*caseExclusions` made for `kind` kept; its locale options read
+ * and ignored.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.caseTransform
+ * @param {string} kind
  * @param {(t: string) => string} f
  */
-const alterStr = (f) => (x) =>
-  x.t === 'Str' ? new Node('Str', f(x.c), x.start, x.end) : x;
+const caseTransform = (kind, f) => (ctx) => {
+  if (option([], keyvals)(ctx) === FAIL) return FAIL;
+  const excl = ctx.state.s.caseExclusions.get(kind) ?? new Set();
+  const ils = tok(ctx);
+  return ils === FAIL ? FAIL : caseTransformWith(excl, f, ils);
+};
 
-/** @see Text.Pandoc.Readers.LaTeX.makeUppercase */
-const makeUppercase = (ils) =>
-  walkInlines({ inline: alterStr((t) => t.toUpperCase()) }, ils);
+const NO_CASE_CHANGE = ['', ['nocasechange'], []];
+const isNoCaseChange = ([id, classes, kvs]) =>
+  id === '' &&
+  classes.length === 1 &&
+  classes[0] === 'nocasechange' &&
+  kvs.length === 0;
+const STYLED = new Set([
+  'Emph',
+  'Strong',
+  'Underline',
+  'Strikeout',
+  'Superscript',
+  'Subscript',
+  'SmallCaps',
+]);
 
-/** @see Text.Pandoc.Readers.LaTeX.makeLowercase */
-const makeLowercase = (ils) => walkInlines({ inline: alterStr(toLower) }, ils);
+/**
+ * Inlines with `f` applied to their text but for excluded words, math,
+ * code and citations; `\NoCaseChange`'s contents unwrapped, unchanged.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.caseTransformWith
+ * @param {Set<string>} excl
+ * @param {(t: string) => string} f
+ * @param {Inlines} ils
+ * @returns {Inlines}
+ */
+function caseTransformWith(excl, f, ils) {
+  const go = (xs) => xs.flatMap(goInline);
+  const goInline = (x) => {
+    const { t, c, start, end } = x;
+    if (t === 'Span' && isNoCaseChange(c[0])) return c[1];
+    if (t === 'Str') return [excl.has(c) ? x : new Node(t, f(c), start, end)];
+    if (STYLED.has(t)) return [new Node(t, go(c), start, end)];
+    if (t === 'Quoted' || t === 'Span') {
+      return [new Node(t, [c[0], go(c[1])], start, end)];
+    }
+    if (t === 'Link') return [new Node(t, [c[0], go(c[1]), c[2]], start, end)];
+    return [x];
+  };
+  return go(ils);
+}
+
+/**
+ * `\MakeTitlecase`'s argument title-cased: its first word, or with
+ * `words=all` each, but for excluded words.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.makeTitlecaseCommand
+ */
+function makeTitlecaseCommand(ctx) {
+  const options = option([], keyvals)(ctx);
+  if (options === FAIL) return FAIL;
+  const excl = ctx.state.s.caseExclusions.get('title') ?? new Set();
+  const ils = tok(ctx);
+  if (ils === FAIL) return FAIL;
+  return lookupKv(options, 'words') === 'all'
+    ? makeTitlecaseAll(excl, ils)
+    : makeTitlecase(ils);
+}
+
+const isSep = (x) =>
+  x.t === 'Space' || x.t === 'SoftBreak' || x.t === 'LineBreak';
+
+/**
+ * Each word's first letter title-cased, but for excluded words.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.makeTitlecaseAll
+ * @param {Set<string>} excl
+ * @param {Inlines} xs
+ * @returns {Inlines}
+ */
+function makeTitlecaseAll(excl, xs) {
+  const out = [];
+  for (let k = 0; k < xs.length; ) {
+    let j = k;
+    while (j < xs.length && !isSep(xs[j])) j++;
+    const w = xs.slice(k, j);
+    out.push(...(excl.has(stringify(w)) ? w : makeTitlecase(w)));
+    while (j < xs.length && isSep(xs[j])) out.push(xs[j++]);
+    k = j;
+  }
+  return out;
+}
+
+/**
+ * `\Declare*caseExclusions`: its comma-separated words kept from case
+ * changes of `kind`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.declareCaseExclusions
+ * @param {string} kind
+ */
+const declareCaseExclusions = (kind) => (ctx) => {
+  const ts = braced(ctx);
+  if (ts === FAIL) return FAIL;
+  const ws = untokenize(ts).split(',').map(strip);
+  const exclusions = new Map(ctx.state.s.caseExclusions);
+  exclusions.set(kind, new Set([...(exclusions.get(kind) ?? []), ...ws]));
+  updateLaTeXState(ctx, { caseExclusions: exclusions });
+  return [];
+};
+
+/**
+ * The first character of the first text title-cased, as LaTeX3's
+ * `\MakeTitlecase` does by default.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.makeTitlecase
+ * @param {Inlines} ils
+ * @returns {Inlines}
+ */
+function makeTitlecase(ils) {
+  // Whether the first text is found, and the inlines.
+  const go = (xs) => {
+    for (let k = 0; k < xs.length; k++) {
+      const [done, y] = goInline(xs[k]);
+      if (done) return [true, [...xs.slice(0, k), y, ...xs.slice(k + 1)]];
+    }
+    return [false, xs];
+  };
+  const goInline = (x) => {
+    const { t, c, start, end } = x;
+    let done;
+    let d;
+    if (t === 'Str' && c !== '') {
+      const first = String.fromCodePoint(c.codePointAt(0));
+      return [
+        true,
+        new Node(t, toTitle(first) + c.slice(first.length), start, end),
+      ];
+    } else if (TITLE_STYLED.has(t)) {
+      [done, d] = go(c);
+    } else if (t === 'Span' || t === 'Quoted') {
+      const [k, ys] = go(c[1]);
+      [done, d] = [k, [c[0], ys]];
+    } else if (t === 'Link') {
+      const [k, ys] = go(c[1]);
+      [done, d] = [k, [c[0], ys, c[2]]];
+    } else {
+      return [false, x];
+    }
+    return [done, done ? new Node(t, d, start, end) : x];
+  };
+  return go(ils)[1];
+}
+
+const TITLE_STYLED = new Set(['Emph', 'Strong', 'Underline', 'SmallCaps']);
+
+// Where a character's title case is not its upper case: digraphs and
+// ligatures capitalized, Greek with iota subscript, Georgian unchanged.
+const TITLE_CASE = new Map([
+  ['ß', 'Ss'],
+  ...['Ǆǅǆ', 'Ǉǈǉ', 'Ǌǋǌ', 'Ǳǲǳ'].flatMap((cs) =>
+    [...cs].map((c) => [c, cs[1]]),
+  ),
+  ['և', 'Եւ'],
+  ['ﬀ', 'Ff'],
+  ['ﬁ', 'Fi'],
+  ['ﬂ', 'Fl'],
+  ['ﬃ', 'Ffi'],
+  ['ﬄ', 'Ffl'],
+  ['ﬅ', 'St'],
+  ['ﬆ', 'St'],
+  ['ﬓ', 'Մն'],
+  ['ﬔ', 'Մե'],
+  ['ﬕ', 'Մի'],
+  ['ﬖ', 'Վն'],
+  ['ﬗ', 'Մխ'],
+  ['ᾲ', 'Ὰͅ'],
+  ['ᾴ', 'Άͅ'],
+  ['ᾷ', '\u0391\u0342\u0345'],
+  ['ῂ', 'Ὴͅ'],
+  ['ῄ', 'Ήͅ'],
+  ['ῇ', '\u0397\u0342\u0345'],
+  ['ῲ', 'Ὼͅ'],
+  ['ῴ', 'Ώͅ'],
+  ['ῷ', '\u03a9\u0342\u0345'],
+  ['ᾳ', 'ᾼ'],
+  ['ᾼ', 'ᾼ'],
+  ['ῃ', 'ῌ'],
+  ['ῌ', 'ῌ'],
+  ['ῳ', 'ῼ'],
+  ['ῼ', 'ῼ'],
+]);
+
+/**
+ * A character title-cased, by Unicode's full mapping.
+ *
+ * @see Data.Text.toTitle
+ * @param {string} c
+ */
+function toTitle(c) {
+  const mapped = TITLE_CASE.get(c);
+  if (mapped !== undefined) return mapped;
+  const code = c.codePointAt(0);
+  // Greek with iota subscript, lower case: its title case form, 8 on.
+  for (const base of [0x1f80, 0x1f90, 0x1fa0]) {
+    if (code >= base && code < base + 8) return String.fromCodePoint(code + 8);
+    if (code >= base + 8 && code < base + 16) return c;
+  }
+  // Georgian lower case: no title case form.
+  if (
+    (code >= 0x10d0 && code <= 0x10fa) ||
+    (code >= 0x10fd && code <= 0x10ff)
+  ) {
+    return c;
+  }
+  return c.toUpperCase();
+}
 
 /**
  * Code with the escapes of `%{}\` the LaTeX writer puts in `\passthrough`
@@ -1090,6 +1303,8 @@ const discarding = (p) => (ctx) => (p(ctx) === FAIL ? FAIL : []);
 const spacesThenControlSeq = (ctx) =>
   spaces(ctx) === FAIL ? FAIL : anyControlSeq(ctx);
 const optsThenBraced = (ctx) => (skipopts(ctx) === FAIL ? FAIL : braced(ctx));
+const optsThenTwoBraced = (ctx) =>
+  optsThenBraced(ctx) === FAIL ? FAIL : braced(ctx);
 const urlArg = (ctx) => {
   const url = bracedUrl(ctx);
   return url === FAIL ? FAIL : unescapeURL(untokenize(url));
@@ -1158,12 +1373,24 @@ const REST_COMMANDS = [
   ['slshape', extracting((ctx) => inlines(ctx), B.emph)],
   ['scshape', extracting((ctx) => inlines(ctx), B.smallcaps)],
   ['bfseries', extracting((ctx) => inlines(ctx), B.strong)],
-  ['MakeUppercase', tokThen(makeUppercase)],
-  ['MakeTextUppercase', tokThen(makeUppercase)], // textcase
-  ['uppercase', tokThen(makeUppercase)],
-  ['MakeLowercase', tokThen(makeLowercase)],
-  ['MakeTextLowercase', tokThen(makeLowercase)],
-  ['lowercase', tokThen(makeLowercase)],
+  ['MakeUppercase', caseTransform('upper', upper)],
+  ['MakeTextUppercase', caseTransform('upper', upper)], // textcase
+  ['uppercase', caseTransform('upper', upper)],
+  ['MakeLowercase', caseTransform('lower', toLower)],
+  ['MakeTextLowercase', caseTransform('lower', toLower)],
+  ['lowercase', caseTransform('lower', toLower)],
+  ['MakeTitlecase', makeTitlecaseCommand],
+  [
+    'NoCaseChange',
+    tokThen((ils, s, e) => B.spanWith(NO_CASE_CHANGE, ils, s, e)),
+  ],
+  [
+    'CaseSwitch',
+    (ctx) => {
+      const x = tok(ctx);
+      return x === FAIL || count(3, tok)(ctx) === FAIL ? FAIL : x;
+    },
+  ],
   [
     'thanks',
     skipping((ctx, start) => {
@@ -1819,6 +2046,20 @@ const BLOCK_COMMANDS = new Map([
   ['DeclareUnknownKeyHandler', discarding(optsThenBraced)],
   ['ProcessKeyOptions', discarding(skipopts)],
   ['SetKeys', discarding(optsThenBraced)],
+  // LaTeX3 case changing
+  ['DeclareUppercaseExclusions', declareCaseExclusions('upper')],
+  ['DeclareLowercaseExclusions', declareCaseExclusions('lower')],
+  ['DeclareTitlecaseExclusions', declareCaseExclusions('title')],
+  ['AddToNoCaseChangeList', discarding(braced)],
+  [
+    'DeclareCaseChangeEquivalent',
+    discarding((ctx) =>
+      withVerbatimMode(spacesThenControlSeq)(ctx) === FAIL ? FAIL : braced(ctx),
+    ),
+  ],
+  ['DeclareUppercaseMapping', discarding(optsThenTwoBraced)],
+  ['DeclareLowercaseMapping', discarding(optsThenTwoBraced)],
+  ['DeclareTitlecaseMapping', discarding(optsThenTwoBraced)],
   // epigraph package
   ['epigraph', epigraph],
   // alignment

@@ -325,6 +325,7 @@ newzealand
 ngerman
 nhttfamily
 nmol
+nocasechange
 nocite
 nodecor
 nohyphens
@@ -508,6 +509,7 @@ textyen
 theoremstyle
 tikzcd
 tikzpicture
+titlecase
 titleformat
 titlehead
 tname
