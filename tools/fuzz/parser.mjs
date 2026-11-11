@@ -111,7 +111,7 @@ const wants = reads.map((r) => r?.json ?? null);
 // messages that differ, as compared, else null.
 function logDiffers({ doc, tabStop }, read, log) {
   const differ = (theirs) => {
-    const [got, want] = logsCompared(doc, tabStop, read.log, theirs);
+    const [got, want] = logsCompared(doc, tabStop, read, theirs);
     const at = (k) => [JSON.stringify(got[k]), JSON.stringify(want[k])];
     for (let k = 0; k < Math.max(got.length, want.length); k++) {
       const pair = at(k);
