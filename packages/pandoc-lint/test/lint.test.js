@@ -152,7 +152,7 @@ test('GitHub: a workflow command per diagnostic, escaped', () => {
     formatGithub(lint(files)),
     [
       '::warning file=a%2Cb%3Ac.md,line=2,endLine=2,col=1,endColumn=7,title=duplicate-link-reference::link reference [a] is defined again%0Aa,b:c.md:1:1: [a]: /a%0ALinks use the last definition.',
-      '::error file=d.md,line=2,endLine=2,col=1,endColumn=9,title=block-in-paragraph::heading is read as paragraph text%0AA paragraph runs on to the next blank line: a heading on the line after its text is part of it.%0APut a blank line before it; if it is meant as text, escape its first character with a backslash.',
+      '::error file=d.md,line=2,endLine=2,col=1,endColumn=9,title=block-in-paragraph::heading is read as paragraph text%0AA paragraph runs on to the next blank line: a heading on the line after its text is part of it.%0APut a blank line before it; if it is meant as text, escape it with a backslash: before its marker, or before the period or parenthesis after its number or letter.',
       '',
     ].join('\n'),
   );

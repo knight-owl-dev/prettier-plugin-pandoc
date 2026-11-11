@@ -56,6 +56,17 @@ export { lintShortcuts } from './shortcuts.js';
  */
 
 /**
+ * How a shortcut's template is read: the reader's extensions changed, as
+ * Pandoc's `+name` and `-name`; whether it is a span's; and whether its
+ * lines are not the file's, so that all of it is at its start.
+ *
+ * @typedef {object} TemplateOptions
+ * @property {string[]} [extensions]
+ * @property {boolean} [spanTemplate]
+ * @property {boolean} [pinned]
+ */
+
+/**
  * The diagnostics of `files`, read as one manuscript: by file in the order
  * given, then by where each starts.
  *
@@ -79,12 +90,12 @@ export function lint(files, options = {}) {
 
 /**
  * The diagnostics of a snippet: markdown taken from a file, a shortcut's
- * body in YAML, placed where it is there. Its first line starts at `line`
+ * template in YAML, placed where it is there. Its first line starts at `line`
  * and `column`; each after it is indented `indent` columns. Given `file`,
  * the text it was taken from, offsets are that text's, else the snippet's.
  *
  * @param {string} text
- * @param {Options & {source?: string, line?: number, column?: number, indent?: number, file?: string}} [options]
+ * @param {Options & TemplateOptions & {source?: string, line?: number, column?: number, indent?: number, file?: string}} [options]
  * @returns {Diagnostic[]}
  */
 export function lintSnippet(text, options = {}) {
@@ -94,13 +105,18 @@ export function lintSnippet(text, options = {}) {
     column = 1,
     indent = 0,
     file,
+    pinned = false,
   } = options;
   const place = (offset) => {
-    const at = Math.min(offset, text.length);
+    const at = pinned ? 0 : Math.min(offset, text.length);
     const local = lineAndColumn(text, at);
+    // An empty line's start is the file's line start: no indent to add.
+    const empty =
+      local.column === 1 && (at === text.length || text[at] === '\n');
     const there = {
       line: line + local.line - 1,
-      column: local.column + (local.line === 1 ? column - 1 : indent),
+      column:
+        local.column + (local.line === 1 ? column - 1 : empty ? 0 : indent),
     };
     const outer = file === undefined ? at : offsetAt(file, there);
     return { path: source, offset: outer, ...there };
@@ -191,16 +207,29 @@ const SEVERITY = { warn: 'WARN', info: 'INFO', error: 'ERROR' };
 
 // The diagnostics of the read of `text`, `place` giving where an offset in
 // it is: one per message, a message Pandoc logs twice once.
-function diagnose(text, place, { tabStop, info = false, noMetadata = false }) {
+function diagnose(
+  text,
+  place,
+  {
+    tabStop,
+    extensions,
+    spanTemplate = false,
+    pinned = false,
+    info = false,
+    noMetadata = false,
+  },
+) {
+  const how = { spanTemplate, pinned };
+  const reader = { tabStop, extensions };
   let doc;
   try {
-    doc = readMarkdown(text, { tabStop });
+    doc = readMarkdown(text, reader);
   } catch (e) {
     if (!(e instanceof PandocParseError)) throw e;
     // Pandoc reads nothing: its failure is all there is to report.
     const { message, start, end } = e;
     const msg = { type: 'PandocParseError', message, start, end };
-    return [diagnostic(RULES.PandocParseError, msg, null, place, text)];
+    return [diagnostic(RULES.PandocParseError, msg, null, place, text, how)];
   }
   const where = (offset) => {
     const p = place(offset);
@@ -212,12 +241,13 @@ function diagnose(text, place, { tabStop, info = false, noMetadata = false }) {
     definitions: doc.definitions,
     firstWithId: (id, before) => firstWithId(doc.blocks, id, before),
     toKey,
+    ...how,
   };
   const seen = new Set();
   const out = [];
   const messages = [
     ...doc.log,
-    ...misreads(doc, text, { tabStop }),
+    ...misreads(doc, text, reader),
     ...undefinedReferences(doc),
     ...(noMetadata ? doc.metadataBlocks.map(metadataInMarkdown) : []),
   ];
@@ -227,7 +257,7 @@ function diagnose(text, place, { tabStop, info = false, noMetadata = false }) {
     const key = JSON.stringify(msg);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(diagnostic(rule, msg, read, place, text));
+    out.push(diagnostic(rule, msg, read, place, text, how));
   }
   return out;
 }
@@ -251,8 +281,9 @@ const metadataInMarkdown = (block) => ({
 });
 
 // A message as a diagnostic: its span kept to the file it starts in, and a
-// frame of the line it starts on.
-function diagnostic(rule, msg, read, place, text) {
+// frame of the line it starts on, where its lines are the file's. A span
+// template's own severity, where its rule has one.
+function diagnostic(rule, msg, read, place, text, { spanTemplate, pinned }) {
   const from = place(msg.start);
   const lineEnd = text.indexOf('\n', msg.start);
   const until = Math.min(msg.end, lineEnd === -1 ? text.length : lineEnd);
@@ -261,7 +292,7 @@ function diagnostic(rule, msg, read, place, text) {
   const callouts = rule.callouts(msg, read);
   return {
     rule: rule.rule,
-    severity: rule.severity,
+    severity: (spanTemplate && rule.spanSeverity) || rule.severity,
     source: from.path,
     start: from.offset,
     end: to.offset,
@@ -271,7 +302,9 @@ function diagnostic(rule, msg, read, place, text) {
     endColumn: to.column,
     callouts: {
       ...withoutEmpty(callouts),
-      verbatim: codeFrame(text, msg.start, until, from.line),
+      ...(pinned
+        ? {}
+        : { verbatim: codeFrame(text, msg.start, until, from.line) }),
     },
   };
 }

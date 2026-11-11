@@ -65,13 +65,20 @@ with, so a tool that pins both checks they read alike by comparing the two.
 
 `--shortcuts=FILE` lints a keystone shortcuts file, laid out as its
 [manual](https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/)
-describes. Each shortcut's `body` is read as a document of its own, under every
-rule, and each diagnostic lands at its line and column in the YAML. A folded or
-quoted body, whose lines are not the file's, reports at its start.
+describes. Each shortcut's templates, its `body` and its `span`, are read as
+documents of their own, under every rule, and each diagnostic lands at its line
+and column in the YAML. A template whose lines are not the file's, folded or
+spread over lines or with escapes, reports at its start, as does each place a
+finding names in it.
 
-Three errors are about the file itself: `yaml-syntax` for invalid YAML,
+A template is read as a fragment, as keystone reads one: no `%` title block, no
+YAML metadata block, and no identifier a heading didn't write. A span's lone
+image stays an image, not a figure. Templates are read at `--tab-stop`, as files
+are.
+
+Four errors are about the file itself: `yaml-syntax` for invalid YAML,
 `shortcut-file` for anything other than a mapping of shortcuts, and
-`shortcut-body` for a body that is not text.
+`shortcut-body` and `shortcut-span` for a template that is not text.
 
 ## JSON
 
@@ -122,23 +129,23 @@ The rest are Pandoc's own messages, in kebab case; `pandoc-parse-error`, where
 Pandoc stops reading, is reported alone. A shortcut reference `[text]` nothing
 defines goes unreported, since prose writes `[sic]` that way.
 
-| Rule                        | Severity | What it finds                                                                     |
-| --------------------------- | -------- | --------------------------------------------------------------------------------- |
-| `block-in-paragraph`        | error    | A div or code fence, heading, quote or list on the line after paragraph text      |
-| `div-fence-length`          | warn     | A closing fence whose length differs from its opener's, in a nest of such lengths |
-| `undefined-reference`       | warn     | A reference link or image, `[t][r]` or `[t][]`, whose label nothing defines       |
-| `undefined-note`            | warn     | A note reference whose label nothing defines                                      |
-| `metadata-in-markdown`      | error    | A YAML metadata block or title block; with `--no-metadata` only                   |
-| `pandoc-parse-error`        | error    | A YAML metadata block Pandoc cannot read                                          |
-| `unclosed-div`              | warn     | A div closed only by the document's end                                           |
-| `duplicate-link-reference`  | warn     | A reference defined again                                                         |
-| `duplicate-note-reference`  | warn     | A note defined again                                                              |
-| `note-defined-but-not-used` | warn     | A note no reference uses                                                          |
-| `duplicate-identifier`      | warn     | An identifier already in use                                                      |
-| `macro-already-defined`     | warn     | A macro or environment defined again                                              |
-| `undefined-toggle`          | warn     | `\iftoggle` on a toggle nothing defines                                           |
-| `parsing-unescaped`         | info     | A TeX special character left unescaped                                            |
-| `skipped-content`           | info     | Raw TeX Pandoc drops                                                              |
+| Rule                        | Severity | What it finds                                                                             |
+| --------------------------- | -------- | ----------------------------------------------------------------------------------------- |
+| `block-in-paragraph`        | error    | A div or code fence, heading, quote or list after paragraph text; warn in a span template |
+| `div-fence-length`          | warn     | A closing fence whose length differs from its opener's, in a nest of such lengths         |
+| `undefined-reference`       | warn     | A reference link or image, `[t][r]` or `[t][]`, whose label nothing defines               |
+| `undefined-note`            | warn     | A note reference whose label nothing defines                                              |
+| `metadata-in-markdown`      | error    | A YAML metadata block or title block; with `--no-metadata` only                           |
+| `pandoc-parse-error`        | error    | A YAML metadata block Pandoc cannot read                                                  |
+| `unclosed-div`              | warn     | A div closed only by the document's end                                                   |
+| `duplicate-link-reference`  | warn     | A reference defined again                                                                 |
+| `duplicate-note-reference`  | warn     | A note defined again                                                                      |
+| `note-defined-but-not-used` | warn     | A note no reference uses                                                                  |
+| `duplicate-identifier`      | warn     | An identifier already in use                                                              |
+| `macro-already-defined`     | warn     | A macro or environment defined again                                                      |
+| `undefined-toggle`          | warn     | `\iftoggle` on a toggle nothing defines                                                   |
+| `parsing-unescaped`         | info     | A TeX special character left unescaped                                                    |
+| `skipped-content`           | info     | Raw TeX Pandoc drops                                                                      |
 
 ## API
 
