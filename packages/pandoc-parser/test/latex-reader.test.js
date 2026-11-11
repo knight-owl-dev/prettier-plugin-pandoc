@@ -43,7 +43,7 @@ const CASES = {
   theorems:
     '\\newtheorem{thm}{Theorem}\\newtheorem{lem}[thm]{Lemma}\\theoremstyle{definition}\\newtheorem*{defn}{Definition}\\theoremstyle{remark}\\newtheorem{rem}{Remark}[thm]\n\\begin{thm}\nA claim.\n\n\\end{thm}\n\\begin{lem}[Note]\n$x$ holds.\n\\end{lem}\n\\begin{defn}Def.\\end{defn}\n\\begin{rem}\n\\vspace{1em}\n\nR.\n\\end{rem}',
   proofs:
-    '\\begin{proof}\nEasy.\n\\end{proof}\n\\begin{proof}[Sketch]\n$x$\n\n\\begin{foo}y\\end{foo}\n\\end{proof}',
+    '\\begin{proof}\nEasy.\n\\end{proof}\n\\begin{proof}[Sketch]\n$x$\n\n\\begin{foo}y\\end{foo}\n\\end{proof}\n\\begin{proof}[\\def\\q{Q}S] \\q\\end{proof}',
 };
 
 for (const [name, text] of Object.entries(CASES)) {

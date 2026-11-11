@@ -691,28 +691,15 @@ const optToks = attempt((ctx) => {
 });
 
 /**
- * An option in brackets, read as inlines on its own: what it leaves
- * unread is dropped, what it changes of the state too.
+ * An option in brackets, read as inlines: what it leaves unread is dropped,
+ * what it changes of the state kept, as it is no TeX group.
  *
  * @see Text.Pandoc.Readers.LaTeX.opt
  * @type {Parser<Inlines>}
  */
 export function opt(ctx) {
   const toks = optToks(ctx);
-  if (toks === FAIL) return FAIL;
-  const sub = lpContext(
-    prepend(toks, null),
-    ctx.state.s,
-    toks.at(-1)?.end,
-    ctx.common,
-  );
-  const result = inlines(sub);
-  if (result === FAIL) {
-    throw new Error(
-      `the LaTeX reader failed in an option at offset ${sub.state.at}`,
-    );
-  }
-  return result;
+  return toks === FAIL ? FAIL : parseFromToks(inlines, toks)(ctx);
 }
 
 /**
