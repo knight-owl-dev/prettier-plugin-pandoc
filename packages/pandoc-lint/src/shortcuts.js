@@ -100,11 +100,18 @@ export function lintShortcuts(path, text, options = {}) {
 }
 
 // Where a literal block's Markdown sits in the YAML: from the line after
-// its header, each line indented as its first line with text.
+// its header, each line indented as the header's indicator says, past the
+// indent of the header's line, or else as its first line with text.
 function placement(text, markdown) {
+  const headerStart = text.lastIndexOf('\n', markdown.range[0]) + 1;
   const contentStart = text.indexOf('\n', markdown.range[0]) + 1;
+  const header = text.slice(markdown.range[0], contentStart);
+  const indicator = /^[|>](?:[+-]?([1-9])|([1-9])[+-]?)/.exec(header);
   const lines = text.slice(contentStart, markdown.range[1]).split('\n');
-  const indent = /^ */.exec(lines.find((l) => l.trim() !== '') ?? '')[0].length;
+  const indent = indicator
+    ? /^ */.exec(text.slice(headerStart))[0].length +
+      Number(indicator[1] ?? indicator[2])
+    : /^ */.exec(lines.find((l) => l.trim() !== '') ?? '')[0].length;
   const first = lineAndColumn(text, contentStart);
   return { line: first.line, column: indent + 1, indent };
 }

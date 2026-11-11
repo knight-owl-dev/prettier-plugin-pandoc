@@ -104,6 +104,16 @@ for (const indent of [4, 6]) {
   });
 }
 
+// An indentation indicator sets the indent: spaces past it are Markdown.
+test('a literal span with an indentation indicator', () => {
+  for (const header of ['|2', '|2-', '|-2']) {
+    const text = `ind:\n  span: ${header}\n      see [x][nope]\n`;
+    assert.deepEqual(found(text), [
+      ['undefined-reference', 3, 11, '[x][nope]'],
+    ]);
+  }
+});
+
 test('a body and a span: each linted', () => {
   const text = [
     'sic:',
