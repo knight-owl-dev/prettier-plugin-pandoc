@@ -10,7 +10,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { unpack } from './lib/hackage.mjs';
+import { digest, unpack } from './lib/hackage.mjs';
 import { load, ROOT } from './lib/run.mjs';
 
 const { pandocLinks, pandocVersion } = await load(
@@ -20,7 +20,7 @@ const upstream = JSON.parse(
   readFileSync(join(ROOT, 'packages/pandoc-parser/upstream.json'), 'utf8'),
 );
 
-const from = upstream.pandoc;
+const from = upstream.pandoc.release;
 const to = pandocVersion();
 if (to === from) {
   console.log(
@@ -90,7 +90,7 @@ const table = (header, rows) =>
         .map((r) => `| ${r.join(' | ')} |`)
         .join('\n')}\n`;
 
-const pandocFrom = await unpack(`pandoc-${from}`);
+const pandocFrom = await unpack(`pandoc-${from}`, upstream.pandoc.sha256);
 const pandocTo = await unpack(`pandoc-${to}`);
 
 // Each ported module and data path by its source path, and the name of its
@@ -125,24 +125,39 @@ const names = Object.keys(upstream.libraries);
 const links = pandocLinks([...names, ...added]);
 const libraries = [];
 for (const name of names) {
-  const follows = upstream.libraries[name].version;
+  const { version: follows, sha256 } = upstream.libraries[name];
   const linked = links.get(name);
   if (linked.join() === follows) continue;
   if (linked.length !== 1 || name === 'ghc') {
-    libraries.push([name, follows, linked.join(', ') || 'none', '']);
+    libraries.push([name, follows, linked.join(', ') || 'none', '', '']);
     continue;
   }
   const file = `libraries/${name}-${follows}-${linked[0]}.diff`;
   const moved = diff(
-    await unpack(`${name}-${follows}`),
+    await unpack(`${name}-${follows}`, sha256),
     await unpack(`${name}-${linked[0]}`),
     join(OUT, file),
   );
-  libraries.push([name, follows, linked[0], moved ? file : '']);
+  const id = `${name}-${linked[0]}`;
+  libraries.push([
+    name,
+    follows,
+    linked[0],
+    `\`${digest(id)}\``,
+    moved ? file : '',
+  ]);
 }
 for (const name of added) {
   const linked = links.get(name);
   if (linked.length === 1) await unpack(`${name}-${linked[0]}`);
+}
+
+// An added dependency, the version Pandoc links and its sdist's sha256.
+function addedEntry(name) {
+  const linked = links.get(name);
+  if (linked.length !== 1)
+    return `${name} (${linked.join(', ') || 'not linked'})`;
+  return `${name} ${linked[0]} (\`${digest(`${name}-${linked[0]}`)}\`)`;
 }
 
 writeFileSync(
@@ -160,15 +175,17 @@ What moved upstream since the port was reviewed on ${from}; the review:
 docs/bumping-pandoc.md. Sources unpacked in \`.scratch/hackage/\`; Pandoc's
 changes in its own words in \`changelog.md\`.
 
+Pandoc ${to}'s sdist sha256, for the restamp: \`${digest(`pandoc-${to}`)}\`.
+
 ## Ported modules and data that changed
 ${table(['Upstream', 'Lines', 'Diff'], modules)}
 ${ported.length - modules.length} others unchanged.
 
 ## Libraries the port follows, moved
-${table(['Library', 'Follows', 'Linked', 'Diff'], libraries)}
+${table(['Library', 'Follows', 'Linked', 'Linked sha256', 'Diff'], libraries)}
 ## Pandoc's dependencies
 
-Added: ${added.map((n) => `${n} ${links.get(n).join(', ') || '(not linked)'}`).join(', ') || 'none'}.
+Added: ${added.map(addedEntry).join(', ') || 'none'}.
 Dropped: ${dropped.join(', ') || 'none'}. In full: \`pandoc.cabal.diff\`.
 
 ## Commits

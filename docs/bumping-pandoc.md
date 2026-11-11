@@ -3,19 +3,20 @@
 `pandoc-parser` follows one Pandoc release: the one the oracle runs.
 [`upstream.json`](../packages/pandoc-parser/upstream.json) records it:
 
-| Field       | Holds                                                          |
-| ----------- | -------------------------------------------------------------- |
-| `pandoc`    | The release the port was last reviewed on                      |
-| `modules`   | Each ported Pandoc module, with the release it was ported from |
-| `data`      | Each Pandoc data file taken, with its release                  |
-| `libraries` | Each library the port follows, its version and modules         |
+| Field       | Holds                                                                 |
+| ----------- | --------------------------------------------------------------------- |
+| `pandoc`    | The release the port was last reviewed on, its Hackage sdist's sha256 |
+| `modules`   | Each ported Pandoc module, with the release it was ported from        |
+| `data`      | Each Pandoc data file taken, with its release                         |
+| `libraries` | Each library the port follows: its version, sdist sha256 and modules  |
 
 A module or data file keeps its release through a review that ports nothing into
 it: `pandoc` alone names the release the whole port was reviewed on.
 
 `upstream.test.js` checks the record against the oracle's binary, its release
 and the library versions it links, and against the modules the ports' `@see`
-tags name.
+tags name. The tools that read sources from Hackage refuse any whose sha256
+differs from the record's, since those are the bytes the review read.
 
 ## A bump arrives
 
@@ -125,11 +126,11 @@ set aside goes in a commit.
 
 In `upstream.json`:
 
-- `pandoc`: the new release.
+- `pandoc`: the new release, with the sha256 the drift README gives.
 - `modules`, `data`: the new release where a behavior row was ported into it;
   the rest stay. A module is added or dropped as the `@see` names change.
-- `libraries`: each at the version `upstream.test.js` names; one added or
-  dropped with its port.
+- `libraries`: each at the version `upstream.test.js` names, with the sha256 the
+  drift README gives; one added or dropped with its port.
 
 `NOTICE.md` gains or loses a library with the port, and takes a license that
 changed (the library's diff shows its `LICENSE`); each package's copy follows.

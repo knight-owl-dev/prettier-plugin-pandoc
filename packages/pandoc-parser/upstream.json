@@ -1,5 +1,8 @@
 {
-  "pandoc": "3.13",
+  "pandoc": {
+    "release": "3.13",
+    "sha256": "40bba607c9b3ed2030caea8f97a8dc9206966c558bb0e9a7472e0f5e6db7c6ee"
+  },
   "modules": {
     "Text.Pandoc.App": "3.11",
     "Text.Pandoc.Class.CommonState": "3.11",
@@ -45,14 +48,38 @@
     "data/translations": "3.11"
   },
   "libraries": {
-    "aeson": { "version": "2.2.5.1", "modules": [] },
-    "commonmark": { "version": "0.3.1", "modules": ["Commonmark.Entity"] },
-    "doclayout": { "version": "0.6", "modules": ["Text.DocLayout"] },
-    "emojis": { "version": "0.1.5", "modules": [] },
-    "filepath": { "version": "1.5.4.0", "modules": ["System.FilePath"] },
-    "ghc": { "version": "9.10.3", "modules": ["Data.Char"] },
+    "aeson": {
+      "version": "2.2.5.1",
+      "sha256": "ea82d650c0bbd8877dbf13a03b9baae3be7ed4a65f4e8cfe5b4eacb4f5beae75",
+      "modules": []
+    },
+    "commonmark": {
+      "version": "0.3.1",
+      "sha256": "72ea2f2f678a5ed0cc7ab20e7eebf161f4a03d4a5e73eda3255c82ebc64dbc53",
+      "modules": ["Commonmark.Entity"]
+    },
+    "doclayout": {
+      "version": "0.6",
+      "sha256": "32b5385063385039eba138c79cabd88fed140fdbc1703a3380664fe96d006c33",
+      "modules": ["Text.DocLayout"]
+    },
+    "emojis": {
+      "version": "0.1.5",
+      "sha256": "377177f4446bee35bf8c1c23678d38606205714987943fe439799b8791017ddc",
+      "modules": []
+    },
+    "filepath": {
+      "version": "1.5.4.0",
+      "sha256": "54aa86c432f593273d7b9f607c5b5e0a1628c2674c6f4e3b5a54eb0c83db5caf",
+      "modules": ["System.FilePath"]
+    },
+    "ghc": {
+      "version": "9.10.3",
+      "modules": ["Data.Char"]
+    },
     "gridtables": {
       "version": "0.1.1.1",
+      "sha256": "e93c9823e98b882dde82037e68029c519cd8efb4c604c53b3e1496777b2d5233",
       "modules": [
         "Text.GridTable",
         "Text.GridTable.ArrayTable",
@@ -62,6 +89,7 @@
     },
     "pandoc-types": {
       "version": "1.23.1.2",
+      "sha256": "81ddadbca8c524dce6cc5d94422598e2ccd72e12a67d8bf242fdcc4ab901519b",
       "modules": [
         "Text.Pandoc.Builder",
         "Text.Pandoc.Definition",
@@ -70,6 +98,7 @@
     },
     "parsec": {
       "version": "3.1.18.0",
+      "sha256": "402f9f133a71462678f9c257934f504f55e441d70c54a73ee70582182450d0af",
       "modules": [
         "Text.Parsec.Char",
         "Text.Parsec.Combinator",
@@ -77,13 +106,19 @@
         "Text.Parsec.Prim"
       ]
     },
-    "scientific": { "version": "0.3.10.0", "modules": ["Data.Scientific"] },
+    "scientific": {
+      "version": "0.3.10.0",
+      "sha256": "1d096837ba690ca3712f243472bc9fbb17574f8f29f4caf391a83739401c9016",
+      "modules": ["Data.Scientific"]
+    },
     "skylighting-core": {
       "version": "0.15",
+      "sha256": "485721e90b3f5e52369a11f08994969a224c038ae4c812734233ff3b30b6fa61",
       "modules": ["Skylighting.Core"]
     },
     "tagsoup": {
       "version": "0.14.8",
+      "sha256": "ba7e5500d853d29f0675b90655b7fdd032a4a7eee82a56e7ee3ef9949fe93ad5",
       "modules": [
         "Text.HTML.TagSoup",
         "Text.HTML.TagSoup.Entity",
@@ -95,13 +130,19 @@
         "Text.HTML.TagSoup.Type"
       ]
     },
-    "text": { "version": "2.1.3", "modules": ["Data.Text"] },
+    "text": {
+      "version": "2.1.3",
+      "sha256": "b1bb1ee43e9dac6417a7d4897316ffc13a7c77ddd737600a3155c3c3d9cef89d",
+      "modules": ["Data.Text"]
+    },
     "unicode-collation": {
       "version": "0.1.3.7",
+      "sha256": "ec7f75d635486d760bf45d2093ff380b1dad4146ceee39107d66cd00af713c57",
       "modules": ["Text.Collate.Lang"]
     },
     "yamlet": {
       "version": "1.0.0.1",
+      "sha256": "615cd15d49adc828d5a509c007a8cf91e9f0b4695e1a2eab7059b1913e29eeea",
       "modules": [
         "Yamlet",
         "Yamlet.Error",
@@ -115,6 +156,10 @@
         "Yamlet.Value"
       ]
     },
-    "yamlet-aeson": { "version": "1.0.0.1", "modules": ["Yamlet.Aeson"] }
+    "yamlet-aeson": {
+      "version": "1.0.0.1",
+      "sha256": "586d713836ab1932228aea09dad2239348d4598cbdfdf371db4d91526cc03cd8",
+      "modules": ["Yamlet.Aeson"]
+    }
   }
 }
