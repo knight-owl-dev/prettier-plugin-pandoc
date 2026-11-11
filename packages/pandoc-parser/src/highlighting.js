@@ -1,6 +1,6 @@
 // Skylighting's language names beside the listings package's, both ways.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Highlighting`: its language map,
+// Ported from Pandoc's `Text.Pandoc.Highlighting`: its language map,
 // and its languages by file extension.
 
 import { syntaxesByExtension } from './skylighting/core.js';

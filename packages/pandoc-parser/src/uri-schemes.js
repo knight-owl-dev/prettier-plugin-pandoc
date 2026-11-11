@@ -1,5 +1,5 @@
 // The URI schemes Pandoc recognizes: IANA's, then unofficial ones in common
-// use, as Pandoc 3.11's `Text.Pandoc.URI.schemes` lists them. Generated from
+// use, as Pandoc's `Text.Pandoc.URI.schemes` lists them. Generated from
 // that list.
 
 // cspell:disable

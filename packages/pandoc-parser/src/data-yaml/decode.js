@@ -4,7 +4,7 @@
 // `Data.Yaml`'s own resolution of scalars, merge keys and duplicate keys
 // applies on top.
 //
-// Ported from yaml 0.11.11.2's `Data.Yaml.Internal`.
+// Ported from yaml's `Data.Yaml.Internal`.
 
 import { isAlias, isMap, isScalar, isSeq, parseAllDocuments } from 'yaml';
 

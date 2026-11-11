@@ -2,7 +2,7 @@
 // of one node (or none: `plain` of nothing), captions, and the inline list
 // operations of `inlines.js`.
 //
-// Ported from pandoc-types 1.23.1.2's `Text.Pandoc.Builder`. Each takes the
+// Ported from pandoc-types' `Text.Pandoc.Builder`. Each takes the
 // node's content as Haskell's does, then its source span `start, end`, which
 // the reader knows where it parses the node; a container's span holds its
 // markup, which its content's spans cannot give.

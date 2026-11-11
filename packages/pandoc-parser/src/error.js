@@ -1,7 +1,7 @@
 // The error a reader fails with on input Pandoc cannot read: what it says,
 // and the span of what fails.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Error`, its `PandocParseError`.
+// Ported from Pandoc's `Text.Pandoc.Error`, its `PandocParseError`.
 
 /** @see Text.Pandoc.Error.PandocParseError */
 export class PandocParseError extends Error {

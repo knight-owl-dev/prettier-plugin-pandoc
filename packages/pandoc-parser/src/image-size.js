@@ -1,6 +1,6 @@
 // Image dimensions as Pandoc reads them from attributes.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.ImageSize`: what readers use.
+// Ported from Pandoc's `Text.Pandoc.ImageSize`: what readers use.
 
 /**
  * A number and the unit after it; null where it starts with no number

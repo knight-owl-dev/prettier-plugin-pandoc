@@ -1,7 +1,7 @@
 // Links, images and spans: text in brackets read again as inlines, then a
 // target in parentheses, or attributes in braces.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. `inlines.js`
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`. `inlines.js`
 // imports this module and this one `inlines.js`: what it imports from here
 // is a function declaration, and what this reads from it, it reads when
 // called.

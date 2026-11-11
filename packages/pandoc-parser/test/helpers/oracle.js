@@ -2,7 +2,13 @@
 // spans left out. Each format reads with Pandoc's default extensions.
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -99,6 +105,43 @@ export function pandocRealLength(texts) {
     'for line in io.lines() do print(pandoc.layout.real_length(line)) end';
   const out = pandoc(['lua', '-e', script], `${texts.join('\n')}\n`);
   return out.trimEnd().split('\n').map(Number);
+}
+
+/**
+ * The Pandoc release the oracle runs: `3.11`, `3.9.0.2`.
+ *
+ * @returns {string}
+ */
+export function pandocVersion() {
+  return pandoc(['--version'], '')
+    .split('\n')[0]
+    .replace(/^pandoc /, '');
+}
+
+/**
+ * Each version of each of `names` that Pandoc's binary links, read from the
+ * cabal unit ids its static build leaves in it: `doclayout-0.6-<hash>`,
+ * `parsec-3.1.18.0-inplace`, and GHC's as its store, `ghc-9.10.3-inplace`.
+ *
+ * @param {string[]} names
+ * @returns {Map<string, string[]>}
+ */
+export function pandocLinks(names) {
+  const dir = process.env.PATH.split(':').find((d) =>
+    existsSync(join(d, 'pandoc')),
+  );
+  const binary = readFileSync(join(dir, 'pandoc'), 'latin1');
+  return new Map(
+    names.map((name) => {
+      const quoted = name.replace(/[.-]/g, '\\$&');
+      const id = new RegExp(
+        `(?<![\\w-])${quoted}-(\\d+(?:\\.\\d+)*)-(?:[0-9a-f]{8,}|inplace)`,
+        'g',
+      );
+      const versions = new Set([...binary.matchAll(id)].map((m) => m[1]));
+      return [name, [...versions].sort()];
+    }),
+  );
 }
 
 // What Pandoc writes, run with `args` on `input`, in `cwd`.

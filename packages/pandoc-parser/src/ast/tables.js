@@ -2,7 +2,7 @@
 // table's width, so that its cells fill a grid, none overlapping another
 // or reaching past the grid.
 //
-// Ported from pandoc-types 1.23.1.2's `Text.Pandoc.Builder`. A cell is
+// Ported from pandoc-types' `Text.Pandoc.Builder`. A cell is
 // Pandoc's `[attr, alignment, rowSpan, colSpan, blocks]`.
 
 import { AlignDefault, Node, nullAttr, Row } from './nodes.js';

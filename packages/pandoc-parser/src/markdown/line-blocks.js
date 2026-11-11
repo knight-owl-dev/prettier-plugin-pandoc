@@ -1,6 +1,6 @@
 // Line blocks: `| ` lines, each read again as inlines.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`.
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`.
 
 import * as B from '../ast/builder.js';
 import { attempt, FAIL } from '../core.js';

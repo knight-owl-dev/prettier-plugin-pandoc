@@ -2,7 +2,7 @@
 // typographic characters they stand for. Each returns its inlines spanning
 // what it read.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Parsing.Smart`; the quoted spans
+// Ported from Pandoc's `Text.Pandoc.Parsing.Smart`; the quoted spans
 // themselves are each reader's, `markdown/inlines.js` for markdown.
 
 import * as B from '../ast/builder.js';

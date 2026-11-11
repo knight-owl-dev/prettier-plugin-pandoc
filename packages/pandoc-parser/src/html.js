@@ -2,7 +2,7 @@
 // on the rest of the input, its first tag checked, and the text up to that
 // tag's end read.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.HTML` (`htmlTag` and the
+// Ported from Pandoc's `Text.Pandoc.Readers.HTML` (`htmlTag` and the
 // tag predicates) and `Text.Pandoc.Readers.HTML.TagCategories`.
 
 import { codePointLength } from './code-points.js';

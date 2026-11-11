@@ -3,7 +3,7 @@
 // allows, as `PandocMonad` abstracts IO: Pandoc's CLI reads the disk, its
 // pure monad nothing.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Class.CommonState`, the fields
+// Ported from Pandoc's `Text.Pandoc.Class.CommonState`, the fields
 // readers use, set up as `Text.Pandoc.App` sets them.
 
 import { lang, parseLang } from './collate/lang.js';

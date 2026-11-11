@@ -1,13 +1,15 @@
 // What each package's tarball holds, as `npm pack` would pack it: its
-// LICENSE and NOTICE.md, its manifest and README, and its sources, nothing
-// else. Fails naming what is missing or stray.
+// LICENSE and NOTICE.md, its manifest and README, its sources, and
+// pandoc-parser's `upstream.json`, nothing else. Fails naming what is missing
+// or stray.
 //
 //   node tools/pack-check.mjs
 
 import { execFileSync } from 'node:child_process';
 
 const REQUIRED = ['LICENSE', 'NOTICE.md', 'package.json'];
-const ALLOWED = /^(LICENSE|NOTICE\.md|README\.md|package\.json|src\/.+)$/;
+const ALLOWED =
+  /^(LICENSE|NOTICE\.md|README\.md|package\.json|upstream\.json|src\/.+)$/;
 
 const packs = JSON.parse(
   execFileSync('npm', ['pack', '--dry-run', '--json', '--workspaces'], {

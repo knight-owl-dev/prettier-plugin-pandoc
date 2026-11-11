@@ -1,12 +1,12 @@
 // Pandoc's AST as `pandoc -t json` encodes it, each block and inline with the
 // source span it was read from.
 //
-// Ported from pandoc-types 1.23.1.2's `Text.Pandoc.Definition` and its Aeson
+// Ported from pandoc-types' `Text.Pandoc.Definition` and its Aeson
 // encoding: a constructor is `{t, c}`, a nullary one `{t}`, a tuple an array,
 // `Nothing` null, and a single-constructor type (`Caption`, `Citation`) its
 // fields bare. Values are never mutated once built: builders share them.
 
-/** The pandoc-types version Pandoc 3.11 writes into its JSON. */
+/** The pandoc-types version Pandoc writes into its JSON. */
 export const API_VERSION = Object.freeze([1, 23, 1, 2]);
 
 /**

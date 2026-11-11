@@ -1,0 +1,106 @@
+{
+  "pandoc": "3.11",
+  "modules": {
+    "Text.Pandoc.App": "3.11",
+    "Text.Pandoc.Class.CommonState": "3.11",
+    "Text.Pandoc.Class.PandocMonad": "3.11",
+    "Text.Pandoc.Error": "3.11",
+    "Text.Pandoc.Highlighting": "3.11",
+    "Text.Pandoc.ImageSize": "3.11",
+    "Text.Pandoc.Logging": "3.11",
+    "Text.Pandoc.Options": "3.11",
+    "Text.Pandoc.Parsing.Capabilities": "3.11",
+    "Text.Pandoc.Parsing.Citations": "3.11",
+    "Text.Pandoc.Parsing.Future": "3.11",
+    "Text.Pandoc.Parsing.General": "3.11",
+    "Text.Pandoc.Parsing.GridTable": "3.11",
+    "Text.Pandoc.Parsing.Lists": "3.11",
+    "Text.Pandoc.Parsing.Math": "3.11",
+    "Text.Pandoc.Parsing.Smart": "3.11",
+    "Text.Pandoc.Parsing.State": "3.11",
+    "Text.Pandoc.Readers.HTML": "3.11",
+    "Text.Pandoc.Readers.HTML.TagCategories": "3.11",
+    "Text.Pandoc.Readers.LaTeX": "3.11",
+    "Text.Pandoc.Readers.LaTeX.Citation": "3.11",
+    "Text.Pandoc.Readers.LaTeX.Inline": "3.11",
+    "Text.Pandoc.Readers.LaTeX.Lang": "3.11",
+    "Text.Pandoc.Readers.LaTeX.Macro": "3.11",
+    "Text.Pandoc.Readers.LaTeX.Math": "3.11",
+    "Text.Pandoc.Readers.LaTeX.Parsing": "3.11",
+    "Text.Pandoc.Readers.LaTeX.SIunitx": "3.11",
+    "Text.Pandoc.Readers.LaTeX.Table": "3.11",
+    "Text.Pandoc.Readers.Markdown": "3.11",
+    "Text.Pandoc.Readers.Metadata": "3.11",
+    "Text.Pandoc.Shared": "3.11",
+    "Text.Pandoc.Sources": "3.11",
+    "Text.Pandoc.TeX": "3.11",
+    "Text.Pandoc.Translations": "3.11",
+    "Text.Pandoc.Translations.Types": "3.11",
+    "Text.Pandoc.URI": "3.11",
+    "Text.Pandoc.UTF8": "3.11",
+    "Text.Pandoc.XML": "3.11"
+  },
+  "data": {
+    "data/abbreviations": "3.11",
+    "data/translations": "3.11"
+  },
+  "libraries": {
+    "aeson": { "version": "2.2.5.0", "modules": ["Data.Aeson.Types"] },
+    "commonmark": { "version": "0.3", "modules": ["Commonmark.Entity"] },
+    "doclayout": { "version": "0.5.0.3", "modules": ["Text.DocLayout"] },
+    "emojis": { "version": "0.1.5", "modules": [] },
+    "filepath": { "version": "1.5.4.0", "modules": ["System.FilePath"] },
+    "ghc": { "version": "9.10.3", "modules": ["Data.Char"] },
+    "gridtables": {
+      "version": "0.1.1.0",
+      "modules": [
+        "Text.GridTable",
+        "Text.GridTable.ArrayTable",
+        "Text.GridTable.Parse",
+        "Text.GridTable.Trace"
+      ]
+    },
+    "libyaml": { "version": "0.1.4", "modules": [] },
+    "pandoc-types": {
+      "version": "1.23.1.2",
+      "modules": [
+        "Text.Pandoc.Builder",
+        "Text.Pandoc.Definition",
+        "Text.Pandoc.Walk"
+      ]
+    },
+    "parsec": {
+      "version": "3.1.18.0",
+      "modules": [
+        "Text.Parsec.Char",
+        "Text.Parsec.Combinator",
+        "Text.Parsec.Pos",
+        "Text.Parsec.Prim"
+      ]
+    },
+    "scientific": { "version": "0.3.8.1", "modules": ["Data.Scientific"] },
+    "skylighting-core": {
+      "version": "0.14.7",
+      "modules": ["Skylighting.Core"]
+    },
+    "tagsoup": {
+      "version": "0.14.8",
+      "modules": [
+        "Text.HTML.TagSoup",
+        "Text.HTML.TagSoup.Entity",
+        "Text.HTML.TagSoup.Implementation",
+        "Text.HTML.TagSoup.Options",
+        "Text.HTML.TagSoup.Parser",
+        "Text.HTML.TagSoup.Render",
+        "Text.HTML.TagSoup.Specification",
+        "Text.HTML.TagSoup.Type"
+      ]
+    },
+    "text": { "version": "2.1.3", "modules": ["Data.Text"] },
+    "unicode-collation": {
+      "version": "0.1.3.7",
+      "modules": ["Text.Collate.Lang"]
+    },
+    "yaml": { "version": "0.11.11.2", "modules": ["Data.Yaml.Internal"] }
+  }
+}

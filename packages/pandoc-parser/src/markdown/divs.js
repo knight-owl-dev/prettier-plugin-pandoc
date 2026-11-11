@@ -1,7 +1,7 @@
 // Fenced divs: blocks between `:::` fences, attributes or a class on the
 // opening one.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. `blocks.js`
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`. `blocks.js`
 // imports this module and this one `blocks.js`, as do the parsers asking
 // for a closing fence: what they import from here is a function declaration,
 // and what this reads from `blocks.js`, it reads when called.

@@ -1,7 +1,7 @@
 // Pandoc's parser state, the fields the port reads so far, and the parsers
 // that read and write them.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Parsing.State` and
+// Ported from Pandoc's `Text.Pandoc.Parsing.State` and
 // `Text.Pandoc.Parsing.Capabilities`. The state is never mutated: a write
 // replaces it, so a choice point restores it by reference.
 

@@ -1,7 +1,7 @@
 // Text and AST utilities Pandoc's readers share, and the `Data.Text`
 // functions they call that JS strings lack.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Shared`.
+// Ported from Pandoc's `Text.Pandoc.Shared`.
 
 import { concat, trimInlines } from './ast/inlines.js';
 import { Node } from './ast/nodes.js';

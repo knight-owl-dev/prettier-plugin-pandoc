@@ -1,7 +1,7 @@
 // Block quotes: lines marked by `>`, lazy lines among them, their text read
 // again as blocks.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. `blocks.js`
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`. `blocks.js`
 // imports this module and this one `blocks.js`: `blockQuote` is a function
 // declaration and reads `parseBlocks` only when called, so either may load
 // first.

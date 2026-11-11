@@ -1,7 +1,7 @@
 // Bullet and ordered lists: each item's lines extracted, its indentation
 // dropped, and read again as blocks.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. Parsers that ask
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`. Parsers that ask
 // whether a list starts import this module, and it imports `blocks.js`: what
 // they import from here is a function declaration, and what it reads from
 // them, it reads when called.

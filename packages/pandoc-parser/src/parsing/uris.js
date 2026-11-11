@@ -1,6 +1,6 @@
 // URIs and e-mail addresses in text, as autolinks read them.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Parsing.General`.
+// Ported from Pandoc's `Text.Pandoc.Parsing.General`.
 
 import { alphaNum, char, isAlphaNum, isSpace, satisfy } from '../char.js';
 import {

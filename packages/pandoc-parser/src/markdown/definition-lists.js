@@ -1,7 +1,7 @@
 // Definition lists: a term on a line of its own, then definitions, each a
 // list item opened by `:` or `~`.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`. `blocks.js`
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`. `blocks.js`
 // imports this module, which imports modules that import `blocks.js`: what
 // `blocks.js` imports from here is a function declaration, and what this
 // reads from those modules, it reads when called.

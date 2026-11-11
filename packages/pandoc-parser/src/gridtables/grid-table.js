@@ -2,7 +2,7 @@
 // traced into cells on a character grid, each cell's lines kept with the
 // source offset of each character.
 //
-// Ported from gridtables 0.1.1.0's `Text.GridTable` (`Parse`, `Trace`,
+// Ported from gridtables' `Text.GridTable` (`Parse`, `Trace`,
 // `ArrayTable`, `rows`). Rows and columns count from 1, as gridtables'.
 
 import { charWidth, realLength } from '../text-width.js';

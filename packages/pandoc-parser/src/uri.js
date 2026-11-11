@@ -1,6 +1,6 @@
 // URIs as Pandoc writes and recognizes them.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.URI`.
+// Ported from Pandoc's `Text.Pandoc.URI`.
 
 import { isSpace } from './char.js';
 

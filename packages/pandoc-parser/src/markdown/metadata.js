@@ -1,7 +1,7 @@
 // Metadata in Markdown: the `%` title block at the start, and YAML
 // metadata blocks, later keys replacing earlier ones.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`, and its
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`, and its
 // `Text.Pandoc.Readers.Metadata.yamlMetaBlock`.
 
 import * as B from '../ast/builder.js';

@@ -1,6 +1,6 @@
 // TeX tokens, as Pandoc's LaTeX reader reads TeX.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.TeX`.
+// Ported from Pandoc's `Text.Pandoc.TeX`.
 
 /**
  * A token's kind: a control sequence (`name` its name), spaces, a newline,

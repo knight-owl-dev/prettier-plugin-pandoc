@@ -1,7 +1,7 @@
 // A table's parts as Pandoc's table parsers build them: its column specs,
 // head, bodies and foot, from a header, rows and a footer.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Parsing.GridTable`. A parsed row
+// Ported from Pandoc's `Text.Pandoc.Parsing.GridTable`. A parsed row
 // is its cells' blocks and the span of its lines.
 
 import * as B from '../ast/builder.js';

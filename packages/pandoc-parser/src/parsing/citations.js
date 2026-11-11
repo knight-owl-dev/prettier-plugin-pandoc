@@ -1,6 +1,6 @@
 // A citation's key: `@` and an identifier, or one in braces.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Parsing.Citations`.
+// Ported from Pandoc's `Text.Pandoc.Parsing.Citations`.
 
 import { char, isAlphaNum, isSpace, oneOf, satisfy } from '../char.js';
 import { alt, attempt, FAIL, lookAhead, many } from '../core.js';

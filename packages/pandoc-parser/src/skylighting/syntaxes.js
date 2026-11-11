@@ -1,6 +1,6 @@
 // Skylighting's syntaxes by name, each with the file-name globs it is
-// for, in the order of its syntax map. Generated from skylighting-core
-// 0.14.7's syntax definitions, taking only these.
+// for, in the order of its syntax map. Generated from skylighting-core's
+// syntax definitions, taking only these.
 
 // cspell:disable
 

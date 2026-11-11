@@ -1,6 +1,6 @@
 // General parsers of Pandoc's toolkit, as its readers compose them.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Parsing.General`.
+// Ported from Pandoc's `Text.Pandoc.Parsing.General`.
 
 import * as B from '../ast/builder.js';
 import { mapSpans, withContents } from '../ast/spans.js';

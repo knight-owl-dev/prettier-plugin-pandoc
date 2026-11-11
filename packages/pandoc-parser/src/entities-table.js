@@ -1,5 +1,5 @@
 // The HTML5 named character references, by name and its semicolon, as
-// commonmark's `Commonmark.Entity.htmlEntities` lists them: Pandoc 3.11
+// commonmark's `Commonmark.Entity.htmlEntities` lists them: Pandoc
 // resolves `&name;` through it. Generated from that table.
 
 // cspell:disable

@@ -1,6 +1,6 @@
 // Tags written back as HTML.
 //
-// Ported from TagSoup 0.14.8's `Text.HTML.TagSoup.Render`.
+// Ported from TagSoup's `Text.HTML.TagSoup.Render`.
 
 /** @typedef {import('./parser.js').Tag} Tag */
 

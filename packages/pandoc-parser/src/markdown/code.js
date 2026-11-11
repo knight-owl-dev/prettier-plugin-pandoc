@@ -1,6 +1,6 @@
 // Code blocks: fenced, and indented by a tab stop.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.Markdown`.
+// Ported from Pandoc's `Text.Pandoc.Readers.Markdown`.
 
 import * as B from '../ast/builder.js';
 import { isSpace, satisfy } from '../char.js';

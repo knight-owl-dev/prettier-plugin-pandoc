@@ -1,6 +1,6 @@
 // siunitx in LaTeX: numbers, units, quantities, lists, ranges and angles.
 //
-// Ported from Pandoc 3.11's `Text.Pandoc.Readers.LaTeX.SIunitx`. A
+// Ported from Pandoc's `Text.Pandoc.Readers.LaTeX.SIunitx`. A
 // command's output is made from its arguments, reordered and rewritten: it
 // spans nothing, where the command starts.
 
