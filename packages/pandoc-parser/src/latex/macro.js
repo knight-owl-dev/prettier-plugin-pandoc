@@ -15,6 +15,7 @@ import {
   controlSeq,
   isArgTok,
   parseFromToks,
+  peekTok,
   satisfyTok,
   singleChar,
   spaces,
@@ -40,12 +41,60 @@ const macrosOn = (ctx) => ctx.state.s.options.extensions.has('latex_macros');
  * @returns {import('../core.js').Parser<T[]>}
  */
 export const macroDef = (construct) => (ctx) => {
+  // Fail before trying each definition, unless the next token can begin
+  // one.
+  const t = peekTok(ctx);
+  if (t === FAIL || t.type !== 'CtrlSeq' || !MACRO_DEF_COMMANDS.has(t.name)) {
+    return FAIL;
+  }
   const start = ctx.state.at;
   const read = withRaw(alt(commandDef, environmentDef))(ctx);
   if (read === FAIL) return FAIL;
   if (macrosOn(ctx)) return [];
   return construct(untokenize(read[1]), start, ctx.state.at);
 };
+
+/**
+ * The control sequences a macro definition can begin with: each its
+ * parsers can start with.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Macro.macroDefCommands
+ */
+const MACRO_DEF_COMMANDS = new Set([
+  'global', // see checkGlobal
+  'let',
+  'edef',
+  'xdef',
+  'def',
+  'gdef',
+  'newif',
+  'newcommand',
+  'renewcommand',
+  'providecommand',
+  'DeclareMathOperator',
+  'DeclareRobustCommand',
+  'NewDocumentCommand',
+  'RenewDocumentCommand',
+  'ProvideDocumentCommand',
+  'DeclareDocumentCommand',
+  'NewExpandableDocumentCommand',
+  'RenewExpandableDocumentCommand',
+  'ProvideExpandableDocumentCommand',
+  'DeclareExpandableDocumentCommand',
+  'NewDocumentEnvironment',
+  'RenewDocumentEnvironment',
+  'ProvideDocumentEnvironment',
+  'DeclareDocumentEnvironment',
+  'NewCommandCopy',
+  'RenewCommandCopy',
+  'DeclareCommandCopy',
+  'NewEnvironmentCopy',
+  'RenewEnvironmentCopy',
+  'DeclareEnvironmentCopy',
+  'newenvironment',
+  'renewenvironment',
+  'provideenvironment',
+]);
 
 const commandDefs = alt(
   newcommand,
