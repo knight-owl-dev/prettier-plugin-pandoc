@@ -26,8 +26,8 @@ test('the port was reviewed on the Pandoc the oracle runs', () => {
   const runs = pandocVersion();
   assert.equal(
     runs,
-    upstream.pandoc,
-    `the oracle runs Pandoc ${runs}, the port was reviewed on ${upstream.pandoc}: ${SOP}`,
+    upstream.pandoc.release,
+    `the oracle runs Pandoc ${runs}, the port was reviewed on ${upstream.pandoc.release}: ${SOP}`,
   );
 });
 
@@ -41,6 +41,20 @@ test('each library at the version the oracle links', () => {
       return `${name}: the port follows ${version}, the oracle links ${linked}`;
     });
   assert.deepEqual(moved, [], `${moved.join('; ')}: ${SOP}`);
+});
+
+// GHC alone has no sdist on Hackage.
+test("each source reviewed is named by its sdist's sha256", () => {
+  const sources = [
+    ['pandoc', upstream.pandoc],
+    ...Object.entries(upstream.libraries).filter(([name]) => name !== 'ghc'),
+  ];
+  const unnamed = sources.filter(([, s]) => !/^[0-9a-f]{64}$/.test(s.sha256));
+  assert.deepEqual(
+    unnamed.map(([name]) => name),
+    [],
+    SOP,
+  );
 });
 
 test('the AST carries the pandoc-types version the port follows', () => {

@@ -17,8 +17,18 @@ const upstream = JSON.parse(
 );
 // A followed library's source; Pandoc's at the release its data was taken
 // from.
-const source = (name) => unpack(`${name}-${upstream.libraries[name].version}`);
-const pandocAt = (path) => unpack(`pandoc-${upstream.data[path]}`);
+const source = (name) => {
+  const { version, sha256 } = upstream.libraries[name];
+  return unpack(`${name}-${version}`, sha256);
+};
+// Pandoc at `release`, checked where it is the one reviewed.
+const pandocAt = (release) => {
+  const { pandoc } = upstream;
+  return unpack(
+    `pandoc-${release}`,
+    release === pandoc.release ? pandoc.sha256 : undefined,
+  );
+};
 
 // GHC's names for the ASCII control characters, by code point.
 const CONTROL = [
@@ -224,7 +234,10 @@ ${DISABLE}export const NAMED_REFERENCES = new Map([\n${lines(rows)}]);\n`;
 }
 
 async function translations() {
-  const dir = join(await pandocAt('data/translations'), 'data/translations');
+  const dir = join(
+    await pandocAt(upstream.data['data/translations']),
+    'data/translations',
+  );
   const langs = readdirSync(dir)
     .filter((f) => f.endsWith('.yaml'))
     .sort()
@@ -244,7 +257,10 @@ ${DISABLE}export const TRANSLATIONS = new Map([\n${langs.join('')}]);\n`;
 }
 
 async function abbreviations() {
-  const file = join(await pandocAt('data/abbreviations'), 'data/abbreviations');
+  const file = join(
+    await pandocAt(upstream.data['data/abbreviations']),
+    'data/abbreviations',
+  );
   const words = readFileSync(file, 'utf8')
     .split('\n')
     .filter((w) => w !== '');
@@ -255,7 +271,7 @@ ${DISABLE}export const ABBREVIATIONS = new Set([\n${lines(words.map(quoted))}]);
 }
 
 async function schemes() {
-  const pandoc = await unpack(`pandoc-${upstream.modules['Text.Pandoc.URI']}`);
+  const pandoc = await pandocAt(upstream.modules['Text.Pandoc.URI']);
   const hs = readFileSync(join(pandoc, 'src/Text/Pandoc/URI.hs'), 'utf8');
   const names = strings(list(hs, 'schemes'));
   return `// The URI schemes Pandoc recognizes: IANA's, then unofficial ones in common
