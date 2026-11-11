@@ -5,11 +5,12 @@ compose `node` service (`docker-compose.yaml`): the test image's Node and
 Pandoc, no network, the repo mounted at `/work`. `make help` lists every target
 with its variables.
 
-Every run stops after `TIMEOUT` seconds (default 1800): a hung parse otherwise
-blocks forever, and `timeout` inside the image cannot stop Node. Right after
-many files under the repo are deleted, a run can fail throughout while Docker
-Desktop's mount catches up, and passes when run again. Output the tools keep
-lands in `.scratch/`.
+Every run stops after `TIMEOUT` seconds (default 480), a lint run after
+`LINT_TIMEOUT` (default 120): a hung parse otherwise blocks forever, and
+`timeout` inside the image cannot stop Node. A fuzz run of a larger `N` needs a
+larger `TIMEOUT`. Right after many files under the repo are deleted, a run can
+fail throughout while Docker Desktop's mount catches up, and passes when run
+again. Output the tools keep lands in `.scratch/`.
 
 ## Fuzz before a printer or parser PR
 
