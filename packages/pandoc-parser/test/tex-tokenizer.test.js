@@ -69,6 +69,27 @@ test('@ is a letter between \\makeatletter and \\makeatother', () => {
   );
 });
 
+test(': and _ are letters between \\ExplSyntaxOn and \\ExplSyntaxOff', () => {
+  assert.deepEqual(
+    toks('\\a_b:n\\ExplSyntaxOn\\a_b:n\\ExplSyntaxOff\\a_b').map(
+      ([type, text]) => [type, text],
+    ),
+    [
+      ['CtrlSeq', '\\a'],
+      ['Symbol', '_'],
+      ['Word', 'b'],
+      ['Symbol', ':'],
+      ['Word', 'n'],
+      ['CtrlSeq', '\\ExplSyntaxOn'],
+      ['CtrlSeq', '\\a_b:n'],
+      ['CtrlSeq', '\\ExplSyntaxOff'],
+      ['CtrlSeq', '\\a'],
+      ['Symbol', '_'],
+      ['Word', 'b'],
+    ],
+  );
+});
+
 test('a control space before a non-blank line: later lines drift', () => {
   assert.deepEqual(toks('x\\ \n y\nz'), [
     ['Word', 'x', 1, 1],

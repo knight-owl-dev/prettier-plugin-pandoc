@@ -141,6 +141,7 @@ eqnarray
 eqref
 etoolbox
 expandafter
+expl
 extratitle
 fancybreak
 fancyverb
