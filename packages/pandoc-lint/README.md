@@ -71,9 +71,11 @@ and column in the YAML. A template whose lines are not the file's, folded or
 spread over lines or with escapes, reports at its start, as does each place a
 finding names in it.
 
-A template is read as a fragment, as keystone reads one: no `%` title block, no
-YAML metadata block, and no identifier a heading didn't write. A span's lone
-image stays an image, not a figure. Templates are read at `--tab-stop`, as files
+A template is read as a fragment,
+[as keystone reads one](https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#how-a-template-is-read):
+no `%` title block, no YAML metadata block, and no identifier a heading didn't
+write. A reference or note finds its definition only within its template, and a
+span's lone image stays an image. Templates are read at `--tab-stop`, as files
 are.
 
 The file itself draws errors of its own:

@@ -139,6 +139,36 @@ test('an unclosed div: where Pandoc closes it, in the file', () => {
   );
 });
 
+// A template is read alone: its references are defined in it, quoted as
+// its YAML writes them.
+test("a template's undefined reference and note: defined in it", () => {
+  const callouts = (text) =>
+    lintShortcuts('s.yaml', text).map((d) => [
+      d.callouts.remedy,
+      d.callouts.see,
+    ]);
+  const see =
+    'https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#how-a-template-is-read';
+  assert.deepEqual(callouts('r:\n  span: |\n    see [this][ref]\n'), [
+    [
+      'Define it in the template: a blank line, then [ref]: followed by its target.',
+      see,
+    ],
+  ]);
+  assert.deepEqual(callouts('n:\n  body: |\n    a claim[^src]\n'), [
+    [
+      'Define it in the template: a blank line, then [^src]: followed by its text.',
+      see,
+    ],
+  ]);
+  assert.deepEqual(callouts('q:\n  span: "see [x][a\\\\_b]"\n'), [
+    [
+      'Define it in the template: a blank line, then [a\\\\_b]: followed by its target.',
+      see,
+    ],
+  ]);
+});
+
 test('a body and a span: each linted', () => {
   const text = [
     'sic:',
