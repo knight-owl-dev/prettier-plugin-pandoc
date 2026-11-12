@@ -19,13 +19,15 @@ import { lintSnippet } from './index.js';
 /** @typedef {import('./index.js').Diagnostic} Diagnostic */
 
 // A template is part of a document, not one: it carries no title or
-// metadata, and its headings no generated identifiers. A span holds
-// inlines, so an image alone in it makes no figure.
+// metadata, its headings no generated identifiers, and no reference finds a
+// heading by its text. A span holds inlines, so an image alone in it makes
+// no figure.
 // @see https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#how-a-template-is-read
 const FRAGMENT = [
   '-pandoc_title_block',
   '-yaml_metadata_block',
   '-auto_identifiers',
+  '-implicit_header_references',
 ];
 const TEMPLATES = [
   { key: 'body', extensions: FRAGMENT },
