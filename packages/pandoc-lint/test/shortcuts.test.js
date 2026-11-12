@@ -189,7 +189,8 @@ test('a body and a span: each linted', () => {
 });
 
 // A template is a fragment: what reads as a document's title, metadata or
-// a heading's own identifier is none of those in it.
+// a heading's own identifier is none of those in it, and no reference finds
+// a heading by its text.
 test('a template read as a fragment', () => {
   const body = (...lines) =>
     ['x:', '  body: |', ...lines.map((l) => (l ? `    ${l}` : '')), ''].join(
@@ -198,6 +199,18 @@ test('a template read as a fragment', () => {
   assert.deepEqual(found(body('---', 'title: [unclosed', '---', '', 'a')), []);
   assert.deepEqual(found(body('# Same', '', '# Same {#same}')), []);
   assert.deepEqual(found(body('% A title', '', 'a'), { noMetadata: true }), []);
+  for (const [heading, see, rules] of [
+    ['# Legend', 'See [Legend][].', ['undefined-reference']],
+    ['# Legend', 'See [the key][Legend].', ['undefined-reference']],
+    ['# Legend {#legend}', 'See [Legend][].', ['undefined-reference']],
+    ['# Legend', 'See [Legend].', []],
+  ]) {
+    assert.deepEqual(
+      found(body(heading, '', see)).map(([rule]) => rule),
+      rules,
+      see,
+    );
+  }
 });
 
 test('a quoted body: at its start, with no frame of lines it lacks', () => {

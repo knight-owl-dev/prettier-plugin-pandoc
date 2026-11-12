@@ -73,10 +73,10 @@ finding names in it.
 
 A template is read as a fragment,
 [as keystone reads one](https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#how-a-template-is-read):
-no `%` title block, no YAML metadata block, and no identifier a heading didn't
-write. A reference or note finds its definition only within its template, and a
-span's lone image stays an image. Templates are read at `--tab-stop`, as files
-are.
+no `%` title block, no YAML metadata block, no identifier a heading didn't
+write, and no reference to a heading by its text. A reference or note finds its
+definition only within its template, and a span's lone image stays an image.
+Templates are read at `--tab-stop`, as files are.
 
 The file itself draws errors of its own:
 
