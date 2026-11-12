@@ -286,6 +286,182 @@ test('what makes it no shortcuts file', () => {
   ]);
 });
 
+// More than one document: keystone reads the first that isn't a null, and
+// refuses a second that holds anything, a written null too, reported at
+// its start.
+// https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#the-file
+test('a second document: the file refused, at its start', () => {
+  assert.deepEqual(found('g:\n  class: font\n---\n~\n'), [
+    ['shortcut-file', 3, 1, '---'],
+  ]);
+  assert.deepEqual(found('g:\n  class: font\n--- !foo\n'), [
+    ['shortcut-file', 3, 1, '--- !foo'],
+  ]);
+  assert.deepEqual(
+    found('~\n---\ng:\n  class: ~\n').map(([rule, line]) => [rule, line]),
+    [
+      ['shortcut-file', 2],
+      ['shortcut-null', 4],
+    ],
+  );
+  const [d] = lintShortcuts('s.yaml', 'g: {}\n---\nh: {}\n');
+  assert.deepEqual(d.callouts, {
+    problem: 'shortcuts file holds more than one YAML document',
+    because: 'A shortcuts file is one map of names to definitions.',
+    remedy:
+      'Merge the documents into one map, and delete any that is only a null.',
+    verbatim: ['2 | ---', '  | ^^^'],
+  });
+});
+
+test('a directive with no document: YAML that is not', () => {
+  assert.deepEqual(
+    found('%YAML 1.2\n').map(([rule]) => rule),
+    ['yaml-syntax'],
+  );
+});
+
+test('a shortcut that is no map: the file refused', () => {
+  assert.deepEqual(found('g: 1\nh: [a]\ni: text\n'), [
+    ['shortcut-file', 1, 4, '1'],
+    ['shortcut-file', 2, 4, '[a]'],
+    ['shortcut-file', 3, 4, 'text'],
+  ]);
+  assert.equal(
+    lintShortcuts('s.yaml', 'g: 1\n')[0].callouts.problem,
+    "shortcut 'g' is not a map",
+  );
+});
+
+test('a document of nothing, or comments alone: no second', () => {
+  assert.deepEqual(found('g:\n  class: font\n---\n'), []);
+  assert.deepEqual(found('---\n# notes\n---\ng:\n  class: font\n'), []);
+});
+
+test('a file only a null: no map of shortcuts', () => {
+  const [d] = lintShortcuts('s.yaml', '~\n');
+  assert.equal(d.rule, 'shortcut-file');
+  assert.equal(
+    d.callouts.problem,
+    "shortcuts file isn't a map of names to definitions",
+  );
+});
+
+// Each: a file, and its repeated and complex keys, where each is written.
+const KEYS = {
+  'a shortcut written again': [
+    'g:\n  class: font\ng:\n  class: align\n',
+    [['shortcut-duplicate-key', 3, 1, 'g', 'key g is written again']],
+  ],
+  'a field written again': [
+    'g:\n  class: font\n  class: align\n',
+    [['shortcut-duplicate-key', 3, 3, 'class', 'key g.class is written again']],
+  ],
+  'a number and its text': [
+    'g:\n  interface:\n    1: a\n    "1": b\n',
+    [
+      [
+        'shortcut-duplicate-key',
+        4,
+        5,
+        '"1"',
+        'key g.interface.1 is written again',
+      ],
+    ],
+  ],
+  'each repeat after the first': [
+    'g: {}\ng: {}\ng: {}\n',
+    [
+      ['shortcut-duplicate-key', 2, 1, 'g', 'key g is written again'],
+      ['shortcut-duplicate-key', 3, 1, 'g', 'key g is written again'],
+    ],
+  ],
+  "a list item's": [
+    'g:\n  classes:\n    - a: 1\n      a: 2\n',
+    [
+      [
+        'shortcut-duplicate-key',
+        4,
+        7,
+        'a',
+        'key g.classes[1].a is written again',
+      ],
+    ],
+  ],
+  'a key an alias writes': [
+    'g:\n  &k class: font\n  *k : align\n',
+    [['shortcut-duplicate-key', 3, 3, '*k', 'key g.*k is written again']],
+  ],
+  '~ and null: apart': ['g:\n  ~: 1\n  null: 2\n', []],
+  'a merge key and "<<": apart': ['g:\n  <<: {}\n  "<<": 2\n', []],
+  'an empty key, at its colon': [
+    'a:\n  : x\n  : y\n',
+    [['shortcut-duplicate-key', 3, 3, ':', 'key a."" is written again']],
+  ],
+  'a list as a key': [
+    '? [a, b]\n: class: font\n',
+    [['shortcut-complex-key', 1, 3, '[a, b]', 'a list is used as a key']],
+  ],
+  'a map as a key, in a shortcut': [
+    'g:\n  ? {a: 1}\n  : x\n',
+    [['shortcut-complex-key', 2, 5, '{a: 1}', 'a map is used as a key in g']],
+  ],
+  'an alias to a map as a key': [
+    'a: &m {x: 1}\n*m : y\n',
+    [['shortcut-complex-key', 2, 1, '*m', 'a map is used as a key']],
+  ],
+};
+
+for (const [name, [text, expected]] of Object.entries(KEYS)) {
+  test(`a key: ${name}`, () => {
+    const keys = lintShortcuts('s.yaml', text).filter((d) =>
+      ['shortcut-duplicate-key', 'shortcut-complex-key'].includes(d.rule),
+    );
+    assert.deepEqual(
+      keys.map((d) => [
+        d.rule,
+        d.line,
+        d.column,
+        text.slice(d.start, d.end),
+        d.callouts.problem,
+      ]),
+      expected,
+    );
+  });
+}
+
+test("a repeated key's callouts: where it was first written", () => {
+  const [d] = lintShortcuts('s.yaml', 'g:\n  class: font\n  class: align\n');
+  assert.deepEqual(d.callouts, {
+    problem: 'key g.class is written again',
+    offenders: ['s.yaml:2:3: class: font'],
+    because: 'A map holds each key once.',
+    remedy: 'Delete all but one.',
+    verbatim: ['3 |   class: align', '  |   ^^^^^'],
+  });
+});
+
+// Keystone drops a complex key and all it holds, an alias's to a map too.
+test('what a complex key holds: nothing read', () => {
+  const rules = (text) => found(text).map(([rule]) => rule);
+  assert.deepEqual(rules('? [a]\n: ~\n'), ['shortcut-complex-key']);
+  assert.deepEqual(rules('a: &m {x: 1}\n*m : ~\n'), ['shortcut-complex-key']);
+  assert.deepEqual(rules('? [a]\n: body: "[x][nope]"\n'), [
+    'shortcut-complex-key',
+  ]);
+});
+
+test('an alias key to no anchor: YAML that is not', () => {
+  assert.deepEqual(found('g:\n  *nope : x\n'), [
+    ['yaml-syntax', 2, 3, '*nope'],
+  ]);
+});
+
+test("a repeated key's offender: its line, no carriage return", () => {
+  const [d] = lintShortcuts('s.yaml', 'g:\r\n  class: a\r\n  class: b\r\n');
+  assert.deepEqual(d.callouts.offenders, ['s.yaml:2:3: class: a']);
+});
+
 // A layer only overrides: a null anywhere stops keystone's build, each
 // reported at the key that holds it, or the list item it is.
 // https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#shadowing-a-system-shortcut
@@ -313,6 +489,14 @@ const NULLS = {
     'a:\n  class: Null\n',
     [2, 3, 'class: Null', 'a.class has no value'],
   ],
+  'a custom tag on no value': [
+    'a:\n  class: !foo\n',
+    [2, 3, 'class: !foo', 'a.class has no value'],
+  ],
+  'a custom tag on no value, a list item': [
+    'a:\n  classes:\n    - x\n    - !foo\n',
+    [4, 5, '- !foo', 'a.classes[2] has no value'],
+  ],
   'a list item, counted from 1': [
     'a:\n  classes: [x, ~]\n',
     [2, 16, '~', 'a.classes[2] has no value'],
@@ -335,8 +519,20 @@ const NULLS = {
   ],
 };
 
+// A core tag's empty value is text, and a tag on a value is that value.
+test('a tag that is no null', () => {
+  assert.deepEqual(
+    found('a:\n  class: !!str\n  content: !foo slot\n  body: !foo ""\n'),
+    [],
+  );
+});
+
+test('a file only a custom tag: no map of shortcuts', () => {
+  assert.deepEqual(found('!foo\n'), [['shortcut-file', 1, 1, '!foo']]);
+});
+
 test('a key written as null: a key, not a null', () => {
-  assert.deepEqual(found('~: x\n'), []);
+  assert.deepEqual(found('~:\n  class: x\n'), []);
   assert.deepEqual(found('a:\n  : x\n'), []);
 });
 

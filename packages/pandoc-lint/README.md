@@ -78,13 +78,15 @@ are.
 
 The file itself draws errors of its own:
 
-| Rule            | What it finds                                                    |
-| --------------- | ---------------------------------------------------------------- |
-| `yaml-syntax`   | Invalid YAML                                                     |
-| `shortcut-file` | Anything other than a mapping of shortcuts                       |
-| `shortcut-null` | A null anywhere, at the key that holds it or the list item it is |
-| `shortcut-body` | A `body` that is neither text nor null                           |
-| `shortcut-span` | A `span` that is neither text nor null                           |
+| Rule                     | What it finds                                                    |
+| ------------------------ | ---------------------------------------------------------------- |
+| `yaml-syntax`            | Invalid YAML                                                     |
+| `shortcut-file`          | More than one document, or anything but a map of shortcuts       |
+| `shortcut-null`          | A null anywhere, at the key that holds it or the list item it is |
+| `shortcut-duplicate-key` | A key written again in its map                                   |
+| `shortcut-complex-key`   | A list or map used as a key                                      |
+| `shortcut-body`          | A `body` that is neither text nor null                           |
+| `shortcut-span`          | A `span` that is neither text nor null                           |
 
 A layer
 [only overrides](https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#shadowing-a-system-shortcut),
