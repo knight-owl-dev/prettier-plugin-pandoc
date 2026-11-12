@@ -5,7 +5,14 @@
 //
 // @see https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/
 
-import { isAlias, isMap, isScalar, isSeq, parseAllDocuments } from 'yaml';
+import {
+  isAlias,
+  isMap,
+  isScalar,
+  isSeq,
+  parseAllDocuments,
+  parseDocument,
+} from 'yaml';
 import { codeFrame } from './frame.js';
 import { lintSnippet } from './index.js';
 
@@ -39,13 +46,15 @@ const TEMPLATES = [
  * @returns {Diagnostic[]}
  */
 export function lintShortcuts(path, text, options = {}) {
-  const docs = parseAllDocuments(text, {
-    uniqueKeys: false,
-    prettyErrors: false,
-  });
+  const parse = { uniqueKeys: false, prettyErrors: false };
+  const docs = parseAllDocuments(text, parse);
   const fail = (rule, problem, [start, end]) =>
     error(path, text, rule, { problem }, start, end);
-  const errors = docs.flatMap((d) => d.errors);
+  // A directive with no document is an error only a document's parse finds.
+  const errors =
+    docs.length > 0
+      ? docs.flatMap((d) => d.errors)
+      : parseDocument(text, parse).errors;
   if (errors.length > 0) {
     return errors.map((e) => fail('yaml-syntax', firstLine(e.message), e.pos));
   }
@@ -58,7 +67,6 @@ export function lintShortcuts(path, text, options = {}) {
   const out = [];
   if (held.length > 1) {
     const start = held[1].range[0];
-    const lineEnd = text.indexOf('\n', start);
     out.push(
       error(
         path,
@@ -66,21 +74,15 @@ export function lintShortcuts(path, text, options = {}) {
         'shortcut-file',
         MANY_DOCUMENTS,
         start,
-        lineEnd === -1 ? text.length : lineEnd,
+        lineEnd(text, start),
       ),
     );
   }
   if (!isMap(doc.contents)) {
-    let [start, end] = doc.contents.range;
-    // A tag or anchor on no value: the range leaves it out.
-    if (start === end) {
-      end = text.slice(0, start).trimEnd().length;
-      start = text.slice(0, end).search(/\S+$/);
-    }
-    out.push(error(path, text, 'shortcut-file', NOT_A_MAP, start, end));
+    out.push(fail('shortcut-file', NOT_A_MAP, spanOf(text, doc.contents)));
     return out;
   }
-  for (const { at, item, start, end } of nulls(text, doc.contents, [])) {
+  for (const { at, item, start, end } of nulls(text, doc, doc.contents, [])) {
     out.push(
       error(path, text, 'shortcut-null', nullCallouts(at, item), start, end),
     );
@@ -89,11 +91,23 @@ export function lintShortcuts(path, text, options = {}) {
   // Each node's findings by the template it is read as: an alias repeats
   // a template, linted where its anchor is.
   const reads = new Map();
-  for (const { key, value } of doc.contents.items) {
-    if (!isMap(value)) continue;
-    const name = isScalar(key) ? String(key.value) : '?';
+  for (const { key, value } of pairsOf(doc, doc.contents)) {
+    const definition = isAlias(value) ? value.resolve(doc) : value;
+    // A null is the null walk's to report.
+    if (isNull(definition)) continue;
+    const name = keyName(key);
+    if (!isMap(definition)) {
+      out.push(
+        fail(
+          'shortcut-file',
+          `shortcut '${name}' is not a map`,
+          spanOf(text, value),
+        ),
+      );
+      continue;
+    }
     for (const template of TEMPLATES) {
-      const written = value.get(template.key, true);
+      const written = definition.get(template.key, true);
       // A null template is the null walk's to report, where it is written.
       if (isNull(written)) continue;
       const markdown = isAlias(written) ? written.resolve(doc) : written;
@@ -211,30 +225,48 @@ const isEmpty = (node) =>
 
 const MANY_DOCUMENTS = {
   problem: 'shortcuts file holds more than one YAML document',
-  because: 'A shortcuts file is one map of shortcut names to definitions.',
+  because: 'A shortcuts file is one map of names to definitions.',
   remedy:
     'Merge the documents into one map, and delete any that is only a null.',
 };
 
-const NOT_A_MAP = {
-  problem: "shortcuts file isn't a map of shortcut names to definitions",
-  remedy: 'Write one, or leave the file empty to define no shortcuts.',
-};
+const NOT_A_MAP = "shortcuts file isn't a map of names to definitions";
+
+// A node's span; a tag or anchor on no value's, which its range leaves out.
+function spanOf(text, node) {
+  const [start, end] = node.range;
+  if (start < end) return [start, end];
+  const before = text.slice(0, start).trimEnd().length;
+  return [text.slice(0, before).search(/\S+$/), before];
+}
+
+// Where the line `at` is on ends, before any carriage return.
+function lineEnd(text, at) {
+  const nl = text.indexOf('\n', at);
+  const end = nl === -1 ? text.length : nl;
+  return end > at && text[end - 1] === '\r' ? end - 1 : end;
+}
+
+// The pairs of `map` keystone reads: a key an alias writes is what it
+// names, and a list or map used as a key is dropped with all it holds.
+const pairsOf = (doc, map) =>
+  map.items.filter(({ key }) => {
+    const named = isAlias(key) ? key.resolve(doc) : key;
+    return named !== undefined && !isMap(named) && !isSeq(named);
+  });
 
 // Each null under `node`, at `path`: the key that holds it, or the list
 // item it is, spanning from there to the null's end.
-function nulls(text, node, path) {
+function nulls(text, doc, node, path) {
   const out = [];
   if (isMap(node)) {
-    for (const { key, value } of node.items) {
-      // Keystone drops a list or map used as a key, and what it holds.
-      if (isMap(key) || isSeq(key)) continue;
+    for (const { key, value } of pairsOf(doc, node)) {
       const at = [...path, keyName(key)];
       if (isNull(value)) {
         const [start, keyEnd] = key.range;
         out.push({ at, start, end: Math.max(keyEnd, value?.range[1] ?? 0) });
       } else {
-        out.push(...nulls(text, value, at));
+        out.push(...nulls(text, doc, value, at));
       }
     }
   } else if (isSeq(node)) {
@@ -246,7 +278,7 @@ function nulls(text, node, path) {
         const start = from === to ? text.lastIndexOf('-', from - 1) : from;
         out.push({ at, item: true, start, end: Math.max(to, start + 1) });
       } else {
-        out.push(...nulls(text, item, at));
+        out.push(...nulls(text, doc, item, at));
       }
     });
   }
@@ -263,6 +295,18 @@ function keys(path, text, doc, node, at) {
     const seen = new Map();
     for (const { key, value } of node.items) {
       const named = isAlias(key) ? key.resolve(doc) : key;
+      if (named === undefined) {
+        out.push(
+          error(
+            path,
+            text,
+            'yaml-syntax',
+            { problem: `alias *${key.source} names no anchor` },
+            ...key.range,
+          ),
+        );
+        continue;
+      }
       if (isMap(named) || isSeq(named)) {
         out.push(
           error(
@@ -271,8 +315,7 @@ function keys(path, text, doc, node, at) {
             'shortcut-complex-key',
             {
               problem: `a ${isMap(named) ? 'map' : 'list'} is used as a key${at.length > 0 ? ` in ${pathOf(at)}` : ''}`,
-              because:
-                'A key names a shortcut, an entry or a field, so it is text.',
+              because: 'Keys are names, written as text.',
             },
             ...key.range,
           ),
@@ -286,7 +329,7 @@ function keys(path, text, doc, node, at) {
             ? '<<'
             : `=${named.source}`;
         const first = seen.get(same);
-        if (first === undefined) seen.set(same, key);
+        if (first === undefined) seen.set(same, keySpan(text, key));
         else
           out.push(
             error(
@@ -295,11 +338,11 @@ function keys(path, text, doc, node, at) {
               'shortcut-duplicate-key',
               {
                 problem: `key ${pathOf(name)} is written again`,
-                offenders: [offender(path, text, first.range[0])],
-                because: 'Only the last of a repeated key would be kept.',
-                remedy: 'Keep one.',
+                offenders: [offender(path, text, first[0])],
+                because: 'A map holds each key once.',
+                remedy: 'Delete all but one.',
               },
-              ...key.range,
+              ...keySpan(text, key),
             ),
           );
       }
@@ -313,12 +356,18 @@ function keys(path, text, doc, node, at) {
   return out;
 }
 
+// A key's span; an empty key's, the colon after it.
+function keySpan(text, key) {
+  const [start, end] = key.range;
+  if (start < end) return [start, end];
+  const colon = start + Math.max(0, text.slice(start).search(/\S/));
+  return [colon, colon + 1];
+}
+
 // The place `start` is, and its line from there, as an offender.
 function offender(path, text, start) {
   const { line, column } = lineAndColumn(text, start);
-  const lineEnd = text.indexOf('\n', start);
-  const rest = text.slice(start, lineEnd === -1 ? text.length : lineEnd);
-  return `${path}:${line}:${column}: ${rest}`;
+  return `${path}:${line}:${column}: ${text.slice(start, lineEnd(text, start))}`;
 }
 
 // A key as a path names it: as written, an alias by its anchor, a list or

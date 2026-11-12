@@ -307,11 +307,30 @@ test('a second document: the file refused, at its start', () => {
   const [d] = lintShortcuts('s.yaml', 'g: {}\n---\nh: {}\n');
   assert.deepEqual(d.callouts, {
     problem: 'shortcuts file holds more than one YAML document',
-    because: 'A shortcuts file is one map of shortcut names to definitions.',
+    because: 'A shortcuts file is one map of names to definitions.',
     remedy:
       'Merge the documents into one map, and delete any that is only a null.',
     verbatim: ['2 | ---', '  | ^^^'],
   });
+});
+
+test('a directive with no document: YAML that is not', () => {
+  assert.deepEqual(
+    found('%YAML 1.2\n').map(([rule]) => rule),
+    ['yaml-syntax'],
+  );
+});
+
+test('a shortcut that is no map: the file refused', () => {
+  assert.deepEqual(found('g: 1\nh: [a]\ni: text\n'), [
+    ['shortcut-file', 1, 4, '1'],
+    ['shortcut-file', 2, 4, '[a]'],
+    ['shortcut-file', 3, 4, 'text'],
+  ]);
+  assert.equal(
+    lintShortcuts('s.yaml', 'g: 1\n')[0].callouts.problem,
+    "shortcut 'g' is not a map",
+  );
 });
 
 test('a document of nothing, or comments alone: no second', () => {
@@ -322,12 +341,9 @@ test('a document of nothing, or comments alone: no second', () => {
 test('a file only a null: no map of shortcuts', () => {
   const [d] = lintShortcuts('s.yaml', '~\n');
   assert.equal(d.rule, 'shortcut-file');
-  assert.deepEqual(
-    [d.callouts.problem, d.callouts.remedy],
-    [
-      "shortcuts file isn't a map of shortcut names to definitions",
-      'Write one, or leave the file empty to define no shortcuts.',
-    ],
+  assert.equal(
+    d.callouts.problem,
+    "shortcuts file isn't a map of names to definitions",
   );
 });
 
@@ -378,6 +394,10 @@ const KEYS = {
   ],
   '~ and null: apart': ['g:\n  ~: 1\n  null: 2\n', []],
   'a merge key and "<<": apart': ['g:\n  <<: {}\n  "<<": 2\n', []],
+  'an empty key, at its colon': [
+    'a:\n  : x\n  : y\n',
+    [['shortcut-duplicate-key', 3, 3, ':', 'key a."" is written again']],
+  ],
   'a list as a key': [
     '? [a, b]\n: class: font\n',
     [['shortcut-complex-key', 1, 3, '[a, b]', 'a list is used as a key']],
@@ -415,18 +435,31 @@ test("a repeated key's callouts: where it was first written", () => {
   assert.deepEqual(d.callouts, {
     problem: 'key g.class is written again',
     offenders: ['s.yaml:2:3: class: font'],
-    because: 'Only the last of a repeated key would be kept.',
-    remedy: 'Keep one.',
+    because: 'A map holds each key once.',
+    remedy: 'Delete all but one.',
     verbatim: ['3 |   class: align', '  |   ^^^^^'],
   });
 });
 
-// Keystone drops a complex key and all it holds.
-test('a null under a complex key: the key alone', () => {
-  assert.deepEqual(
-    found('? [a]\n: ~\n').map(([rule]) => rule),
-    ['shortcut-complex-key'],
-  );
+// Keystone drops a complex key and all it holds, an alias's to a map too.
+test('what a complex key holds: nothing read', () => {
+  const rules = (text) => found(text).map(([rule]) => rule);
+  assert.deepEqual(rules('? [a]\n: ~\n'), ['shortcut-complex-key']);
+  assert.deepEqual(rules('a: &m {x: 1}\n*m : ~\n'), ['shortcut-complex-key']);
+  assert.deepEqual(rules('? [a]\n: body: "[x][nope]"\n'), [
+    'shortcut-complex-key',
+  ]);
+});
+
+test('an alias key to no anchor: YAML that is not', () => {
+  assert.deepEqual(found('g:\n  *nope : x\n'), [
+    ['yaml-syntax', 2, 3, '*nope'],
+  ]);
+});
+
+test("a repeated key's offender: its line, no carriage return", () => {
+  const [d] = lintShortcuts('s.yaml', 'g:\r\n  class: a\r\n  class: b\r\n');
+  assert.deepEqual(d.callouts.offenders, ['s.yaml:2:3: class: a']);
 });
 
 // A layer only overrides: a null anywhere stops keystone's build, each
@@ -499,7 +532,7 @@ test('a file only a custom tag: no map of shortcuts', () => {
 });
 
 test('a key written as null: a key, not a null', () => {
-  assert.deepEqual(found('~: x\n'), []);
+  assert.deepEqual(found('~:\n  class: x\n'), []);
   assert.deepEqual(found('a:\n  : x\n'), []);
 });
 
