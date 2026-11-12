@@ -456,6 +456,14 @@ const NULLS = {
     'a:\n  class: Null\n',
     [2, 3, 'class: Null', 'a.class has no value'],
   ],
+  'a custom tag on no value': [
+    'a:\n  class: !foo\n',
+    [2, 3, 'class: !foo', 'a.class has no value'],
+  ],
+  'a custom tag on no value, a list item': [
+    'a:\n  classes:\n    - x\n    - !foo\n',
+    [4, 5, '- !foo', 'a.classes[2] has no value'],
+  ],
   'a list item, counted from 1': [
     'a:\n  classes: [x, ~]\n',
     [2, 16, '~', 'a.classes[2] has no value'],
@@ -477,6 +485,18 @@ const NULLS = {
     [2, 3, '"[1]": ~', '"a.b"."[1]" has no value'],
   ],
 };
+
+// A core tag's empty value is text, and a tag on a value is that value.
+test('a tag that is no null', () => {
+  assert.deepEqual(
+    found('a:\n  class: !!str\n  content: !foo slot\n  body: !foo ""\n'),
+    [],
+  );
+});
+
+test('a file only a custom tag: no map of shortcuts', () => {
+  assert.deepEqual(found('!foo\n'), [['shortcut-file', 1, 1, '!foo']]);
+});
 
 test('a key written as null: a key, not a null', () => {
   assert.deepEqual(found('~: x\n'), []);

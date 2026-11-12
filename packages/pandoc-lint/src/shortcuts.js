@@ -71,9 +71,13 @@ export function lintShortcuts(path, text, options = {}) {
     );
   }
   if (!isMap(doc.contents)) {
-    out.push(
-      error(path, text, 'shortcut-file', NOT_A_MAP, ...doc.contents.range),
-    );
+    let [start, end] = doc.contents.range;
+    // A tag or anchor on no value: the range leaves it out.
+    if (start === end) {
+      end = text.slice(0, start).trimEnd().length;
+      start = text.slice(0, end).search(/\S+$/);
+    }
+    out.push(error(path, text, 'shortcut-file', NOT_A_MAP, start, end));
     return out;
   }
   for (const { at, item, start, end } of nulls(text, doc.contents, [])) {
@@ -187,9 +191,17 @@ function lineAndColumn(text, offset) {
 
 const firstLine = (message) => message.split('\n')[0].replace(/\.$/, '');
 
-// Whether `node` is a null as written: an alias is one where its anchor is.
+// Whether `node` is a null as written, as keystone reads one: a custom tag
+// on no value is one, a core tag's empty value is text. An alias is one
+// where its anchor is.
+// @see https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#shadowing-a-system-shortcut
 const isNull = (node) =>
-  node == null || (isScalar(node) && node.value === null);
+  node == null ||
+  (isScalar(node) &&
+    (node.value === null ||
+      (node.type === 'PLAIN' &&
+        node.source === '' &&
+        !node.tag?.startsWith('tag:yaml.org,2002:'))));
 
 // Whether a document's contents are nothing, or comments alone: a null
 // with no text, tag or anchor.
