@@ -6,9 +6,9 @@
  * What a rule reads a message against: where an offset is, as
  * `path:line:column`; the source's text between two offsets; and the
  * read's reference definitions and AST, for the place a duplicate repeats;
- * whether it is a span's template, which is one paragraph; whether its
- * lines are not the file's, every place in it at its start; and Markdown
- * as the file writes it, for a remedy to quote.
+ * which template it is, read on its own, a span's one paragraph; whether
+ * its lines are not the file's, every place in it at its start; and
+ * Markdown as the file writes it, for a remedy to quote.
  *
  * @typedef {object} Read
  * @property {(offset: number) => string} where
@@ -16,7 +16,7 @@
  * @property {{start: number, end: number, label: [number, number]}[]} definitions
  * @property {(id: string, before: number) => {start: number, end: number} | null} firstWithId
  * @property {(label: string) => string} toKey
- * @property {boolean} spanTemplate
+ * @property {'body' | 'span' | undefined} template
  * @property {boolean} pinned
  * @property {(markdown: string) => string} written
  */
@@ -30,6 +30,16 @@
  * @property {'error' | 'warn' | 'info'} [spanSeverity] In a span's template.
  * @property {(msg: object, read: Read) => Record<string, string | string[]>} callouts
  */
+
+// Where a reference or note is defined: a template, read alone, holds its
+// own, after a blank line, as a paragraph runs on to one.
+const defineIn = (read, definition) =>
+  read.template
+    ? {
+        remedy: `Define it in the template: a blank line, then ${read.written(definition)}.`,
+        see: 'https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#how-a-template-is-read',
+      }
+    : { remedy: `Define it, as ${definition}, in any file of the manuscript.` };
 
 // The characters TeX escapes with a backslash alone.
 const ESCAPED = new Set('&#%$_{}');
@@ -167,9 +177,10 @@ export const RULES = {
     callouts: (msg, read) => ({
       problem: `${msg.block} is read as paragraph text`,
       because: `A paragraph runs on to the next blank line: a ${msg.block} on the line after its text is part of it.`,
-      remedy: read.spanTemplate
-        ? `A span is one paragraph: write ${read.written(msg.escaped)} instead.`
-        : `Put a blank line before it; if it is meant as text, write ${read.written(msg.escaped)} instead.`,
+      remedy:
+        read.template === 'span'
+          ? `A span is one paragraph: write ${read.written(msg.escaped)} instead.`
+          : `Put a blank line before it; if it is meant as text, write ${read.written(msg.escaped)} instead.`,
     }),
   },
   DivFenceLength: {
@@ -186,19 +197,19 @@ export const RULES = {
   UndefinedReference: {
     rule: 'undefined-reference',
     severity: 'warn',
-    callouts: (msg) => ({
+    callouts: (msg, read) => ({
       problem: `reference ${msg.label} is not defined`,
       effect: `Pandoc prints the ${msg.kind} as text, brackets and all.`,
-      remedy: `Define it, as ${msg.label}: followed by its target, in any file of the manuscript.`,
+      ...defineIn(read, `${msg.label}: followed by its target`),
     }),
   },
   UndefinedNote: {
     rule: 'undefined-note',
     severity: 'warn',
-    callouts: (msg) => ({
+    callouts: (msg, read) => ({
       problem: `note [^${msg.label}] is not defined`,
       effect: 'Pandoc prints the reference as text, brackets and all.',
-      remedy: `Define it, as [^${msg.label}]: followed by its text, in any file of the manuscript.`,
+      ...defineIn(read, `[^${msg.label}]: followed by its text`),
     }),
   },
   MetadataInMarkdown: {

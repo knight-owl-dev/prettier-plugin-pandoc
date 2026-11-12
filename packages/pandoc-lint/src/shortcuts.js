@@ -21,6 +21,7 @@ import { lintSnippet } from './index.js';
 // A template is part of a document, not one: it carries no title or
 // metadata, and its headings no generated identifiers. A span holds
 // inlines, so an image alone in it makes no figure.
+// @see https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#how-a-template-is-read
 const FRAGMENT = [
   '-pandoc_title_block',
   '-yaml_metadata_block',
@@ -31,7 +32,6 @@ const TEMPLATES = [
   {
     key: 'span',
     extensions: [...FRAGMENT, '-implicit_figures'],
-    spanTemplate: true,
   },
 ];
 
@@ -141,7 +141,7 @@ export function lintShortcuts(path, text, options = {}) {
         lintSnippet(markdown.value, {
           ...options,
           extensions: template.extensions,
-          spanTemplate: template.spanTemplate,
+          template: template.key,
           ...placement(text, markdown),
           source: path,
           file: text,

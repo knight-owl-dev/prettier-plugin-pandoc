@@ -57,13 +57,13 @@ export { lintShortcuts } from './shortcuts.js';
 
 /**
  * How a shortcut's template is read: the reader's extensions changed, as
- * Pandoc's `+name` and `-name`; whether it is a span's; whether its lines
- * are not the file's, so that all of it is at its start; and whether it is
- * a double-quoted scalar, which writes a backslash twice.
+ * Pandoc's `+name` and `-name`; which template it is, read on its own;
+ * whether its lines are not the file's, so that all of it is at its start;
+ * and whether it is a double-quoted scalar, which writes a backslash twice.
  *
  * @typedef {object} TemplateOptions
  * @property {string[]} [extensions]
- * @property {boolean} [spanTemplate]
+ * @property {'body' | 'span'} [template]
  * @property {boolean} [pinned]
  * @property {boolean} [doubleQuoted]
  */
@@ -216,14 +216,14 @@ function diagnose(
     tabStop,
     extensions,
     sources,
-    spanTemplate = false,
+    template,
     pinned = false,
     doubleQuoted = false,
     info = false,
     noMetadata = false,
   },
 ) {
-  const how = { spanTemplate, pinned };
+  const how = { template, pinned };
   // The misread check re-reads pieces of the text: `sources`' offsets are
   // the whole text's.
   const reader = { tabStop, extensions };
@@ -291,7 +291,7 @@ const metadataInMarkdown = (block) => ({
 // A message as a diagnostic: its span kept to the file it starts in, and a
 // frame of the line it starts on, where its lines are the file's. A span
 // template's own severity, where its rule has one.
-function diagnostic(rule, msg, read, place, text, { spanTemplate, pinned }) {
+function diagnostic(rule, msg, read, place, text, { template, pinned }) {
   const from = place(msg.start);
   const lineEnd = text.indexOf('\n', msg.start);
   const until = Math.min(msg.end, lineEnd === -1 ? text.length : lineEnd);
@@ -300,7 +300,7 @@ function diagnostic(rule, msg, read, place, text, { spanTemplate, pinned }) {
   const callouts = rule.callouts(msg, read);
   return {
     rule: rule.rule,
-    severity: (spanTemplate && rule.spanSeverity) || rule.severity,
+    severity: (template === 'span' && rule.spanSeverity) || rule.severity,
     source: from.path,
     start: from.offset,
     end: to.offset,

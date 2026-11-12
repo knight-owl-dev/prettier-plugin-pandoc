@@ -171,6 +171,10 @@ test('references and notes nothing in the manuscript defines', () => {
       ['undefined-note', 37, 'note [^n] is not defined'],
     ],
   );
+  for (const d of lint(files)) {
+    assert.match(d.callouts.remedy, /, in any file of the manuscript\.$/);
+    assert.equal(d.callouts.see, undefined);
+  }
 });
 
 test('a metadata block that is no YAML, the only diagnostic', () => {
