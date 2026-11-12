@@ -286,6 +286,149 @@ test('what makes it no shortcuts file', () => {
   ]);
 });
 
+// More than one document: keystone reads the first that isn't a null, and
+// refuses a second that holds anything, a written null too, reported at
+// its start.
+// https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#the-file
+test('a second document: the file refused, at its start', () => {
+  assert.deepEqual(found('g:\n  class: font\n---\n~\n'), [
+    ['shortcut-file', 3, 1, '---'],
+  ]);
+  assert.deepEqual(found('g:\n  class: font\n--- !foo\n'), [
+    ['shortcut-file', 3, 1, '--- !foo'],
+  ]);
+  assert.deepEqual(
+    found('~\n---\ng:\n  class: ~\n').map(([rule, line]) => [rule, line]),
+    [
+      ['shortcut-file', 2],
+      ['shortcut-null', 4],
+    ],
+  );
+  const [d] = lintShortcuts('s.yaml', 'g: {}\n---\nh: {}\n');
+  assert.deepEqual(d.callouts, {
+    problem: 'shortcuts file holds more than one YAML document',
+    because: 'A shortcuts file is one map of shortcut names to definitions.',
+    remedy:
+      'Merge the documents into one map, and delete any that is only a null.',
+    verbatim: ['2 | ---', '  | ^^^'],
+  });
+});
+
+test('a document of nothing, or comments alone: no second', () => {
+  assert.deepEqual(found('g:\n  class: font\n---\n'), []);
+  assert.deepEqual(found('---\n# notes\n---\ng:\n  class: font\n'), []);
+});
+
+test('a file only a null: no map of shortcuts', () => {
+  const [d] = lintShortcuts('s.yaml', '~\n');
+  assert.equal(d.rule, 'shortcut-file');
+  assert.deepEqual(
+    [d.callouts.problem, d.callouts.remedy],
+    [
+      "shortcuts file isn't a map of shortcut names to definitions",
+      'Write one, or leave the file empty to define no shortcuts.',
+    ],
+  );
+});
+
+// Each: a file, and its repeated and complex keys, where each is written.
+const KEYS = {
+  'a shortcut written again': [
+    'g:\n  class: font\ng:\n  class: align\n',
+    [['shortcut-duplicate-key', 3, 1, 'g', 'key g is written again']],
+  ],
+  'a field written again': [
+    'g:\n  class: font\n  class: align\n',
+    [['shortcut-duplicate-key', 3, 3, 'class', 'key g.class is written again']],
+  ],
+  'a number and its text': [
+    'g:\n  interface:\n    1: a\n    "1": b\n',
+    [
+      [
+        'shortcut-duplicate-key',
+        4,
+        5,
+        '"1"',
+        'key g.interface.1 is written again',
+      ],
+    ],
+  ],
+  'each repeat after the first': [
+    'g: {}\ng: {}\ng: {}\n',
+    [
+      ['shortcut-duplicate-key', 2, 1, 'g', 'key g is written again'],
+      ['shortcut-duplicate-key', 3, 1, 'g', 'key g is written again'],
+    ],
+  ],
+  "a list item's": [
+    'g:\n  classes:\n    - a: 1\n      a: 2\n',
+    [
+      [
+        'shortcut-duplicate-key',
+        4,
+        7,
+        'a',
+        'key g.classes[1].a is written again',
+      ],
+    ],
+  ],
+  'a key an alias writes': [
+    'g:\n  &k class: font\n  *k : align\n',
+    [['shortcut-duplicate-key', 3, 3, '*k', 'key g.*k is written again']],
+  ],
+  '~ and null: apart': ['g:\n  ~: 1\n  null: 2\n', []],
+  'a merge key and "<<": apart': ['g:\n  <<: {}\n  "<<": 2\n', []],
+  'a list as a key': [
+    '? [a, b]\n: class: font\n',
+    [['shortcut-complex-key', 1, 3, '[a, b]', 'a list is used as a key']],
+  ],
+  'a map as a key, in a shortcut': [
+    'g:\n  ? {a: 1}\n  : x\n',
+    [['shortcut-complex-key', 2, 5, '{a: 1}', 'a map is used as a key in g']],
+  ],
+  'an alias to a map as a key': [
+    'a: &m {x: 1}\n*m : y\n',
+    [['shortcut-complex-key', 2, 1, '*m', 'a map is used as a key']],
+  ],
+};
+
+for (const [name, [text, expected]] of Object.entries(KEYS)) {
+  test(`a key: ${name}`, () => {
+    const keys = lintShortcuts('s.yaml', text).filter((d) =>
+      ['shortcut-duplicate-key', 'shortcut-complex-key'].includes(d.rule),
+    );
+    assert.deepEqual(
+      keys.map((d) => [
+        d.rule,
+        d.line,
+        d.column,
+        text.slice(d.start, d.end),
+        d.callouts.problem,
+      ]),
+      expected,
+    );
+  });
+}
+
+test("a repeated key's callouts: where it was first written", () => {
+  const [d] = lintShortcuts('s.yaml', 'g:\n  class: font\n  class: align\n');
+  assert.deepEqual(d.callouts, {
+    problem: 'key g.class is written again',
+    offenders: ['s.yaml:2:3: class: font'],
+    because: 'Only the last of a repeated key would be kept.',
+    remedy: 'Keep one.',
+    verbatim: ['3 |   class: align', '  |   ^^^^^'],
+  });
+});
+
+// Keystone drops a complex key and all it holds.
+test('a null under a complex key: the key alone', () => {
+  assert.deepEqual(
+    found('? [a]\n: ~\n').map(([rule]) => rule),
+    ['shortcut-complex-key'],
+  );
+});
+
 // A layer only overrides: a null anywhere stops keystone's build, each
 // reported at the key that holds it, or the list item it is.
 // https://keystone.knight-owl.dev/shortcuts/writing-shortcuts/#shadowing-a-system-shortcut
