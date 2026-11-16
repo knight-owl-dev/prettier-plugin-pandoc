@@ -8,9 +8,9 @@
 FROM node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
 
 # renovate: datasource=github-release-attachments depName=jgm/pandoc
-ARG PANDOC_AMD64=3.13@sha256:38aa33b325a2bc96a4c39409631212db55702f564250bcdbead180b3bf646389
+ARG PANDOC_AMD64=3.14@sha256:c5f4720cdefb3f7bdc5d07202ef579feef0d1370773c873804dd8fdaa8c4f1b8
 # renovate: datasource=github-release-attachments depName=jgm/pandoc
-ARG PANDOC_ARM64=3.13@sha256:21e1d4ba09bd0b334590d204580fd4f6629b21be4ab6a32b26cc98982e9e0c68
+ARG PANDOC_ARM64=3.14@sha256:c692f3d78a415741bbbac4cdbbbe26fa7edca1f43d2301b982fbf4009cc8cf7f
 
 ARG TARGETARCH
 
