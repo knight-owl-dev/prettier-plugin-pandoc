@@ -5,7 +5,7 @@
 # publishes, pinned per architecture as <tag>@sha256:<tarball digest>. Moving
 # it: docs/bumping-pandoc.md.
 
-FROM node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
 
 # renovate: datasource=github-release-attachments depName=jgm/pandoc
 ARG PANDOC_AMD64=3.13@sha256:38aa33b325a2bc96a4c39409631212db55702f564250bcdbead180b3bf646389
