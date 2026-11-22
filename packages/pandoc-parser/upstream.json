@@ -1,7 +1,7 @@
 {
   "pandoc": {
-    "release": "3.13",
-    "sha256": "40bba607c9b3ed2030caea8f97a8dc9206966c558bb0e9a7472e0f5e6db7c6ee"
+    "release": "3.14",
+    "sha256": "94804ddd05c67e9ad91740e7c010ba4ed4da96fada0f0b66d668e90cdd8aea38"
   },
   "modules": {
     "Text.Pandoc.App": "3.11",
@@ -23,13 +23,13 @@
     "Text.Pandoc.Parsing.State": "3.11",
     "Text.Pandoc.Readers.HTML": "3.11",
     "Text.Pandoc.Readers.HTML.TagCategories": "3.11",
-    "Text.Pandoc.Readers.LaTeX": "3.13",
+    "Text.Pandoc.Readers.LaTeX": "3.14",
     "Text.Pandoc.Readers.LaTeX.Citation": "3.13",
     "Text.Pandoc.Readers.LaTeX.Inline": "3.13",
     "Text.Pandoc.Readers.LaTeX.Lang": "3.11",
-    "Text.Pandoc.Readers.LaTeX.Macro": "3.13",
+    "Text.Pandoc.Readers.LaTeX.Macro": "3.14",
     "Text.Pandoc.Readers.LaTeX.Math": "3.11",
-    "Text.Pandoc.Readers.LaTeX.Parsing": "3.13",
+    "Text.Pandoc.Readers.LaTeX.Parsing": "3.14",
     "Text.Pandoc.Readers.LaTeX.SIunitx": "3.11",
     "Text.Pandoc.Readers.LaTeX.Table": "3.13",
     "Text.Pandoc.Readers.Markdown": "3.13",
@@ -49,13 +49,13 @@
   },
   "libraries": {
     "aeson": {
-      "version": "2.2.5.1",
-      "sha256": "ea82d650c0bbd8877dbf13a03b9baae3be7ed4a65f4e8cfe5b4eacb4f5beae75",
+      "version": "2.3.2.0",
+      "sha256": "c30d187d60fb81b0f93f72442ee6b1abd2709fc3b5e3befcf4173f6b30983458",
       "modules": []
     },
     "commonmark": {
-      "version": "0.3.1",
-      "sha256": "72ea2f2f678a5ed0cc7ab20e7eebf161f4a03d4a5e73eda3255c82ebc64dbc53",
+      "version": "0.3.2",
+      "sha256": "ba4232bdbb529d6869d9eef3100ee8f2252254b79a983c560744c305c9d20e60",
       "modules": ["Commonmark.Entity"]
     },
     "doclayout": {
@@ -64,8 +64,8 @@
       "modules": ["Text.DocLayout"]
     },
     "emojis": {
-      "version": "0.1.5",
-      "sha256": "377177f4446bee35bf8c1c23678d38606205714987943fe439799b8791017ddc",
+      "version": "0.1.6",
+      "sha256": "8276ce47974cd0dcad1855a6e1e78350c6af00fd89136060762d61b68c0bf265",
       "modules": []
     },
     "filepath": {
@@ -112,8 +112,8 @@
       "modules": ["Data.Scientific"]
     },
     "skylighting-core": {
-      "version": "0.15",
-      "sha256": "485721e90b3f5e52369a11f08994969a224c038ae4c812734233ff3b30b6fa61",
+      "version": "0.15.0.1",
+      "sha256": "498d56e66175f1a58e5724a5f9ac4fc7c894252ce3886f9fc20e5dfb18c3f6b3",
       "modules": ["Skylighting.Core"]
     },
     "tagsoup": {
