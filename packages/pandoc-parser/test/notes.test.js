@@ -86,3 +86,17 @@ for (const [where, [text, first]] of Object.entries(DEFINED_IN)) {
     });
   }
 }
+
+test('a read exposes each note definition: its label and span', () => {
+  const text =
+    'a[^1]\n\n[^1]: One.\n\n    Two.\n\n- [^i]: In an item.\n\n  [^i]: Again.\n';
+  const notes = readMarkdown(text).notes.map((n) => [
+    n.key,
+    text.slice(n.start, n.end),
+  ]);
+  assert.deepEqual(notes, [
+    ['1', '[^1]: One.\n\n    Two.'],
+    ['i', '[^i]: In an item.'],
+    ['i', '[^i]: Again.'],
+  ]);
+});

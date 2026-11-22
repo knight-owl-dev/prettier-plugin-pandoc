@@ -65,9 +65,8 @@ export function readMarkdown(source, options) {
   const opts = readerOptions(options);
   const { text, toSource, input } = readerInput(source, opts.tabStop);
   const sources = joined(options?.sources, text, input);
-  const [blocks, meta, definitions, log, missed, metadataBlocks] = inSource(
-    toSource,
-    () =>
+  const [blocks, meta, definitions, log, missed, metadataBlocks, notes] =
+    inSource(toSource, () =>
       readResolved((references) => {
         const state = { ...defaultParserState(opts), sources };
         const ctx = { text, pos: 0, state, references, log: [] };
@@ -83,10 +82,11 @@ export function readMarkdown(source, options) {
           [...ctx.log, ...held],
           inOrder(ctx.state.unresolved),
           inOrder(ctx.state.metadataBlocks),
+          inOrder(ctx.state.noteDefinitions),
         ];
         return { value: read, state: ctx.state };
       }),
-  );
+    );
   const result = doc(
     mapSpans(blocks, toSource, toSource, input),
     mapSpans(meta, toSource, toSource, input),
@@ -114,6 +114,13 @@ export function readMarkdown(source, options) {
     mapItemSpans(m, toSource, toSource),
   );
   Object.defineProperty(result, 'metadataBlocks', { value: metadata });
+  // Each note definition, in source order: Pandoc keeps no node of one.
+  const noteSpans = notes.map(({ key, start, end }) => ({
+    key,
+    start: toSource(start),
+    end: toSource(end),
+  }));
+  Object.defineProperty(result, 'notes', { value: noteSpans });
   return result;
 }
 

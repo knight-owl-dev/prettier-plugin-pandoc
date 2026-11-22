@@ -1,8 +1,8 @@
 // A read's log beside Pandoc's: each message at Pandoc's position. Pandoc
 // gives a position in text extracted to be read again in that text's
-// frame: a note's or raw TeX's (a `chunk`), or, in its source's name, a
-// container's (a list item's, a quote's, a table cell's). There only the
-// message is compared, the port's position being the source's. In raw TeX,
+// frame: raw TeX's (a `chunk`), or, in its source's name, a container's or
+// note's (a list item's, a quote's, a table cell's). There only the message
+// is compared, the port's position being the source's. In raw TeX,
 // Pandoc's tokenizer drifts behind the text (`tokenize`): there Pandoc's
 // position may fall behind the port's, never ahead.
 
@@ -41,13 +41,16 @@ function rereadSpans(value, spans = []) {
  *
  * @param {string} text
  * @param {number} tabStop
- * @param {{blocks: object[], log: import('../../src/logging.js').LogMessage[]}} read
+ * @param {{blocks: object[], log: import('../../src/logging.js').LogMessage[], notes?: {start: number, end: number}[]}} read
  * @param {object[]} theirs
  * @returns {[object[], object[]]}
  */
 export function logsCompared(text, tabStop, read, theirs) {
   const at = positionsIn(text, tabStop);
-  const reread = rereadSpans(read.blocks);
+  const reread = [
+    ...rereadSpans(read.blocks),
+    ...(read.notes ?? []).map(({ start, end }) => [start, end]),
+  ];
   const inReread = (offset) =>
     reread.some(([start, end]) => start < offset && offset <= end);
   const want = theirs.map(normalized(at(text.length)));
@@ -56,10 +59,13 @@ export function logsCompared(text, tabStop, read, theirs) {
       fields.type === 'UnclosedDiv'
         ? { closepos: end, openpos: start }
         : { at: pos };
+    // Raised in text read again, every position is in that text's frame:
+    // an unclosed div's close too, past a note's last line.
+    const framed = inReread(Object.values(offsets).at(-1));
     const out = { ...fields };
     for (const [key, offset] of Object.entries(offsets)) {
       if (!(key in (want[k] ?? {}))) continue;
-      if (inReread(offset)) delete want[k][key];
+      if (framed) delete want[k][key];
       else out[key] = at(offset);
     }
     if (LATEX.has(out.type) && out.at && behind(want[k].at, out.at)) {

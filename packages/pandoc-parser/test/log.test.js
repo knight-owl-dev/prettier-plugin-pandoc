@@ -19,6 +19,10 @@ const CASES = {
   'notes not used, by label': '[^b]: b\n\n[^a]: a\n\n[^c]: c\n\nUse[^c].\n',
   'a note defined in a list item, not used': '- x\n\n  [^i]: note\n',
   'a note used in a note': '[^a]: See[^b].\n\n[^b]: b\n\nText[^a].\n',
+  'a link reference defined again in a note':
+    'Text[^n].\n\n[^n]: x\n\n    [a]: /a\n    [a]: /b\n',
+  'a div unclosed in a note': 'Text[^n].\n\n[^n]: one\n\n    ::: d\n    open\n',
+  'an HTML div unclosed in a note': '[^n]:<div>\n\n',
   'an identifier given twice': '# One {#h}\n\n# Two {#h}\n',
   'an identifier given that one was made': '# H\n\n## Other {#h}\n',
   'identifiers made alike': '# H\n\n# H\n',
