@@ -34,6 +34,8 @@ const CASES = {
     'a \\foo{##} b\n\na \\foo{x\\\ny} b\n\na \\foo{^^\nx} b\n\na \\foo{x\\   \n\nz} b',
   'special macros':
     'a \\expandafter\\foo b\n\na \\iffalse b c\n\na \\iftrue x\\else y\\fi z, a \\xspace b\n\na \\foo{\\iffalse}\\fi} b',
+  "expanding to nothing at a cell's end":
+    '\\newcommand\\x{}\\newcommand\\y[1]{#2}\n\n| \\iffalse\\fi | \\iftrue\\fi | a\\x | \\x | \\inteval{} | \\iffalse x\\fi | x \\iffalse\\fi | x \\xspace | \\y{a} |\n|-|-|-|-|-|-|-|-|-|\n',
   'groups and final braces':
     'a \\bgroup x y\\egroup{} z\n\na \\LaTeX{}{} b \\ldots{} c',
   verbatim: '\\verb|x|\n\n\\verb|x\ny|',

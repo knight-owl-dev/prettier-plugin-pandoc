@@ -702,7 +702,7 @@ function doMacrosOn(ctx, n, input) {
       close.text === '}'
     ) {
       const name = t.name === 'begin' ? word.text : `end${word.text}`;
-      return handleMacros(ctx, n, t, name, rest) ?? input;
+      return orInput(handleMacros(ctx, n, t, name, rest), input);
     }
   }
   if (t.name === 'expandafter') {
@@ -711,8 +711,12 @@ function doMacrosOn(ctx, n, input) {
       return combineTok(next.tok, doMacrosOn(ctx, n, tail(next)));
     }
   }
-  return handleMacros(ctx, n, t, t.name, tail(input)) ?? input;
+  return orInput(handleMacros(ctx, n, t, t.name, tail(input)), input);
 }
+
+// An expansion, else `input`: Haskell's `<|> return inp`. An expansion to
+// nothing is the empty list, null, still an expansion.
+const orInput = (expansion, input) => (expansion === FAIL ? input : expansion);
 
 // The three tokens after the head, and the stream after them.
 function take3(input) {
@@ -747,7 +751,7 @@ function combineTok(t, list) {
 
 /**
  * The expansion of macro `name` at `at`, its arguments read from `rest`;
- * null where it is no macro or its arguments do not parse.
+ * `FAIL` where it is no macro or its arguments do not parse.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.handleMacros
  */
@@ -757,7 +761,7 @@ function handleMacros(ctx, n, at, name, rest) {
   if (macro === undefined) {
     // What a special macro gives may begin with a macro.
     const special = trySpecialMacro(ctx, name, rest);
-    return special === null ? null : doMacrosOn(ctx, n + 1, special);
+    return special === FAIL ? FAIL : doMacrosOn(ctx, n + 1, special);
   }
   // A macro expanding to itself after an unknown command expands again at
   // the same position, each time in a fresh `doMacros` (#11088).
@@ -793,7 +797,7 @@ function handleMacros(ctx, n, at, name, rest) {
     macro.expansionPoint === 'ExpandWhenUsed'
       ? withVerbatimMode(read)(sub)
       : read(sub);
-  if (args === FAIL) return null;
+  if (args === FAIL) return FAIL;
   updateLaTeXState(ctx, { lastExpansion });
   const after = sub.state.input;
   let result = after;
@@ -999,7 +1003,7 @@ function addTok(inArg, args, at, t, acc) {
 /**
  * The expansion of a macro Pandoc handles itself, low-level TeX its macro
  * type cannot hold: `\xspace`, `\iftrue`, `\iffalse`, `\ifmmode`,
- * `\ifstrequal`. Null for any other.
+ * `\ifstrequal`. `FAIL` for any other.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.trySpecialMacro
  */
@@ -1038,12 +1042,12 @@ function trySpecialMacro(ctx, name, rest) {
       return handleEval(ctx, strip, rest);
     default: {
       const xparseIf = XPARSE_IFS.get(name);
-      return xparseIf === undefined ? null : handleIf(ctx, xparseIf, rest);
+      return xparseIf === undefined ? FAIL : handleIf(ctx, xparseIf, rest);
     }
   }
 }
 
-// What a conditional leaves of `rest`, read in a fresh state; null where
+// What a conditional leaves of `rest`, read in a fresh state; `FAIL` where
 // it does not parse.
 // @see Text.Pandoc.Readers.LaTeX.Parsing.handleIf
 function handleIf(ctx, parser, rest) {
@@ -1054,8 +1058,7 @@ function handleIf(ctx, parser, rest) {
     undefined,
     ctx.common,
   );
-  const result = parser(sub);
-  return result === FAIL ? null : result;
+  return parser(sub);
 }
 
 const PRIMITIVE_CONDITIONALS = new Set([
@@ -1085,8 +1088,8 @@ const PRIMITIVE_CONDITIONALS = new Set([
 /**
  * A conditional's branch `b` takes, before what follows its `\fi`; the
  * other skipped unexpanded, as TeX skips it. A macro that is one primitive
- * conditional, as `\newif` makes, nests as one. Null where no `\fi` ends
- * it.
+ * conditional, as `\newif` makes, nests as one. `FAIL` where no `\fi`
+ * ends it.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.doIf
  * @param {boolean} b
@@ -1108,20 +1111,20 @@ function doIf(ctx, b, rest) {
     }
   }
   const split = splitConditional(conditionals, rest);
-  if (split === null) return null;
+  if (split === FAIL) return FAIL;
   const [ifToks, elseToks, after] = split;
   return prepend(b ? ifToks : elseToks, after);
 }
 
 /**
  * A conditional's tokens before its `\else` or `\fi`, those of its
- * `\else` branch, and the stream after its `\fi`; null where no `\fi` ends
- * it.
+ * `\else` branch, and the stream after its `\fi`; `FAIL` where no `\fi`
+ * ends it.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.splitConditional
  * @param {Set<string>} conditionals
  * @param {TokList} list
- * @returns {[Tok[], Tok[], TokList] | null}
+ * @returns {[Tok[], Tok[], TokList] | typeof FAIL}
  */
 function splitConditional(conditionals, list) {
   const branches = [[]];
@@ -1141,7 +1144,7 @@ function splitConditional(conditionals, list) {
     }
     branches.at(-1).push(t);
   }
-  return null;
+  return FAIL;
 }
 
 const bracedOrOne = alt(
@@ -1350,7 +1353,7 @@ function handleEval(ctx, evaluator, rest) {
   };
   const { line, column, at, source } = sub.state;
   const toks = braced(sub);
-  if (toks === FAIL) return null;
+  if (toks === FAIL) return FAIL;
   const arg = untokenize(toks);
   let result = evaluator(arg);
   if (result === null) {
