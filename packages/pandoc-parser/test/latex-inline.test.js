@@ -21,6 +21,10 @@ const CASES = {
     'a\\footnote{note \\label{fn} here}b \\ref{fn} \\thanks[x]{t}',
   'footnote marks and texts':
     'a\\footnotemark{} b\\footnotetext{text} c\\footnotemark[5] d\\footnotetext[5]{five} e\\footnotemark[9]',
+  "Pandoc's deferred notes, marks in their texts":
+    '\\begin{tabular}{l}\na\\pandocfootnotemark{1}\\\\\n\\end{tabular}\n\\pandocfootnotetext{1}{one \\pandocfootnotemark{2}}\\pandocfootnotetext{2}{nested}\n\nb\\pandocfootnotemark{x y} c\\pandocfootnotetext{x y}{ex} d\\pandocfootnotemark{z} e\\pandocfootnotemark{s}\\pandocfootnotetext{s}{self \\pandocfootnotemark{s}} f\\footnotemark{}\\footnotetext{num}',
+  'the footnote counter moved':
+    'a\\footnotemark{} b\\footnotemark{}\n\n\\addtocounter{footnote}{-1}\n\\footnotetext{one}\n\\addtocounter{footnote}{1}\n\\footnotetext{two}\n\n\\addtocounter{page}{2} c\\footnotemark[3]\\addtocounter{footnote}{(- 1)}\\footnotetext{(-1)} \\addtocounter{footnote}{0x2}\\addtocounter{footnote}{1.0}\\addtocounter{footnote}{x}\\addtocounter{footnote}{1}{y}',
   'line breaks and passthrough': 'x\\newline y \\passthrough{\\texttt{a\\%b}}',
   links:
     '\\url{http://a.b/c\\_d#e} \\url{a\\\\b\\x\\\\\\%d} \\nolinkurl{x\\%y} \\href{http://z}{zed} \\hyperlink{t}{to t} \\hyperref[lab]{L} \\hyperref{u}{c}{n}{T} \\hypertarget{h}{H}',
