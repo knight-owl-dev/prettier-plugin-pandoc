@@ -236,24 +236,28 @@ function resolveRefs(labels, x) {
 }
 
 /**
- * A `\footnotemark`'s span, the note `\footnotetext` gave its number; an
- * empty string without one.
+ * A footnote mark's span, the note its text gave its key, the marks in it
+ * resolved too; an empty string without one. Each text serves one mark on
+ * a path, so the marks in it end.
  *
  * @see Text.Pandoc.Readers.LaTeX.resolveFootnoteMarks
- * @param {Map<number, Blocks>} fnTexts
+ * @param {Map<string, Blocks>} fnTexts
  * @param {Node} x
  */
 function resolveFootnoteMarks(fnTexts, x) {
   if (x.t !== 'Span') return x;
   const [[, classes, kvs]] = x.c;
-  const numText = lookupKv(kvs, 'note-num');
-  if (!classes.includes('footnote-mark') || numText === undefined) return x;
-  // Haskell's `reads` of an `Int`, all of it.
-  if (!/^\s*-?\d+$/.test(numText)) return x;
-  const contents = fnTexts.get(Number(numText));
-  return contents === undefined
-    ? new Node('Str', '', x.start, x.end)
-    : new Node('Note', contents, x.start, x.end);
+  const key = lookupKv(kvs, 'note-key');
+  if (!classes.includes('footnote-mark') || key === undefined) return x;
+  const contents = fnTexts.get(key);
+  if (contents === undefined) return new Node('Str', '', x.start, x.end);
+  const rest = new Map(fnTexts);
+  rest.delete(key);
+  const inner = walk(
+    { inline: (y) => resolveFootnoteMarks(rest, y) },
+    contents,
+  );
+  return new Node('Note', inner, x.start, x.end);
 }
 
 // ---------------------------------------------------------------------
@@ -800,8 +804,7 @@ function footnotemark(ctx, start) {
     noteNum = ctx.state.s.lastNoteNum + 1;
     updateLaTeXState(ctx, { lastNoteNum: noteNum });
   }
-  const attr = ['', ['footnote-mark'], [['note-num', String(noteNum)]]];
-  return B.spanWith(attr, [], start, ctx.state.at);
+  return footnoteMarkSpan(String(noteNum), start, ctx.state.at);
 }
 
 /**
@@ -813,15 +816,89 @@ function footnotemark(ctx, start) {
 function footnotetext(ctx) {
   const mbNum = optionalFootnoteNum(ctx);
   if (mbNum === FAIL) return FAIL;
-  const noteNum = mbNum ?? ctx.state.s.lastNoteNum;
+  return storeFootnoteText(ctx, String(mbNum ?? ctx.state.s.lastNoteNum));
+}
+
+/**
+ * `\pandocfootnotemark{id}`, Pandoc's LaTeX writer's mark for a note in a
+ * table, caption and the like: a mark for the text
+ * `\pandocfootnotetext{id}` gives.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.pandocfootnotemark
+ * @param {object} ctx
+ * @param {number} start
+ */
+function pandocfootnotemark(ctx, start) {
+  const key = braced(ctx);
+  if (key === FAIL) return FAIL;
+  updateLaTeXState(ctx, { lastNoteNum: ctx.state.s.lastNoteNum + 1 });
+  return footnoteMarkSpan(`pandoc:${untokenize(key)}`, start, ctx.state.at);
+}
+
+/**
+ * `\pandocfootnotetext{id}{…}`: the text of the note marked `id`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.pandocfootnotetext
+ * @param {object} ctx
+ */
+function pandocfootnotetext(ctx) {
+  const key = braced(ctx);
+  if (key === FAIL) return FAIL;
+  return storeFootnoteText(ctx, `pandoc:${untokenize(key)}`);
+}
+
+/**
+ * A footnote mark, resolved after reading (`resolveFootnoteMarks`).
+ *
+ * @see Text.Pandoc.Readers.LaTeX.footnoteMarkSpan
+ * @param {string} key
+ * @param {number} start
+ * @param {number} end
+ */
+const footnoteMarkSpan = (key, start, end) =>
+  B.spanWith(['', ['footnote-mark'], [['note-key', key]]], [], start, end);
+
+/**
+ * The group next as the text of the note keyed `key`.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.storeFootnoteText
+ * @param {object} ctx
+ * @param {string} key
+ */
+function storeFootnoteText(ctx, key) {
   const contents = noteBlocks(ctx);
   if (contents === FAIL) return FAIL;
-  const footnoteTexts = new Map(ctx.state.s.footnoteTexts).set(
-    noteNum,
-    contents,
-  );
+  const footnoteTexts = new Map(ctx.state.s.footnoteTexts).set(key, contents);
   updateLaTeXState(ctx, { footnoteTexts });
   return [];
+}
+
+/**
+ * `\addtocounter{ctr}{n}`: the footnote counter moved by `n`, so a
+ * `\footnotetext` after gets its number; any other, raw.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.addtocounter
+ * @param {object} ctx
+ * @param {number} start
+ */
+function addtocounter(ctx, start) {
+  const r = withRaw((c) => {
+    const ctr = braced(c);
+    if (ctr === FAIL) return FAIL;
+    const num = braced(c);
+    return num === FAIL ? FAIL : [untokenize(ctr), untokenize(num)];
+  })(ctx);
+  if (r === FAIL) return FAIL;
+  const [[ctr, num], toks] = r;
+  const n = ctr === 'footnote' ? safeReadInt(num) : null;
+  if (n !== null) {
+    updateLaTeXState(ctx, { lastNoteNum: ctx.state.s.lastNoteNum + n });
+    return [];
+  }
+  const raw = `\\addtocounter${untokenize(toks)}`;
+  return enabled(ctx, 'raw_tex')
+    ? B.rawBlock('latex', raw, start, ctx.state.at)
+    : ignore(ctx, raw, start);
 }
 
 /**
@@ -1403,6 +1480,8 @@ const REST_COMMANDS = [
   ['footnote', skipping(footnote)],
   ['footnotemark', footnotemark],
   ['footnotetext', footnotetext],
+  ['pandocfootnotemark', pandocfootnotemark],
+  ['pandocfootnotetext', pandocfootnotetext],
   ['newline', (ctx, start) => B.linebreak(start, ctx.state.at)],
   // xparse argument markers, in case they leak into the document:
   ['NoValue', constant('-NoValue-')],
@@ -1920,6 +1999,7 @@ function mathUntil(close, f) {
  */
 const BLOCK_COMMANDS = new Map([
   ['par', (ctx) => (skipopts(ctx) === FAIL ? FAIL : [])],
+  ['addtocounter', addtocounter],
   ['parbox', parbox],
   ['title', title],
   ['subtitle', metaTok('subtitle')],
@@ -2567,7 +2647,6 @@ const TREAT_AS_BLOCK = new Set([
   'makeglossary',
   'addcontentsline',
   'addtocontents',
-  'addtocounter',
   // \ignore{} is used conventionally in literate haskell for definitions
   // that are to be processed by the compiler but not printed.
   'ignore',
