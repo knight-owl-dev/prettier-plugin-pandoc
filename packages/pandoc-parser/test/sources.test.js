@@ -54,30 +54,14 @@ for (const [name, texts] of Object.entries(CASES)) {
   });
 }
 
-// Pandoc fails on raw TeX that runs on into a file whose name sorts first.
-test('raw TeX into a file whose name sorts first: Pandoc fails', () => {
+test('raw TeX into a file whose name sorts first', () => {
   const files = [
     { path: 'ch9.md', text: '\\begin{foo}\na\nb\n' },
     { path: 'ch10.md', text: 'e\n\\end{foo}\n\nafter\n' },
   ];
-  assert.throws(() => pandocFiles(files), /combinator 'many'/);
   const { text, sources } = toSources(files);
-  assert.throws(
-    () => readMarkdown(text, { sources }),
-    (e) =>
-      e instanceof PandocParseError &&
-      e.start === 0 &&
-      e.detail.file === 'ch9.md' &&
-      e.detail.into === 'ch10.md',
-  );
-  // In the order their names sort, the same TeX reads.
-  const sorted = [
-    { path: 'ch09.md', text: files[0].text },
-    { path: 'ch10.md', text: files[1].text },
-  ];
-  const joined = toSources(sorted);
-  const ours = withoutSpans(readMarkdown(joined.text, joined));
-  assert.deepEqual(JSON.parse(JSON.stringify(ours)), pandocFilesAst(sorted));
+  const ours = withoutSpans(readMarkdown(text, { sources }));
+  assert.deepEqual(JSON.parse(JSON.stringify(ours)), pandocFilesAst(files));
 });
 
 test('raw TeX into the same file read again: Pandoc fails', () => {
