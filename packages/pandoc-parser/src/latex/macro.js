@@ -104,9 +104,25 @@ const MACRO_DEF_COMMANDS = new Set([
 function commandDef(ctx) {
   const pairs = commandDefs(ctx);
   if (pairs === FAIL) return FAIL;
-  if (macrosOn(ctx)) for (const pair of pairs) insertMacro(ctx, pair);
+  if (macrosOn(ctx)) {
+    for (const pair of pairs) {
+      if (!PANDOC_INTERNAL_MACROS.has(pair[0])) insertMacro(ctx, pair);
+    }
+  }
   return undefined;
 }
+
+/**
+ * Macros Pandoc's LaTeX template defines and the reader reads itself:
+ * their definitions are past its expansion, so ignored.
+ *
+ * @see Text.Pandoc.Readers.LaTeX.Macro.pandocInternalMacros
+ */
+const PANDOC_INTERNAL_MACROS = new Set([
+  'pandocbounded',
+  'pandocfootnotemark',
+  'pandocfootnotetext',
+]);
 
 // `\newenvironment{envname}[n-args][default]{begin}{end}` is
 // `\newcommand{\envname}[n-args][default]{begin}` and

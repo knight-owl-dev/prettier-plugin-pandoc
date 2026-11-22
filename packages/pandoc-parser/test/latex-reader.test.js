@@ -33,6 +33,8 @@ const CASES = {
     '\\newcommand{\\x}{A}\\newcommand{\\x}{B}\\x \\renewcommand{\\x}{C}\\x \\providecommand{\\x}{D}\\x \\providecommand{\\y}{E}\\y',
   'def, let and edef':
     '\\def\\x#1{<#1>}\\x{a} \\x b \\def\\y#1.{(#1)}\\y z. \\let\\z\\x\\z{c} \\edef\\w{\\x{d}}\\w \\let\\q=a\\q',
+  "Pandoc's template macros, defined":
+    '\\newcommand\\pandocbounded[1]{[#1]}\n\\def\\pandocfootnotemark#1{M}\\gdef\\pandocfootnotetext#1#2{T}\\let\\pandocbounded\\relax\n\\pandocbounded{x} a\\pandocfootnotemark{1} b\\pandocfootnotetext{1}{note}',
   'global definitions': '{\\def\\x{L}\\gdef\\y{G}\\global\\def\\z{Z}}\\x\\y\\z',
   conditionals:
     '\\iftrue yes\\else no\\fi \\iffalse A\\else B\\fi \\newif\\iffoo \\iffoo T\\else F\\fi \\footrue \\iffoo T\\else F\\fi \\newif\\foo x \\foo y',
