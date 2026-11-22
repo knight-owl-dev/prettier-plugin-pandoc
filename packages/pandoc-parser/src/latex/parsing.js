@@ -62,8 +62,8 @@ const isDigit = (c) => c >= '0' && c <= '9';
  * The tokens of `text` from `from` to `to`, the first at Pandoc's position
  * `start`, each in its file `source` where it has one. They are made on
  * demand: a consumer of the first ones tokenizes no further. Positions
- * move as Pandoc's do, drifts and all: a control space before a non-blank
- * line and `^^` before a newline leave later positions behind the text.
+ * move as Pandoc's do, drifts and all: `^^` before a newline leaves later
+ * positions behind the text.
  *
  * @see Text.Pandoc.Readers.LaTeX.Parsing.tokenize
  * @param {string} text
@@ -149,14 +149,13 @@ export function* tokenize(
           [r3, n3] = span(r1 + 1, isSpaceOrTab);
           n2 = 1;
         }
-        const width = 1 + n1 + n2 + n3;
         if (charAt(r3) === '\n') {
           yield tok('CtrlSeq', at, r1, { name: ' ' });
-          [column, at] = [column + width, r1];
+          [column, at] = [column + 1 + n1, r1];
         } else {
-          // Pandoc's position misses the newline: later lines drift.
           yield tok('CtrlSeq', at, r3, { name: ' ' });
-          [column, at] = [column + width, r3];
+          [line, column] = n2 ? [line + 1, 1 + n3] : [line, column + 1 + n1];
+          at = r3;
         }
       } else {
         const end = rest + d.length;

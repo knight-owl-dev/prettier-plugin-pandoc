@@ -90,20 +90,22 @@ test(': and _ are letters between \\ExplSyntaxOn and \\ExplSyntaxOff', () => {
   );
 });
 
-test('a control space before a non-blank line: later lines drift', () => {
-  assert.deepEqual(toks('x\\ \n y\nz'), [
+test('a control space before a non-blank line: its newline and spaces', () => {
+  assert.deepEqual(toks('x\\ \n y\nz\\  w'), [
     ['Word', 'x', 1, 1],
     ['CtrlSeq', '\\ \n ', 1, 2, ' '],
-    ['Word', 'y', 1, 6],
-    ['Newline', '\n', 1, 7],
-    ['Word', 'z', 2, 1],
+    ['Word', 'y', 2, 2],
+    ['Newline', '\n', 2, 3],
+    ['Word', 'z', 3, 1],
+    ['CtrlSeq', '\\  ', 3, 2, ' '],
+    ['Word', 'w', 3, 5],
   ]);
 });
 
 test('a control space before a blank line: the backslash and its spaces', () => {
   assert.deepEqual(toks('\\ \n \nz'), [
     ['CtrlSeq', '\\ ', 1, 1, ' '],
-    ['Newline', '\n', 1, 5],
+    ['Newline', '\n', 1, 3],
     ['Spaces', ' ', 2, 1],
     ['Newline', '\n', 2, 2],
     ['Word', 'z', 3, 1],
