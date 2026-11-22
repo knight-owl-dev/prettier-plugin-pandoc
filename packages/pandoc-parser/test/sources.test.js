@@ -21,11 +21,11 @@ const CASES = {
   'carriage returns': ['```\r\nA\r\n', 'B\r\n```\r\n'],
   'a byte order mark': ['﻿# One\n', '﻿# Two\n'],
   'a div runs on': ['::: d\nopen\n', 'more\n'],
-  // A tokenizer drift stays in the file it happens in.
   'raw TeX runs on past control spaces': [
     '\\begin{foo}\na\\ \nb\\ \nc\\ \nd\n',
     'e\n\\end{foo}\n\nafter\n',
   ],
+  // A tokenizer drift stays in the file it happens in.
   'raw TeX runs on past ^^ line ends': [
     '\\begin{foo}\na^^\nb^^\nc^^\nd\n',
     'e\n\\end{foo}\n\nafter\n',
