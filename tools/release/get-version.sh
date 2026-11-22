@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
 versions="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' packages/*/package.json | sort -u)"
-pins="$(sed -n 's/^    "@knight-owl-llc\/pandoc-parser": "\(.*\)"$/\1/p' packages/*/package.json | sort -u)"
+pins="$(sed -E -n 's/^    "@knight-owl-llc\/pandoc-parser": "([^"]*)",?$/\1/p' packages/*/package.json | sort -u)"
 
 if [[ "$(wc -l <<< "${versions}")" -ne 1 || -z "${versions}" ]]; then
   echo "ERROR: the packages' versions differ:" >&2
@@ -20,7 +20,8 @@ if [[ "$(wc -l <<< "${versions}")" -ne 1 || -z "${versions}" ]]; then
   exit 1
 fi
 if [[ -n "${pins}" && "${pins}" != "${versions}" ]]; then
-  echo "ERROR: pandoc-parser is pinned at ${pins}, not ${versions}" >&2
+  echo "ERROR: pandoc-parser is pinned off ${versions}:" >&2
+  grep -H '^    "@knight-owl-llc/pandoc-parser"' packages/*/package.json >&2
   exit 1
 fi
 

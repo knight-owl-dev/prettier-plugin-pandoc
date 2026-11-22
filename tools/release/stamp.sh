@@ -14,9 +14,9 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 version="$(tools/release/validate-version.sh "$1")"
 
 for manifest in packages/*/package.json; do
-  sed -i.bak \
+  sed -E -i.bak \
     -e "s/^  \"version\": \"[^\"]*\",$/  \"version\": \"${version}\",/" \
-    -e "s/^    \"@knight-owl-llc\/pandoc-parser\": \"[^\"]*\"$/    \"@knight-owl-llc\/pandoc-parser\": \"${version}\"/" \
+    -e "s/^    \"@knight-owl-llc\/pandoc-parser\": \"[^\"]*\"(,?)$/    \"@knight-owl-llc\/pandoc-parser\": \"${version}\"\1/" \
     "${manifest}"
   rm "${manifest}.bak"
 done

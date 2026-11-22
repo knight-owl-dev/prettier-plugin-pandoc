@@ -8,6 +8,7 @@
     "includes": [
       "packages/*/src/**/*.js",
       "packages/*/test/**/*.js",
+      "test/**/*.js",
       "tools/**/*.mjs",
       "**/*.json",
       "**/*.jsonc",
