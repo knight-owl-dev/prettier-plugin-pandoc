@@ -6,7 +6,7 @@
 import * as B from '../ast/builder.js';
 import { Node } from '../ast/nodes.js';
 import { walk } from '../ast/walk.js';
-import { byCodePoint, codePointLength } from '../code-points.js';
+import { codePointLength } from '../code-points.js';
 import { commonState } from '../common-state.js';
 import {
   alt,
@@ -2502,12 +2502,11 @@ export function getInputTokens(ctx) {
   return streamOf(sources());
 }
 
-// Pandoc's order of positions: by file name, then line and column.
-const before = (a, b) => {
-  const names = byCodePoint(a.source ?? '', b.source ?? '');
-  if (names !== 0) return names < 0;
-  return a.line < b.line || (a.line === b.line && a.column < b.column);
-};
+// Whether `a` is short of `b`: in another file, or before it in its own.
+const shortOf = (a, b) =>
+  (a.source ?? '') !== (b.source ?? '') ||
+  a.line < b.line ||
+  (a.line === b.line && a.column < b.column);
 
 // Parsec's error where `many` repeats a parser that reads nothing.
 const MANY_EMPTY =
@@ -2556,12 +2555,12 @@ export const rawLaTeXParser = (toks, parser, valParser) => (ctx) => {
   const macros = new Map([...pstate.macros, ...value.state.s.macros[0]]);
   ctx.state = { ...ctx.state, macros };
   const from = ctx.pos;
-  while (ctx.pos < ctx.text.length && before(getPosition(ctx), endpos)) {
+  while (ctx.pos < ctx.text.length && shortOf(getPosition(ctx), endpos)) {
     ctx.pos += codePointLength(ctx.text, ctx.pos);
   }
-  // An extent that ends in a file whose name sorts no later lies behind the
-  // parse. The TeX then reads nothing, and the `many` around it fails
-  // Pandoc: jgm/pandoc#12072.
+  // An extent that ends early in a file of the same name, read again, lies
+  // behind the parse. The TeX then reads nothing, and the `many` around it
+  // fails Pandoc.
   if (ctx.pos === from && toks2.length > 0) {
     const files = filesOf(ctx);
     const [here, into] = [from, toks2.at(-1).start].map((o) =>

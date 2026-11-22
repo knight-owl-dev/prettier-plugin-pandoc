@@ -119,14 +119,11 @@ export const RULES = {
             effect: 'Pandoc fails to read the manuscript.',
           }
         : {
-            problem:
-              msg.into === msg.file
-                ? `raw TeX runs on into ${msg.into} again`
-                : `raw TeX runs on into ${msg.into}, whose name sorts before ${msg.file}`,
+            problem: `raw TeX runs on into ${msg.into} again`,
             because:
-              'Pandoc compares positions across files by name first, which puts the end of the TeX before its start.',
+              'Pandoc tells positions apart by file name, which puts the end of the TeX before its start.',
             effect: 'Pandoc fails to read the manuscript.',
-            remedy: `End the TeX in ${msg.file}, or name the files so they sort in the order given.`,
+            remedy: `End the TeX in ${msg.file}.`,
           },
   },
   MacroAlreadyDefined: {
