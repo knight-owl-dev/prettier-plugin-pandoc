@@ -28,7 +28,7 @@ doc.blocks[0].start; // where the first block starts in `text`
 | `DEFAULT_TAB_STOP`                       | Pandoc's default `--tab-stop`, 4                                                       |
 | `PandocParseError`                       | The error a read throws where Pandoc's fails: `start`, `end`, and any `detail`         |
 
-A Markdown read also carries four properties outside its JSON:
+A Markdown read also carries properties outside its JSON:
 
 | Property         | What it holds                                                                       |
 | ---------------- | ----------------------------------------------------------------------------------- |
@@ -36,6 +36,7 @@ A Markdown read also carries four properties outside its JSON:
 | `log`            | The messages Pandoc logs reading it, in order, each with Pandoc's fields and a span |
 | `unresolved`     | Each reference and note looked up and not found: kind, form, label and span         |
 | `metadataBlocks` | Each YAML metadata block and title block read for metadata, with its span           |
+| `notes`          | Each note definition: its label, `key`, and span                                    |
 
 Offsets are UTF-16 code units, as JavaScript indexes a string.
 
