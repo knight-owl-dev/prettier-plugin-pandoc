@@ -54,7 +54,7 @@ const CASES = {
       Makefile: 'all:\n',
       'c.h': 'int\n',
     },
-    '\\lstinputlisting{code.py}\n\\lstinputlisting[language=Haskell]{x.hs}\n\\lstinputlisting[firstline=2,lastline=3,numbers=left,label=l]{code.py}\n\\lstinputlisting[firstline=3]{code.py} \\lstinputlisting[lastline=0]{code.py}\n\\lstinputlisting{f.none}\n\\lstinputlisting{Makefile}\n\\lstinputlisting{c.h}\n\\lstinputlisting{"missing.js"}',
+    '\\lstinputlisting{code.py}\n\\lstinputlisting[language=Haskell]{x.hs}\n\\lstinputlisting[firstline=2,lastline=3,numbers=left,label=l]{code.py}\n\\lstinputlisting[firstline=3]{code.py} \\lstinputlisting[lastline=0]{code.py} \\lstinputlisting[firstline=(2),lastline=0x3]{code.py}\n\\lstinputlisting{f.none}\n\\lstinputlisting{Makefile}\n\\lstinputlisting{c.h}\n\\lstinputlisting{"missing.js"}',
   ],
   'filecontents input': [
     {},
