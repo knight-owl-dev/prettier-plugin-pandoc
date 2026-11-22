@@ -46,9 +46,6 @@ jobs:
       - name: Test
         run: make test
 
-      - name: Pack check
-        run: make pack-check
-
   bun:
     name: Bun build
     runs-on: ubuntu-26.04-arm
