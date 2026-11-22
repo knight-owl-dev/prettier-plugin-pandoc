@@ -36,6 +36,57 @@ export function strip(s) {
   return cs.slice(from, to).join('');
 }
 
+// A Haskell integer literal: decimal, or `0x` or `0o` and its digits.
+const INT_LITERAL = /^(?:0[xX][0-9a-fA-F]+|0[oO][0-7]+|[0-9]+)(?![0-9a-zA-Z.])/;
+// What Haskell's lexer runs into one symbol with `-`.
+const SYMBOL = /^[!#$%&*+./<=>?@\\^|~:-]$/;
+
+/**
+ * `s` read as an `Int`, as Haskell's `reads` takes the first parse: a
+ * literal, `-` before it, parentheses around, spaces anywhere between and
+ * after, wrapped to 64 bits; null where it is none.
+ *
+ * @see Text.Pandoc.Shared.safeRead
+ * @param {string} s
+ * @returns {number | null}
+ */
+export function safeReadInt(s) {
+  const cs = [...s];
+  let i = 0;
+  const spaces = () => {
+    while (i < cs.length && isSpace(cs[i])) i++;
+  };
+  const literal = () => {
+    const m = INT_LITERAL.exec(cs.slice(i).join(''));
+    if (m === null) return null;
+    i += m[0].length;
+    const t = m[0].replace(/^0[oO]/, '0o').replace(/^0X/, '0x');
+    return BigInt(t);
+  };
+  const value = () => {
+    spaces();
+    if (cs[i] === '(') {
+      i++;
+      const v = value();
+      spaces();
+      if (v === null || cs[i] !== ')') return null;
+      i++;
+      return v;
+    }
+    let negate = false;
+    if (cs[i] === '-' && !SYMBOL.test(cs[i + 1] ?? '')) {
+      negate = true;
+      i++;
+      spaces();
+    }
+    const n = literal();
+    return n === null ? null : negate ? -n : n;
+  };
+  const v = value();
+  spaces();
+  return v === null || i < cs.length ? null : Number(BigInt.asIntN(64, v));
+}
+
 /**
  * The runs of `s` between its spaces, as GHC's `isSpace` has them.
  *

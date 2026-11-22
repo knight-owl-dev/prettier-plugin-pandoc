@@ -41,6 +41,7 @@ import {
   extractSpaces,
   formatCode,
   NBSP,
+  safeReadInt,
   splitTextBy,
   stringify,
   strip,
@@ -1817,12 +1818,6 @@ function inputMinted(ctx, start) {
     readFileFromTexinputs(ctx, untokenize(f).replaceAll('"', '')) ?? '';
   return B.codeBlockWith(attr, code, start, ctx.state.at);
 }
-
-// Haskell's `read` of an `Int`, spaces around it allowed.
-const safeReadInt = (t) =>
-  /^\s*-?[0-9]+\s*$/.test(t)
-    ? Number(BigInt.asIntN(64, BigInt(t.trim())))
-    : null;
 
 /**
  * `\lstinputlisting[options]{file}`: the file, or the lines `firstline`
