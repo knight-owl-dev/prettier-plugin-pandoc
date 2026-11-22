@@ -12,9 +12,9 @@ IS_TTY := $(shell test -t 0 && echo 1)
 DOCKER_TTY ?= $(if $(IS_TTY),-t)
 
 .PHONY: resolve test test-image lint lint-fix lint-actions lint-docker lint-js \
-	lint-js-fix lint-md lint-md-fix lint-md-fmt lint-md-fmt-fix lint-notices lint-sh lint-spell help \
+	lint-js-fix lint-md lint-md-fix lint-md-fmt lint-md-fmt-fix lint-sh lint-spell help \
 	fuzz-print fuzz-parser shrink probe snapshots-diff snapshots-write bench \
-	bench-compare pandoc-drift tables pandoc-lint bun-check pack-check release
+	bench-compare pandoc-drift tables pandoc-lint bun-check release
 
 # Node, npm and Pandoc come from the compose services (docker-compose.yaml),
 # never the host. They run as the invoking user, so node_modules on the mount
@@ -37,7 +37,7 @@ node_modules/.package-lock.json: package-lock.json | test-image
 resolve: test-image
 	@$(COMPOSE) run --rm -T npm install --ignore-scripts
 
-# Run every package's tests, the Pandoc oracle included
+# Run every package's tests, the Pandoc oracle included, and the packaging rules
 test: test-image node_modules/.package-lock.json
 	@$(RUN) node --test
 
@@ -98,9 +98,6 @@ release:
 	@test -n "$(RELEASE)" || { echo "ERROR: name the release: RELEASE=patch, minor, major, or X.Y.Z" >&2; exit 1; }
 	@AUTOMERGE="$(AUTOMERGE)" tools/release/release.sh $(RELEASE)
 
-pack-check: test-image node_modules/.package-lock.json
-	@$(RUN) node tools/pack-check.mjs
-
 bun-check: test-image node_modules/.package-lock.json
 	@$(COMPOSE) build bun
 	@$(COMPOSE) run --rm -T bun tools/bun/check.sh $(BUN_CHECK_ARGS)
@@ -123,7 +120,7 @@ bench-compare: test-image node_modules/.package-lock.json
 
 # The lint targets invoke their tools bare; the aggregate targets re-enter the
 # ci-tools image, so the toolchain is the pinned one wherever make runs.
-LINT_TARGETS := lint-actions lint-docker lint-js lint-md lint-md-fmt lint-notices lint-sh lint-spell
+LINT_TARGETS := lint-actions lint-docker lint-js lint-md lint-md-fmt lint-sh lint-spell
 
 # `timeout` ends a run whose client died forwarding nothing, and as PID 1
 # passes Ctrl-C and `docker stop` on to make's recipe.
@@ -143,12 +140,6 @@ lint-actions:
 	@echo "Linting GitHub Actions..." && actionlint .github/workflows/*.yml && echo "OK"
 	@echo "Validating GitHub Actions pins..." \
 		&& validate-action-pins .github/workflows/*.yml && echo "OK"
-
-# Each package ships the root's LICENSE and NOTICE.md: its copies must match.
-lint-notices:
-	@echo "Checking package notices..." && for p in packages/*/; do \
-		cmp LICENSE "$${p}LICENSE" && cmp NOTICE.md "$${p}NOTICE.md" || exit 1; \
-	done && echo "OK"
 
 lint-sh:
 	@echo "Linting shell scripts..." && shellcheck tools/*.sh tools/*/*.sh && echo "OK"
@@ -184,13 +175,12 @@ lint-spell:
 help:
 	@echo ""
 	@echo "prettier-plugin-pandoc Commands:"
-	@echo "  make test              Run all tests, the Pandoc oracle included"
+	@echo "  make test              Run all tests, the Pandoc oracle and packaging rules included"
 	@echo "  make resolve           Re-resolve package-lock.json"
 	@echo "  make lint              Run all linters"
 	@echo "  make lint-fix          Fix all auto-fixable lint issues"
 	@echo "  make lint-actions      Lint workflows and verify action pins"
 	@echo "  make lint-docker       Lint the Dockerfiles (test image, Bun)"
-	@echo "  make lint-notices      Check each package's LICENSE and NOTICE.md match the root's"
 	@echo "  make lint-sh           Lint the shell scripts (shellcheck)"
 	@echo "  make lint-js           Lint and format-check JavaScript and JSON (biome)"
 	@echo "  make lint-js-fix       Fix JavaScript and JSON formatting and lint issues"
@@ -214,6 +204,5 @@ help:
 	@echo "  make tables            Generate the tables taken from upstream data again"
 	@echo "  make pandoc-lint       Lint a manuscript (FILES=<file.md ...> [ARGS])"
 	@echo "  make bun-check         Compile pandoc-lint with Bun; check it lints as Node does"
-	@echo "  make pack-check        Check what each package's tarball holds"
 	@echo "  make release           Open a release PR (RELEASE=patch|minor|major|X.Y.Z, AUTOMERGE=1)"
 	@echo ""

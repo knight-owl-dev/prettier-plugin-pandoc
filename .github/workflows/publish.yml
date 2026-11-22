@@ -37,9 +37,6 @@ jobs:
       - name: Test
         run: make test
 
-      - name: Pack check
-        run: make pack-check
-
   # Each on its own architecture, so each binary is run and checked against
   # Node, not only built.
   binaries:
